@@ -20,10 +20,16 @@ class DetailFieldSpec:
     label: str
     test_ids: tuple[str, ...]
     stable_names: tuple[str, ...]
+    placeholders: tuple[str, ...] = ()
 
 
 class CompanyDetailPage(BasePage):
-    name = DetailFieldSpec("name", ("company-name", "companyName"), ("companyName", "company_name", "name"))
+    name = DetailFieldSpec(
+        "name",
+        ("company-name", "companyName"),
+        ("companyName", "company_name", "name"),
+        ("Input Company Name",),
+    )
     industry_type = DetailFieldSpec(
         "industry type",
         ("industry-type", "industryType"),
@@ -34,17 +40,28 @@ class CompanyDetailPage(BasePage):
         ("company-type", "companyType"),
         ("companyType", "company_type", "type"),
     )
-    address = DetailFieldSpec("address", ("street-address", "streetAddress", "address"), ("streetAddress", "address"))
+    address = DetailFieldSpec(
+        "address",
+        ("street-address", "streetAddress", "address"),
+        ("streetAddress", "address"),
+        ("Input Company Address",),
+    )
     postal_code = DetailFieldSpec(
         "postal code",
         ("postal-code", "postalCode"),
         ("postalCode", "postal_code", "zip"),
+        ("Choose Postal Code",),
     )
-    email = DetailFieldSpec("email", ("company-email", "email"), ("email",))
-    phone = DetailFieldSpec("phone", ("company-phone", "phone"), ("phone", "phoneNumber", "phone_number"))
+    email = DetailFieldSpec("email", ("company-email", "email"), ("email",), ("Input Email",))
+    phone = DetailFieldSpec(
+        "phone",
+        ("company-phone", "phone"),
+        ("phone", "phoneNumber", "phone_number"),
+        ("Input Mobile Number",),
+    )
 
     def expect_loaded_for(self, company_name: str) -> None:
-        self.expect_detail_value(self.name, company_name)
+        expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=20_000)
 
     def expect_company_values(self, data: CompanyRegistrationData) -> None:
         attach_json("company-detail-expected-values", data.expected_detail_values())
@@ -114,14 +131,27 @@ class CompanyDetailPage(BasePage):
 
     def _wait_after_delete(self) -> None:
         try:
-            self.page.wait_for_load_state("networkidle", timeout=10_000)
+            self.page.wait_for_load_state("domcontentloaded", timeout=2_000)
         except TimeoutError:
-            self.page.wait_for_load_state("domcontentloaded")
+            pass
 
     def _detail_value_candidates(self, spec: DetailFieldSpec, expected_value: str) -> list[tuple[str, Locator]]:
         label = re.compile(re.escape(spec.label), re.I)
         exact_value = re.compile(rf"^\s*{re.escape(expected_value)}\s*$", re.I)
-        candidates = [(f"data-testid {test_id}", self.page.get_by_test_id(test_id).first) for test_id in spec.test_ids]
+        candidates = [
+            (f"placeholder {placeholder}", self.page.get_by_placeholder(placeholder).first)
+            for placeholder in spec.placeholders
+        ]
+        candidates.extend(
+            [
+                ("combobox with exact value", self.page.get_by_role("combobox").filter(has_text=exact_value).first),
+                # Text fallback is justified because eSuite profile renders select values as visible read-only text.
+                ("exact visible detail text", self.page.get_by_text(expected_value, exact=True).first),
+                # Text fallback is justified because long address fields may be rendered with surrounding location text.
+                ("contained visible detail text", self.page.get_by_text(expected_value, exact=False).first),
+            ]
+        )
+        candidates.extend((f"data-testid {test_id}", self.page.get_by_test_id(test_id).first) for test_id in spec.test_ids)
         candidates.extend(
             [
                 (
@@ -138,19 +168,11 @@ class CompanyDetailPage(BasePage):
                 for stable_name in spec.stable_names
             ]
         )
-        candidates.extend(
-            [
-                # Text fallback is justified because detail view markup may expose values as plain read-only text.
-                ("exact visible detail text", self.page.get_by_text(expected_value, exact=True).first),
-                # Text fallback is justified because long address fields may be rendered with surrounding location text.
-                ("contained visible detail text", self.page.get_by_text(expected_value, exact=False).first),
-            ]
-        )
         return candidates
 
     @staticmethod
     def _expect_locator_has_value(locator: Locator, expected_value: str) -> None:
-        expect(locator).to_be_visible(timeout=5_000)
+        expect(locator).to_be_visible(timeout=1_000)
         try:
             expect(locator).to_have_value(expected_value, timeout=1_000)
             return

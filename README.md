@@ -122,6 +122,28 @@ For local live mobile verification in this repository, the assignment-provided f
 
 ## Running Tests
 
+You can use the npm shortcuts below from the project root.
+
+```powershell
+npm run test:quick
+npm run test:ai
+npm run test:web:quality
+npm run test:web:login
+npm run test:web:company:step1
+npm run test:web:company:full
+npm run test:mobile:foundation
+npm run test:mobile:login
+npm run test:mobile:customer
+```
+
+The full suite shortcut is:
+
+```powershell
+npm test
+```
+
+The direct Pytest commands are also available when you want to pass extra Pytest options.
+
 All suites:
 
 ```powershell

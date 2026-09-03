@@ -230,10 +230,12 @@ class RegisterCompanyWizardPage(BasePage):
 
     def _text_control(self, spec: FieldSpec) -> Locator:
         label_regex = re.compile(re.escape(spec.label), re.I)
-        candidates = [
-            (f"data-testid {test_id}", self.page.get_by_test_id(test_id).first)
-            for test_id in spec.test_ids
-        ]
+        candidates = existing_locator_candidates(
+            [
+                (f"data-testid {test_id}", self.page.get_by_test_id(test_id).first)
+                for test_id in spec.test_ids
+            ]
+        )
         candidates.extend(
             [
                 (f"placeholder {spec.label}", self.page.get_by_placeholder(label_regex).first),
@@ -243,32 +245,40 @@ class RegisterCompanyWizardPage(BasePage):
             ]
         )
         candidates.extend(
-            [
+            existing_locator_candidates(
+                [
                 (f"stable name/id {stable_name}", self.page.locator(stable_text_selector(stable_name)).first)
                 for stable_name in spec.stable_names
-            ]
+                ]
+            )
         )
         candidates.append((f"textbox named {spec.label}", self.page.get_by_role("textbox", name=label_regex).first))
         return self.first_visible(candidates, f"{spec.label} input", timeout_ms=5_000)
 
     def _choice_controls(self, spec: FieldSpec) -> list[tuple[str, Locator]]:
         label_regex = re.compile(re.escape(spec.label), re.I)
-        candidates = [
-            (f"data-testid {test_id}", self.page.get_by_test_id(test_id).first)
-            for test_id in spec.test_ids
-        ]
+        candidates = existing_locator_candidates(
+            [
+                (f"data-testid {test_id}", self.page.get_by_test_id(test_id).first)
+                for test_id in spec.test_ids
+            ]
+        )
         candidates.extend(
             [
+                (f"combobox containing Choose {spec.label}", self.page.get_by_role("combobox").filter(has_text=f"Choose {spec.label}").first),
+                (f"button containing Choose {spec.label}", self.page.get_by_role("button").filter(has_text=f"Choose {spec.label}").first),
                 (f"combobox named {spec.label}", self.page.get_by_role("combobox", name=label_regex).first),
                 (f"button named {spec.label}", self.page.get_by_role("button", name=label_regex).first),
                 (f"label {spec.label}", self.page.get_by_label(label_regex).first),
             ]
         )
         candidates.extend(
-            [
+            existing_locator_candidates(
+                [
                 (f"stable name/id {stable_name}", self.page.locator(stable_choice_selector(stable_name)).first)
                 for stable_name in spec.stable_names
-            ]
+                ]
+            )
         )
         # Text fallback is justified because current eSuite dropdown buttons expose visible text but no stable name/id.
         candidates.append((f"assignment dropdown Choose {spec.label}", self.page.get_by_text(f"Choose {spec.label}", exact=True).first))
@@ -288,10 +298,15 @@ class RegisterCompanyWizardPage(BasePage):
 
     def _visible_option(self, value: str, *, timeout_ms: int = 10_000) -> Locator:
         exact = re.compile(rf"^{re.escape(value)}$", re.I)
-        return self.first_visible(
+        role_candidates = existing_locator_candidates(
             [
                 ("option with exact value", self.page.get_by_role("option", name=exact).first),
                 ("menu item with exact value", self.page.get_by_role("menuitem", name=exact).first),
+            ]
+        )
+        return self.first_visible(
+            role_candidates
+            + [
                 # Text fallback is justified because dropdown option markup often lacks ARIA roles.
                 ("visible option text regex", self.page.get_by_text(exact).last),
                 # Text fallback is justified because dropdown option markup often lacks ARIA roles.
@@ -416,3 +431,14 @@ def stable_choice_selector(stable_name: str) -> str:
         f"select[name='{stable_name}'], [role='combobox'][name='{stable_name}'], "
         f"select[id='{stable_name}'], [id='{stable_name}'], [aria-label='{stable_name}']"
     )
+
+
+def existing_locator_candidates(candidates: list[tuple[str, Locator]]) -> list[tuple[str, Locator]]:
+    existing = []
+    for label, locator in candidates:
+        try:
+            if locator.count() > 0:
+                existing.append((label, locator))
+        except PlaywrightError:
+            continue
+    return existing

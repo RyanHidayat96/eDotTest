@@ -49,6 +49,9 @@ class CompanyManagePage(BasePage):
         expect(self.heading).to_be_visible(timeout=15_000)
 
     def search_company(self, company_name: str) -> None:
+        if self.page.locator("input").count() == 0:
+            attach_text("company-manage-search-not-used", "Company list exposes no search input; verifying visible card list instead.")
+            return
         try:
             search = self.search_control
         except AssertionError as error:
@@ -82,21 +85,30 @@ class CompanyManagePage(BasePage):
 
     def open_company_detail(self, company_name: str) -> CompanyDetailPage:
         self.search_company(company_name)
-        record = self._company_record(company_name)
-        record.scroll_into_view_if_needed(timeout=5_000)
-        try:
-            record.hover(timeout=2_000)
-        except PlaywrightError:
-            pass
+        errors: list[str] = []
+        for attempt in range(1, 4):
+            try:
+                record = self._company_record(company_name)
+                record.scroll_into_view_if_needed(timeout=5_000)
+                try:
+                    record.hover(timeout=2_000)
+                except PlaywrightError:
+                    pass
 
-        if not self._try_open_detail_from_record(record):
-            record.click()
+                if not self._try_open_detail_from_record(record):
+                    self._click_and_wait_for_detail(record)
 
-        self._wait_after_table_action()
-        detail = CompanyDetailPage(self.page, self.settings)
-        detail.expect_loaded_for(company_name)
-        attach_json("company-detail-opened", {"company_name": company_name})
-        return detail
+                self._wait_after_table_action()
+                detail = CompanyDetailPage(self.page, self.settings)
+                detail.expect_loaded_for(company_name)
+                attach_json("company-detail-opened", {"company_name": company_name})
+                return detail
+            except (AssertionError, PlaywrightError, TimeoutError) as error:
+                errors.append(f"attempt {attempt}: {error}")
+                if "/profile" in self.page.url:
+                    break
+                self.page.wait_for_load_state("domcontentloaded")
+        raise AssertionError(f"Could not open detail for company {company_name!r}; {' | '.join(errors)}")
 
     def delete_company_if_present(self, company_name: str) -> None:
         self.search_company(company_name)
@@ -123,6 +135,14 @@ class CompanyManagePage(BasePage):
     def _company_record_candidates(self, company_name: str) -> list[tuple[str, Locator]]:
         company_name_pattern = re.compile(re.escape(company_name), re.I)
         return [
+            (
+                "company card containing company name and Manage action",
+                # Text fallback is justified because company cards expose persisted company names as visible card text.
+                self.page.locator("div.rounded-lg.border")
+                .filter(has_text=company_name_pattern)
+                .filter(has=self.page.get_by_role("button", name=DETAIL_ACTION))
+                .first,
+            ),
             ("row containing company name", self.page.get_by_role("row", name=company_name_pattern).first),
             ("link named company", self.page.get_by_role("link", name=company_name_pattern).first),
             ("button named company", self.page.get_by_role("button", name=company_name_pattern).first),
@@ -143,11 +163,16 @@ class CompanyManagePage(BasePage):
         for _, locator in self._detail_action_candidates(record):
             try:
                 expect(locator).to_be_visible(timeout=2_000)
-                locator.click()
+                self._click_and_wait_for_detail(locator)
                 return True
             except (AssertionError, PlaywrightError, TimeoutError):
                 continue
         return False
+
+    def _click_and_wait_for_detail(self, locator: Locator) -> None:
+        before_url = self.page.url
+        locator.click(timeout=5_000)
+        self.page.wait_for_url(lambda url: "/profile" in url or url != before_url, timeout=10_000)
 
     def _try_delete_from_manage(self, company_name: str) -> bool:
         record = self._company_record(company_name, timeout_ms=5_000)
@@ -200,9 +225,9 @@ class CompanyManagePage(BasePage):
 
     def _wait_after_table_action(self) -> None:
         try:
-            self.page.wait_for_load_state("networkidle", timeout=10_000)
+            self.page.wait_for_load_state("domcontentloaded", timeout=2_000)
         except TimeoutError:
-            self.page.wait_for_load_state("domcontentloaded")
+            pass
 
 
 def stable_search_selector() -> str:

@@ -15,7 +15,9 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 
 ## Verification Snapshot
 
-- PASS - Local suite: `.\.venv\Scripts\python.exe -m pytest tests` returned `48 passed, 5 skipped`.
+- PASS - Focused local suite: `.\.venv\Scripts\python.exe -m pytest tests\ai tests\web\test_web_quality_gates.py tests\web\test_foundation.py tests\web\test_company_registration_data.py tests\mobile\test_mobile_foundation.py -q` returned `43 passed, 2 skipped`.
+- PASS - Live web login: `.\.venv\Scripts\python.exe -m pytest tests\web\test_login.py -q` returned `1 passed in 16.18s`.
+- PASS - Live web Manage/detail navigation was verified against an existing QA-created company after hardening locator retry and profile URL waiting.
 - PASS - Syntax: `.\.venv\Scripts\python.exe -m compileall edot_qa tools tests` completed.
 - PASS - Sleep scan: `rg -n "time\.sleep|sleep\(" edot_qa tests mobile tools` returned no matches.
 - PASS - Secret scan: literal assignment/fallback credentials returned no matches in tracked project files; `.env.example` keeps secret values empty.
@@ -25,6 +27,7 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 - PASS - Maestro CLI: after refreshing the Windows PATH, `maestro --version` reports `2.10.0`.
 - PASS - Mobile device/app: `adb devices` shows ready device `6a0706f0`; `id.edot.ework` is installed and launches to the login screen.
 - PASS - Mobile login live flow: fallback credentials from the assignment PDF were used in local `.env`; login passed and dashboard text `Revenue` was asserted.
+- BLOCKED - Current mobile login recheck skips because no adb-visible ready mobile device is available.
 - PASS - Mobile suite: `tests/mobile` returned `18 passed, 1 skipped`; only customer creation remains skipped until post-login customer selectors are confirmed.
 
 ## Phase 1 - Manual Test Case Design
@@ -47,17 +50,17 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 - PASS - Target URL defaults to `https://esuite.edot.id`: `edot_qa/config.py`.
 - PASS - Credentials are loaded from environment only: `ESUITE_EMAIL`, `ESUITE_PASSWORD`.
 - PASS - Login page object covers `Use Email or Username`, email submit, password submit, redirect wait, and dashboard load: `edot_qa/web/pages/login_page.py`.
-- PARTIAL - Login dashboard greeting assertion exists for `Welcome Back,`, but live login proof is blocked without local valid credentials or storage state.
+- PASS - Login dashboard greeting assertion exists for `Welcome Back,` and live login passed.
 - PASS - Session reuse via `PLAYWRIGHT_STORAGE_STATE` exists: `edot_qa/web/session_state.py`, `tests/web/conftest.py`.
 - PASS - Failure screenshot attachment exists in Pytest hook: `tests/conftest.py`.
 - PASS - Company wizard page object covers Company Name, Email, Phone, Industry Type, Company Type, Language, Street Address, Country, Province, City, District, Zone, Postal Code: `edot_qa/web/pages/register_company_wizard_page.py`.
 - PASS - `Next` disabled validation test exists: `tests/web/test_create_company.py`.
 - PASS - Company data comes from Phase 3A generator before UI use: `tests/web/test_create_company.py`.
-- PARTIAL - Create-company live workflow implementation exists, but live product proof is blocked without credentials/storage state.
+- PARTIAL - Create-company live workflow implementation exists and step-one validation passed previously, but the complete create/detail/delete live test has not been re-run to completion after the latest Manage/detail hardening because the user requested a one-minute maximum wait.
 - PASS - Manage/detail page objects exist: `company_manage_page.py`, `company_detail_page.py`.
 - PASS - Tier 2 field assertions are marked and check name, industry type, company type, address, postal code, email, phone: `edot_qa/web/pages/company_detail_page.py`.
 - PASS - Cleanup attempts delete on failure without hiding original failure: `tests/web/test_create_company.py`, `tests/web/test_web_mobile_handoff.py`.
-- PARTIAL - Cleanup/delete verification exists in code, but live product deletion proof is blocked without credentials/storage state.
+- PARTIAL - Cleanup/delete verification exists in code, but live cleanup proof still needs a completed create/detail/delete run.
 - PASS - Raw Playwright selector guardrail test enforces selectors outside web tests: `tests/web/test_web_quality_gates.py`.
 - PASS - No `time.sleep()` usage found.
 
@@ -141,5 +144,5 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 
 - Keep physical device `6a0706f0` visible in `adb devices`.
 - Confirm customer selectors after a valid eWork login.
-- Provide valid local eSuite credentials or storage state to run live web login/create/detail/delete.
+- Complete one live web create/detail/delete run when allowed to run beyond the one-minute diagnostic limit or when the flow is further optimized.
 - Prefer successful web-created handoff for final end-to-end proof; fallback mobile login proof already exists.

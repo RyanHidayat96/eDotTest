@@ -25,7 +25,7 @@ def run_maestro_flow(maestro_runner: MaestroRunner):
     def _run(
         flow: str,
         *,
-        timeout_seconds: int = 300,
+        timeout_seconds: int = 60,
         extra_env: dict[str, str] | None = None,
     ) -> MaestroResult:
         return assert_maestro_passed(

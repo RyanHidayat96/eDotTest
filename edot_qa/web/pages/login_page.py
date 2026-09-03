@@ -90,7 +90,7 @@ class LoginPage(BasePage):
             return urlparse(url).netloc == expected_host
 
         try:
-            self.page.wait_for_url(is_esuite_url, timeout=60_000)
+            self.page.wait_for_url(is_esuite_url, timeout=20_000)
         except TimeoutError:
             current_host = urlparse(self.page.url).netloc
             raise AssertionError(

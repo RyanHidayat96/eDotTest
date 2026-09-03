@@ -63,7 +63,7 @@ class MaestroRunner:
         self,
         flow: str | Path,
         *,
-        timeout_seconds: int = 300,
+        timeout_seconds: int = 60,
         extra_env: dict[str, str] | None = None,
     ) -> MaestroResult:
         if not command_available(self.settings.maestro_cli):

@@ -29,7 +29,7 @@ METADATA_ROWS = [
     ["Field", "Value"],
     ["Source of truth", "Take Home Test QA Automation Engineer eDOT V4.pdf"],
     ["Execution framework", "edot_codex_qa_automation_plan.md"],
-    ["Repository link", "TBD - no Git remote configured in current workspace"],
+    ["Repository link", "https://github.com/RyanHidayat96/TestEdot"],
     ["Credential policy", "Use environment variables only; no credentials or API keys stored in workbook"],
     ["Runtime data token", "${RUN_ID} is replaced by suite-generated unique run id"],
     ["Negative assertion note", "No invented product error copy. Later negative submit tests must assert exact app error text discovered from product."],
@@ -179,13 +179,13 @@ def write_workbook(test_case_rows: list[list[str]]) -> None:
         "xl/worksheets/sheet2.xml": worksheet_xml(METADATA_ROWS, metadata_widths),
         "docProps/app.xml": """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>Codex</Application>
+  <Application>Python workbook builder</Application>
 </Properties>""",
         "docProps/core.xml": f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <dc:title>eDOT QA Automation Manual Test Cases</dc:title>
-  <dc:creator>Codex</dc:creator>
-  <cp:lastModifiedBy>Codex</cp:lastModifiedBy>
+  <dc:creator>Ryan Hidayat</dc:creator>
+  <cp:lastModifiedBy>Ryan Hidayat</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">{dt.datetime.utcnow().replace(microsecond=0).isoformat()}Z</dcterms:created>
   <dcterms:modified xsi:type="dcterms:W3CDTF">{dt.datetime.utcnow().replace(microsecond=0).isoformat()}Z</dcterms:modified>
 </cp:coreProperties>""",

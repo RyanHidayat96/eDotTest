@@ -127,6 +127,10 @@ class MobileSettings:
 
     def maestro_environment(self, extra_values: dict[str, str] | None = None) -> dict[str, str]:
         env = os.environ.copy()
+        env.update(self.maestro_variables(extra_values))
+        return env
+
+    def maestro_variables(self, extra_values: dict[str, str] | None = None) -> dict[str, str]:
         optional_values = {
             "EWORK_APP_ID": self.ework_app_id,
             "EWORK_EMAIL": self.ework_email,
@@ -147,13 +151,14 @@ class MobileSettings:
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id,
             "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id,
         }
+        variables = {}
         for key, value in optional_values.items():
             if value:
-                env[key] = value
+                variables[key] = value
         for key, value in (extra_values or {}).items():
             if value:
-                env[key] = value
-        return env
+                variables[key] = value
+        return variables
 
 
 def load_mobile_settings() -> MobileSettings:

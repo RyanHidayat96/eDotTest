@@ -116,6 +116,7 @@ EWORK_CUSTOMER_SEARCH_FIELD_ID=
 ```
 
 Mobile credentials should come from the web-created company handoff where possible. If handoff data is not available, set valid mobile credentials only in local environment variables.
+For local live mobile verification in this repository, the assignment-provided fallback eWork account was used because no web-created company handoff was available. The fallback values stay only in the ignored local `.env` file and are not committed.
 
 ## Running Tests
 
@@ -228,4 +229,4 @@ Triage verdicts are human-review proposals only. The script never changes tests,
 
 ## Current Local Verification Notes
 
-Local unit and guardrail tests pass without secrets. Live web/mobile execution still depends on real credentials, eWork app availability, Maestro CLI, and an ADB-visible ready device.
+Local unit and guardrail tests pass without committed secrets. Live mobile login has been verified on a physical ADB device using the assignment-provided fallback eWork account. Live mobile customer creation still requires post-login customer selectors. Live web execution still depends on valid eSuite credentials or storage state.

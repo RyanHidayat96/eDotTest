@@ -51,6 +51,21 @@ def package_installed(
     return any(line.strip() == expected for line in completed.stdout.splitlines())
 
 
+def clear_app_data(
+    package_name: str,
+    adb_command: str = "adb",
+    *,
+    device_id: str | None = None,
+    timeout_seconds: int = 10,
+) -> str:
+    command = [adb_command]
+    if device_id:
+        command.extend(["-s", device_id])
+    command.extend(["shell", "pm", "clear", package_name])
+    completed = _run_adb(command, timeout_seconds=timeout_seconds)
+    return completed.stdout.strip()
+
+
 def parse_adb_devices(output: str) -> list[MobileDevice]:
     devices: list[MobileDevice] = []
     for raw_line in output.splitlines():

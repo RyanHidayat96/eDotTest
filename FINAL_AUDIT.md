@@ -22,8 +22,10 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 - PASS - Workbook structure: XLSX ZIP/XML check passed; required headers present; repository link present; no tool-name author metadata remains.
 - PASS - Deliberate triage evidence: `reports/triage/step14-deliberate-triage.md` exists and classifies the broken wrong locator as `script/environment defect`.
 - BLOCKED - Allure HTML CLI: `allure` is not on PATH, so raw Allure results exist but HTML generation cannot be verified locally.
-- BLOCKED - Maestro CLI: `maestro` is not on PATH.
-- BLOCKED - Mobile device: `adb devices` runs, but final check showed no ready device listed; live mobile proof remains blocked.
+- PASS - Maestro CLI: after refreshing the Windows PATH, `maestro --version` reports `2.10.0`.
+- PASS - Mobile device/app: `adb devices` shows ready device `6a0706f0`; `id.edot.ework` is installed and launches to the login screen.
+- PASS - Mobile login live flow: fallback credentials from the assignment PDF were used in local `.env`; login passed and dashboard text `Revenue` was asserted.
+- PASS - Mobile suite: `tests/mobile` returned `18 passed, 1 skipped`; only customer creation remains skipped until post-login customer selectors are confirmed.
 
 ## Phase 1 - Manual Test Case Design
 
@@ -63,14 +65,14 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 
 - PASS - Mobile suite uses Maestro YAML plus Pytest wrapper: `mobile/flows`, `tests/mobile`, `edot_qa/mobile/maestro.py`.
 - PASS - Pytest wrapper writes to same Allure result convention as web.
-- PASS - App ID is environment-driven through `EWORK_APP_ID`.
-- BLOCKED - Maestro CLI runtime proof is blocked because `maestro` is not on PATH.
-- BLOCKED - ADB command works, but no ready device was listed in the final `adb devices` check.
+- PASS - App ID is environment-driven through `EWORK_APP_ID`; installed package was verified as `id.edot.ework`.
+- PASS - Maestro CLI runtime proof passed after refreshing the Windows PATH.
+- PASS - ADB command works and ready device `6a0706f0` is visible.
 - PASS - Mobile credentials are environment-only: `EWORK_EMAIL`, `EWORK_PASSWORD`, `EWORK_COMPANY_CODE`; no credentials are hardcoded in YAML.
 - PASS - Web-created company handoff is preferred through `artifacts/handoff/web_company.json` and `edot_qa/mobile/config.py`.
-- PASS - Fallback credentials were not used and are not committed.
-- PARTIAL - Mobile login flow asserts dashboard text, but live app execution is blocked by missing Maestro and app/package verification.
-- PARTIAL - Mobile create-customer flow asserts saved customer name, contact, and address, but live execution is blocked by missing Maestro and app/package verification.
+- PASS - Fallback credentials from the assignment PDF were used for local live mobile login verification and are not committed.
+- PASS - Mobile login flow enters Company ID, username, and password, then asserts dashboard text; package, login selectors, credentials, and dashboard assertion are live-verified.
+- PARTIAL - Mobile create-customer flow asserts saved customer name, contact, and address, but live execution is blocked by missing post-login customer selectors.
 - PASS - Reusable login sub-flow exists and entry flows call it using `runFlow`: `mobile/flows/common/login.yaml`, `mobile/flows/login.yaml`, `mobile/flows/create_customer.yaml`.
 - PASS - Reusable customer sub-flow exists: `mobile/flows/common/create_customer.yaml`.
 - PASS - Selector priority currently uses environment-provided IDs; no coordinate taps are present.
@@ -108,7 +110,7 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 
 - PASS - `README.md` covers dependencies, setup, Playwright install, Maestro CLI, emulator/ADB, environment variables, suite commands, Allure generation/opening, triage, architecture, handoff, and troubleshooting.
 - PASS - `AI_USAGE.md` covers model choice, where AI runs, exact prompts, invalid/unavailable behavior, and forbidden AI actions.
-- PASS - Fallback mobile credentials were not used, so README does not claim fallback usage.
+- PASS - README states that the assignment-provided fallback eWork account was used for local live mobile verification.
 
 ## Evidence And Deliverables
 
@@ -133,13 +135,13 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 
 - N/A - CI pipeline not implemented.
 - N/A - Parallel execution not implemented.
-- PARTIAL - Genuine web-to-mobile handoff is implemented and locally unit-tested, but live e2e proof is blocked by web credentials/Maestro/app availability.
+- PARTIAL - Genuine web-to-mobile handoff is implemented and locally unit-tested, but live e2e proof is blocked by web credentials and missing post-login customer selectors.
 
 ## Open Blockers Before Submission
 
 - Install Allure CLI and generate/open `reports/allure-report`.
-- Install Maestro CLI or run through WSL and verify `maestro --version`.
-- Connect an emulator or physical device that stays visible in `adb devices`.
-- Confirm eWork SFA package ID and selectors through Maestro Studio or hierarchy.
+- Reopen PowerShell or refresh PATH so `C:\maestro\bin` is visible without manual PATH reload.
+- Keep physical device `6a0706f0` visible in `adb devices`.
+- Confirm customer selectors after a valid eWork login.
 - Provide valid local eSuite credentials or storage state to run live web login/create/detail/delete.
-- Provide valid mobile credentials or successful web-created handoff to run live mobile login/customer creation.
+- Prefer successful web-created handoff for final end-to-end proof; fallback mobile login proof already exists.

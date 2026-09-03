@@ -7,7 +7,14 @@ import pytest
 
 from edot_qa.config import ROOT_DIR
 from edot_qa.mobile.config import MobileSettings, load_mobile_settings
-from edot_qa.mobile.device import adb_devices, command_available, package_installed, parse_adb_devices, ready_device
+from edot_qa.mobile.device import (
+    adb_devices,
+    clear_app_data,
+    command_available,
+    package_installed,
+    parse_adb_devices,
+    ready_device,
+)
 from edot_qa.mobile.maestro import MaestroResult, MaestroRunner, assert_maestro_passed
 
 
@@ -80,6 +87,16 @@ def test_package_installed_checks_exact_package(monkeypatch):
     assert package_installed("com.example.app", device_id="emulator-5554")
 
 
+def test_clear_app_data_uses_device_scoped_pm_clear(monkeypatch):
+    def fake_run(command, **kwargs):
+        assert command == ["adb", "-s", "emulator-5554", "shell", "pm", "clear", "com.example.app"]
+        return subprocess.CompletedProcess(command, 0, stdout="Success\n", stderr="")
+
+    monkeypatch.setattr("edot_qa.mobile.device.subprocess.run", fake_run)
+
+    assert clear_app_data("com.example.app", device_id="emulator-5554") == "Success"
+
+
 def test_maestro_runner_builds_device_scoped_command(tmp_path):
     settings = _mobile_settings(tmp_path, mobile_device_id="emulator-5554")
     flow_path = settings.maestro_flow_dir / "login.yaml"
@@ -88,6 +105,47 @@ def test_maestro_runner_builds_device_scoped_command(tmp_path):
     command = MaestroRunner(settings).build_command("login.yaml")
 
     assert command == ["maestro", "--device", "emulator-5554", "test", str(flow_path)]
+
+
+def test_maestro_runner_can_pass_cli_environment_values(tmp_path):
+    settings = _mobile_settings(tmp_path, mobile_device_id="emulator-5554")
+    command = MaestroRunner(settings).build_command("login.yaml", include_env_flags=True)
+
+    assert "-e" in command
+    assert "EWORK_APP_ID=id.edot.ework" in command
+    assert "EWORK_LOGIN_SCREEN_TEXT=Login" in command
+
+
+def test_maestro_runner_redacts_sensitive_cli_values(monkeypatch, tmp_path):
+    settings = _mobile_settings(tmp_path, mobile_device_id="emulator-5554")
+    flow_path = settings.maestro_flow_dir / "login.yaml"
+    flow_path.write_text("appId: ${EWORK_APP_ID}\n---\n- launchApp\n", encoding="utf-8")
+    monkeypatch.setattr("edot_qa.mobile.maestro.command_available", lambda _: True)
+
+    def fake_run(*args, **kwargs):
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=1,
+            stdout="EWORK_PASSWORD=secret-value and user@example.test failed",
+            stderr="bad secret-value",
+        )
+
+    redaction_settings = MobileSettings(
+        **{
+            **settings.__dict__,
+            "ework_email": "user@example.test",
+            "ework_password": "secret-value",
+            "ework_company_code": "company-code-secret",
+        }
+    )
+    monkeypatch.setattr("edot_qa.mobile.maestro.subprocess.run", fake_run)
+
+    result = MaestroRunner(redaction_settings).run_flow("login.yaml")
+
+    assert "secret-value" not in " ".join(result.command)
+    assert "secret-value" not in result.stdout
+    assert "secret-value" not in result.stderr
+    assert "user@example.test" not in result.stdout
 
 
 def test_maestro_runner_returns_failed_result_without_swallowing(monkeypatch, tmp_path):

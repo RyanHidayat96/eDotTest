@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from edot_qa.ai.test_data import GeneratedTestData
+
+
+UNSAFE_COMPANY_NAME = re.compile(r"[^A-Za-z0-9 ]+")
 
 
 class LocationCascade(BaseModel):
@@ -46,13 +50,13 @@ class CompanyRegistrationData(BaseModel):
     def from_generated_test_data(cls, generated: GeneratedTestData) -> "CompanyRegistrationData":
         company = generated.data.company
         suffix = generated.run_id[-8:].upper()
-        company_name = company.legal_name
+        company_name = normalize_company_name_for_web(company.legal_name, suffix)
         if suffix not in company_name.upper():
             company_name = f"{company_name} QA {suffix}"
         return cls(
             company_name=company_name,
             email=company.email,
-            phone=company.phone,
+            phone=normalize_phone_for_web(company.phone),
             industry_type=company.industry,
             company_type=os.getenv("ESUITE_COMPANY_TYPE", cls.model_fields["company_type"].default),
             language=os.getenv("ESUITE_COMPANY_LANGUAGE", cls.model_fields["language"].default),
@@ -72,3 +76,30 @@ class CompanyRegistrationData(BaseModel):
             "email": self.email,
             "phone": self.phone,
         }
+
+
+def normalize_company_name_for_web(company_name: str, suffix: str) -> str:
+    cleaned = UNSAFE_COMPANY_NAME.sub(" ", company_name)
+    words = cleaned.split()
+    if not words:
+        return f"PT Nusantara Ritel Mandiri QA {suffix}"
+    prefix = words[0].upper()
+    if prefix not in {"PT", "CV"}:
+        words.insert(0, "PT")
+    root_words: list[str] = []
+    for word in words[1:]:
+        upper_word = word.upper()
+        if upper_word in {"PT", "CV", "PERSERO", "TBK", "QA", suffix.upper()}:
+            continue
+        root_words.append(word.title())
+    root = " ".join(root_words[:4]) or "Nusantara Ritel Mandiri"
+    return f"{words[0].upper()} {root} QA {suffix}"
+
+
+def normalize_phone_for_web(phone: str) -> str:
+    digits = re.sub(r"\D+", "", phone)
+    if digits.startswith("62"):
+        digits = digits[2:]
+    if digits.startswith("0"):
+        digits = digits[1:]
+    return digits[:13]

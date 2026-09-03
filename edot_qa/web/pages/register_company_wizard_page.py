@@ -173,9 +173,9 @@ class RegisterCompanyWizardPage(BasePage):
         ]
         candidates.extend(
             [
-                (f"textbox named {spec.label}", self.page.get_by_role("textbox", name=label_regex).first),
-                (f"label {spec.label}", self.page.get_by_label(label_regex).first),
                 (f"placeholder {spec.label}", self.page.get_by_placeholder(label_regex).first),
+                (f"placeholder Input {spec.label}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label)}", re.I)).first),
+                (f"label {spec.label}", self.page.get_by_label(label_regex).first),
             ]
         )
         candidates.extend(
@@ -184,6 +184,7 @@ class RegisterCompanyWizardPage(BasePage):
                 for stable_name in spec.stable_names
             ]
         )
+        candidates.append((f"textbox named {spec.label}", self.page.get_by_role("textbox", name=label_regex).first))
         return self.first_visible(candidates, f"{spec.label} input", timeout_ms=5_000)
 
     def _choice_controls(self, spec: FieldSpec) -> list[tuple[str, Locator]]:

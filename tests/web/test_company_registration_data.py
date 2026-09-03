@@ -32,7 +32,7 @@ def test_company_registration_maps_ai_data_and_defaults():
 
     assert registration.company_name == "PT Ritel Nusantara QA ABC12345"
     assert registration.email == "qa.company@example.test"
-    assert registration.phone == "+628123456789"
+    assert registration.phone == "8123456789"
     assert registration.industry_type == "Retail"
     assert registration.company_type == "Retailer"
     assert registration.language == "English"
@@ -44,7 +44,7 @@ def test_company_registration_maps_ai_data_and_defaults():
         "address": "Jl. Sudirman No. 10, Jakarta Selatan",
         "postal code": "12190",
         "email": "qa.company@example.test",
-        "phone": "+628123456789",
+        "phone": "8123456789",
     }
 
 

@@ -18,12 +18,12 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 edot_qa/
   ai/                  AI test-data and failure-triage modules
   mobile/              Maestro runner, ADB checks, mobile config, customer data mapping
-  reporting/           Allure attachment helpers
+  reporting/           Allure attachment, metadata, and category helpers
   web/                 eSuite page objects, registration model, storage state helpers
 mobile/flows/          Maestro entry flows and reusable runFlow sub-flows
 test_cases/            Manual test case CSV and Excel workbook
 tests/                 Pytest suites for web, mobile, AI, quality gates
-tools/                 Workbook builder and Allure triage CLI
+tools/                 Workbook builder, Allure report generator, and triage CLI
 ```
 
 ## Prerequisites
@@ -231,6 +231,8 @@ npm run allure:open:mobile
 ```
 
 The Allure binary comes from `allure-commandline` in `devDependencies`, same as a local Node-based automation project. No global Allure PATH is required.
+
+Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report.
 
 ## AI Failure Triage
 

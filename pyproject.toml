@@ -23,7 +23,7 @@ dev = []
 include = ["edot_qa*"]
 
 [tool.pytest.ini_options]
-addopts = "--strict-config --strict-markers --alluredir=reports/allure-results"
+addopts = "--strict-config --strict-markers --alluredir=reports/allure-results --clean-alluredir"
 markers = [
     "ai: AI data generation and triage tests",
     "e2e: cross-platform end-to-end tests",

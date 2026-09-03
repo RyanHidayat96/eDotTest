@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pytest
 
+from edot_qa.reporting.allure_metadata import apply_allure_metadata
 from edot_qa.reporting.allure_helpers import attach_png
+
+
+@pytest.fixture(autouse=True)
+def allure_metadata(request: pytest.FixtureRequest) -> None:
+    apply_allure_metadata(request.node)
 
 
 @pytest.hookimpl(hookwrapper=True)

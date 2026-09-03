@@ -19,10 +19,11 @@
     "test:mobile:customer": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_create_customer.py -q -rs",
     "triage": ".venv\\Scripts\\python.exe tools/triage_allure_failures.py --results-dir reports/allure-results --output reports/triage/triage-report.md",
     "triage:no-ai": ".venv\\Scripts\\python.exe tools/triage_allure_failures.py --results-dir reports/allure-results --output reports/triage/triage-report.md --no-ai",
-    "allure:generate": "allure generate reports/allure-results --clean -o reports/allure-report",
-    "allure:generate:mobile": "allure generate reports/allure-results-mobile-live --clean -o reports/allure-report-mobile",
-    "allure:open": "allure open reports/allure-report",
-    "allure:open:mobile": "allure open reports/allure-report-mobile"
+    "allure:clean": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -Recurse -Force 'reports/allure-results','reports/allure-results-mobile-live','reports/allure-report','reports/allure-report-mobile' -ErrorAction SilentlyContinue\"",
+    "allure:generate": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --results-dir reports/allure-results --report-dir reports/allure-report",
+    "allure:generate:mobile": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --results-dir reports/allure-results-mobile-live --report-dir reports/allure-report-mobile",
+    "allure:open": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --results-dir reports/allure-results --report-dir reports/allure-report --open",
+    "allure:open:mobile": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --results-dir reports/allure-results-mobile-live --report-dir reports/allure-report-mobile --open"
   },
   "devDependencies": {
     "allure-commandline": "^2.43.0"

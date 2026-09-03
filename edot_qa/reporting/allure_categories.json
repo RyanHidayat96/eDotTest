@@ -1,0 +1,41 @@
+[
+  {
+    "name": "Web UI Wait / Selector Issues",
+    "matchedStatuses": [
+      "failed",
+      "broken"
+    ],
+    "messageRegex": ".*(Timeout [0-9]+ms exceeded|waiting on the predicate|Locator|strict mode violation|not visible|Page\\.screenshot|Playwright).*"
+  },
+  {
+    "name": "Mobile Runtime / Maestro Issues",
+    "matchedStatuses": [
+      "failed",
+      "broken",
+      "skipped"
+    ],
+    "messageRegex": ".*(Maestro|adb|No adb-visible|not installed|package|device|EWORK_|MOBILE_).*"
+  },
+  {
+    "name": "Credential / Environment Issues",
+    "matchedStatuses": [
+      "failed",
+      "broken",
+      "skipped"
+    ],
+    "messageRegex": ".*(credentials|ESUITE_|GEMINI_|401|403|Unauthorized|Forbidden|storage_state|Missing).*"
+  },
+  {
+    "name": "Product / Data Assertion Defects",
+    "matchedStatuses": [
+      "failed"
+    ],
+    "messageRegex": "^(?!.*(Timeout [0-9]+ms exceeded|Locator|Maestro|adb|credentials|storage_state)).*(AssertionError|Expected|actual|mismatch|still visible|did not match|mandatory|required|disabled).*"
+  },
+  {
+    "name": "Ignored / Skipped Tests",
+    "matchedStatuses": [
+      "skipped"
+    ]
+  }
+]

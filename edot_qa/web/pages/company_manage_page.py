@@ -69,18 +69,16 @@ class CompanyManagePage(BasePage):
         expect(self._company_record(company_name)).to_be_visible(timeout=15_000)
         attach_json("company-manage-record-present", {"company_name": company_name})
 
-    def expect_company_absent(self, company_name: str) -> None:
+    def expect_company_absent(self, company_name: str, company_id: str | None = None) -> None:
+        self._reload_companies_page()
         self.search_company(company_name)
-        errors: list[str] = []
-        for description, locator in self._company_record_candidates(company_name):
-            try:
-                # Tier 2: cleanup must prove deleted company is gone from Manage results.
-                expect(locator).not_to_be_visible(timeout=15_000)
-            except AssertionError as error:
-                errors.append(f"{description}: {error}")
-        if errors:
-            raise AssertionError(f"Deleted company {company_name!r} is still visible in Manage results")
-        attach_json("company-cleanup-record-absent", {"company_name": company_name})
+        self._expect_identifier_absent("company name", company_name, self._company_record_candidates(company_name))
+
+        if company_id:
+            self.search_company(company_id)
+            self._expect_identifier_absent("company id", company_id, self._company_identifier_candidates(company_id))
+
+        attach_json("company-cleanup-record-absent", {"company_name": company_name, "company_id": company_id})
 
     def open_company_detail(self, company_name: str) -> CompanyDetailPage:
         self.search_company(company_name)
@@ -148,6 +146,47 @@ class CompanyManagePage(BasePage):
             # Text fallback is justified because created company name is the exact persisted value under test.
             ("exact company-name text", self.page.get_by_text(company_name, exact=True).first),
         ]
+
+    def _company_identifier_candidates(self, identifier: str) -> list[tuple[str, Locator]]:
+        pattern = re.compile(re.escape(identifier), re.I)
+        return [
+            ("company card containing identifier", self.page.locator("div.rounded-lg.border").filter(has_text=pattern).first),
+            ("row containing identifier", self.page.get_by_role("row", name=pattern).first),
+            ("cell containing identifier", self.page.get_by_role("cell", name=pattern).first),
+            ("link named identifier", self.page.get_by_role("link", name=pattern).first),
+            ("button named identifier", self.page.get_by_role("button", name=pattern).first),
+            ("exact identifier text", self.page.get_by_text(identifier, exact=True).first),
+        ]
+
+    def _expect_identifier_absent(
+        self,
+        label: str,
+        identifier: str,
+        candidates: list[tuple[str, Locator]],
+    ) -> None:
+        errors: list[str] = []
+        for description, locator in candidates:
+            try:
+                # Tier 2: cleanup must prove deleted company identifiers are gone from Companies results.
+                expect(locator).not_to_be_visible(timeout=3_000)
+            except AssertionError as error:
+                errors.append(f"{description}: {error}")
+        if errors:
+            raise AssertionError(f"Deleted company {label} {identifier!r} is still visible in Companies results")
+
+    def _reload_companies_page(self) -> None:
+        self.page.goto("/companies")
+        self.page.wait_for_load_state("domcontentloaded")
+        self.first_visible(
+            [
+                ("button named + Add Company", self.page.get_by_role("button", name=re.compile(r"^\+?\s*Add Company$", re.I)).first),
+                ("button named Manage Company", self.page.get_by_role("button", name=re.compile(r"^Manage Company$", re.I)).first),
+                # Text fallback is justified because the eSuite company list exposes this exact section title.
+                ("company list My Company text", self.page.get_by_text("My Company", exact=True).first),
+            ],
+            "company list after cleanup",
+            timeout_ms=10_000,
+        )
 
     def _is_company_visible(self, company_name: str, timeout_ms: int) -> bool:
         for _, locator in self._company_record_candidates(company_name):

@@ -66,45 +66,6 @@ DETAIL_COMPANY_NAME_FIELD_SCRIPT = """
   });
 }
 """
-DETAIL_VALUE_READY_SCRIPT = """
-(values) => {
-  const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim().toLowerCase();
-  const compact = (value) => normalize(value).replace(/[^a-z0-9]+/g, "");
-  const expected = values
-    .map((value) => ({ normalized: normalize(value), compacted: compact(value) }))
-    .filter((value) => value.normalized || value.compacted);
-  const visible = (element) => {
-    const style = window.getComputedStyle(element);
-    const rect = element.getBoundingClientRect();
-    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
-  };
-  const elements = Array.from(
-    document.querySelectorAll(
-      "input, textarea, select, button, [role='combobox'], [role='textbox'], [data-testid], [aria-label], p, span, div"
-    )
-  );
-  return expected.some((needle) =>
-    elements.some((element) => {
-      if (!visible(element)) return false;
-      const valuesToCheck = [
-        element.value,
-        element.textContent,
-        element.getAttribute("aria-label"),
-        element.getAttribute("title"),
-      ];
-      return valuesToCheck.some((candidate) => {
-        const normalizedCandidate = normalize(candidate);
-        const compactedCandidate = compact(candidate);
-        return (
-          (needle.normalized && normalizedCandidate.includes(needle.normalized)) ||
-          (needle.compacted && compactedCandidate.includes(needle.compacted))
-        );
-      });
-    })
-  );
-}
-"""
-
 
 @dataclass(frozen=True)
 class DetailFieldSpec:
@@ -120,6 +81,12 @@ class CompanyDetailPage(BasePage):
         ("company-name", "companyName"),
         ("companyName", "company_name", "name"),
         ("Input Company Name",),
+    )
+    company_id = DetailFieldSpec(
+        "company id",
+        ("company-id", "companyId"),
+        ("companyId", "company_id", "id"),
+        ("Input Company ID",),
     )
     industry_type = DetailFieldSpec(
         "industry type",
@@ -199,6 +166,11 @@ class CompanyDetailPage(BasePage):
             f"Could not verify company detail {spec.label!r} value {expected_value!r}; tried {len(errors)} locators"
         )
 
+    def company_id_value(self) -> str:
+        value = self._detail_field_current_value(self.company_id)
+        attach_json("company-detail-id", {"company_id": value})
+        return value
+
     def delete_current_company(self) -> None:
         self._delete_action().click()
         self._confirm_delete_if_needed()
@@ -263,6 +235,30 @@ class CompanyDetailPage(BasePage):
         )
         return candidates
 
+    def _detail_field_current_value(self, spec: DetailFieldSpec) -> str:
+        errors: list[str] = []
+        for description, locator in self._detail_field_candidates(spec):
+            try:
+                expect(locator).to_be_visible(timeout=1_000)
+                value = self._locator_current_value(locator)
+                if _is_meaningful_detail_value(value):
+                    return value
+                errors.append(f"{description}: empty")
+            except (AssertionError, PlaywrightError, TimeoutError) as error:
+                errors.append(f"{description}: {error}")
+        raise AssertionError(f"Could not read company detail {spec.label!r}; tried {len(errors)} locators")
+
+    def _detail_field_candidates(self, spec: DetailFieldSpec) -> list[tuple[str, Locator]]:
+        label = re.compile(re.escape(spec.label), re.I)
+        candidates = [
+            (f"placeholder {placeholder}", self.page.get_by_placeholder(placeholder).first)
+            for placeholder in spec.placeholders
+        ]
+        candidates.extend((f"data-testid {test_id}", self.page.get_by_test_id(test_id).first) for test_id in spec.test_ids)
+        candidates.extend((f"stable name/id {stable_name}", self.page.locator(stable_detail_selector(stable_name)).first) for stable_name in spec.stable_names)
+        candidates.append(("textbox labelled field", self.page.get_by_label(label).first))
+        return candidates
+
     @staticmethod
     def _expect_locator_has_value(locator: Locator, expected_value: str) -> None:
         expect(locator).to_be_visible(timeout=1_000)
@@ -272,6 +268,18 @@ class CompanyDetailPage(BasePage):
         except (AssertionError, PlaywrightError):
             pass
         expect(locator).to_contain_text(expected_value, timeout=1_000)
+
+    @staticmethod
+    def _locator_current_value(locator: Locator) -> str:
+        for getter in (locator.input_value, locator.text_content):
+            try:
+                value = getter(timeout=1_000)
+            except (PlaywrightError, TimeoutError):
+                continue
+            normalized = " ".join((value or "").split())
+            if normalized:
+                return normalized
+        return ""
 
     def refresh_once_if_company_name_empty(self, company_name: str) -> None:
         self.expect_detail_shell_loaded()
@@ -301,13 +309,6 @@ class CompanyDetailPage(BasePage):
                 arg={"expected": company_name, "requireExpected": require_expected},
                 timeout=timeout_ms,
             )
-            return True
-        except TimeoutError:
-            return False
-
-    def _has_any_expected_detail_value(self, values: list[str], timeout_ms: int) -> bool:
-        try:
-            self.page.wait_for_function(DETAIL_VALUE_READY_SCRIPT, arg=values, timeout=timeout_ms)
             return True
         except TimeoutError:
             return False
@@ -438,3 +439,8 @@ def _delete_confirmation_is_visible(page: Page) -> bool:
         return True
     except (AssertionError, PlaywrightError, TimeoutError):
         return False
+
+
+def _is_meaningful_detail_value(value: str) -> bool:
+    lowered = value.strip().lower()
+    return bool(lowered) and not lowered.startswith(("input ", "choose ", "select "))

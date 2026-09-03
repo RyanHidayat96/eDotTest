@@ -107,6 +107,7 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
     attach_json("handoff-company-registration-data", registration.as_allure_payload())
 
     primary_error: Exception | None = None
+    created_company_id: str | None = None
     try:
         wizard = CompaniesPage(authenticated_page, settings).open_register_company_wizard()
         wizard.complete_three_step_registration(registration)
@@ -114,7 +115,9 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
         manage_page = CompaniesPage(authenticated_page, settings).open_manage()
         # Tier 2: handoff source company must exist in Manage before mobile consumes it.
         manage_page.expect_company_present(registration.company_name)
-        manage_page.open_company_detail(registration.company_name).expect_company_values(registration)
+        detail_page = manage_page.open_company_detail(registration.company_name)
+        detail_page.expect_company_values(registration)
+        created_company_id = detail_page.company_id_value()
 
         handoff = CompanyHandoff.from_registration(registration, source_run_id=generated_data.run_id)
         write_company_handoff(handoff, mobile_probe.company_handoff_path)
@@ -130,7 +133,7 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
         try:
             cleanup_page = CompaniesPage(authenticated_page, settings).open_manage()
             cleanup_page.delete_company_if_present(registration.company_name)
-            cleanup_page.expect_company_absent(registration.company_name)
+            cleanup_page.expect_company_absent(registration.company_name, company_id=created_company_id)
             delete_company_handoff(mobile_probe.company_handoff_path)
         except Exception as cleanup_error:
             attach_text("handoff-cleanup-error", str(cleanup_error))

@@ -41,6 +41,7 @@ def test_create_company_three_step_wizard_with_ai_data(settings, authenticated_p
     attach_json("company-registration-data", registration.as_allure_payload())
 
     primary_error: Exception | None = None
+    created_company_id: str | None = None
     try:
         wizard = CompaniesPage(authenticated_page, settings).open_register_company_wizard()
         wizard.complete_three_step_registration(registration)
@@ -50,6 +51,7 @@ def test_create_company_three_step_wizard_with_ai_data(settings, authenticated_p
         manage_page.expect_company_present(registration.company_name)
         detail_page = manage_page.open_company_detail(registration.company_name)
         detail_page.expect_company_values(registration)
+        created_company_id = detail_page.company_id_value()
     except Exception as error:
         primary_error = error
         raise
@@ -57,7 +59,7 @@ def test_create_company_three_step_wizard_with_ai_data(settings, authenticated_p
         try:
             cleanup_page = CompaniesPage(authenticated_page, settings).open_manage()
             cleanup_page.delete_company_if_present(registration.company_name)
-            cleanup_page.expect_company_absent(registration.company_name)
+            cleanup_page.expect_company_absent(registration.company_name, company_id=created_company_id)
         except Exception as cleanup_error:
             attach_text("company-cleanup-error", str(cleanup_error))
             if primary_error is None:

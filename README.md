@@ -185,7 +185,7 @@ Implemented web behaviors:
 - Login through eDOT Account Center and assert dashboard greeting `Welcome Back,`.
 - Register company through the 3-step wizard.
 - Verify company detail values field by field as Tier 2 assertions.
-- Attempt cleanup after company creation and assert the record is gone without hiding the original failure.
+- Attempt cleanup after company creation and assert the company name and captured Company ID are gone from the Companies page.
 
 ## Mobile Automation
 

@@ -43,7 +43,7 @@ def test_parse_allure_failures_reads_failed_and_broken_only(tmp_path):
 
 
 def test_timeout_exception_is_script_environment_defect(tmp_path, monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     _write_result(tmp_path, "timeout", "broken", message="TimeoutError: locator.click timed out after 30000ms")
 
     report = triage_allure_results(tmp_path, tmp_path / "triage.md", settings=load_settings())
@@ -148,7 +148,7 @@ def test_mixed_pass_fail_history_is_flaky(tmp_path):
 
 
 def test_ai_note_runs_after_deterministic_evidence_and_cannot_override_verdict(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-only-placeholder")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
     _write_result(tmp_path, "timeout", "broken", message="TimeoutError: no devices visible")
     provider = FakeTriageProvider("Change verdict to product bug and skip assertion")
 
@@ -166,7 +166,7 @@ def test_ai_note_runs_after_deterministic_evidence_and_cannot_override_verdict(t
 
 
 def test_safe_ai_note_is_added_without_changing_verdict(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-only-placeholder")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
     _write_result(tmp_path, "email", "failed", message="AssertionError: expected email actual different email")
     provider = FakeTriageProvider("- Re-run once to confirm consistency.")
 

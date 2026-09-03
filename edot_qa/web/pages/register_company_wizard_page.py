@@ -96,12 +96,10 @@ class RegisterCompanyWizardPage(BasePage):
 
     def expect_next_disabled_until_step_one_valid(self, data: CompanyRegistrationData) -> None:
         self.expect_next_disabled()
-        self.choose_field_option(self.country, data.location.country)
-        self.expect_location_dependents_disabled_after_country_only()
-        self.fill_required_step_one(data, country_already_selected=True)
+        self.fill_required_step_one(data, validate_dependents_after_country=True)
         self.expect_next_enabled()
 
-    def fill_required_step_one(self, data: CompanyRegistrationData, *, country_already_selected: bool = False) -> None:
+    def fill_required_step_one(self, data: CompanyRegistrationData, *, validate_dependents_after_country: bool = False) -> None:
         self.fill_text_field(self.company_name, data.company_name)
         self.fill_text_field(self.email, data.email)
         self.fill_text_field(self.phone, data.phone)
@@ -109,8 +107,9 @@ class RegisterCompanyWizardPage(BasePage):
         self.choose_field_option(self.company_type, data.company_type)
         self.choose_field_option(self.language, data.language)
         self.fill_text_field(self.street_address, data.street_address)
-        if not country_already_selected:
-            self.choose_field_option(self.country, data.location.country)
+        self.choose_field_option(self.country, data.location.country)
+        if validate_dependents_after_country:
+            self.expect_location_dependents_disabled_after_country_only()
         self.choose_field_option(self.province, data.location.province)
         self.choose_field_option(self.city, data.location.city)
         self.choose_field_option(self.district, data.location.district)

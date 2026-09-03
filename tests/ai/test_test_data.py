@@ -10,8 +10,9 @@ from edot_qa.ai.test_data import (
     TestDataGenerator,
     business_test_data_json_schema,
     build_prompt,
-    extract_response_text,
+    extract_gemini_text,
     generate_test_data,
+    gemini_response_schema,
 )
 from edot_qa.config import load_settings
 
@@ -50,7 +51,7 @@ VALID_PAYLOAD = {
 
 
 def test_faker_fallback_is_deterministic(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     settings = load_settings()
     first = TestDataGenerator(settings=settings).generate("run-step-4", attach_to_allure=False)
     second = TestDataGenerator(settings=settings).generate("run-step-4", attach_to_allure=False)
@@ -62,7 +63,7 @@ def test_faker_fallback_is_deterministic(monkeypatch):
 
 
 def test_invalid_model_output_retries_then_uses_valid_payload(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-only-placeholder")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
     provider = FakeModelProvider(["not-json", json.dumps(VALID_PAYLOAD)])
     generated = TestDataGenerator(settings=load_settings(), model_provider=provider).generate(
         "abc12345",
@@ -76,7 +77,7 @@ def test_invalid_model_output_retries_then_uses_valid_payload(monkeypatch):
 
 
 def test_invalid_model_output_falls_back_after_attempt_limit(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-only-placeholder")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
     monkeypatch.setenv("AI_TEST_DATA_MAX_ATTEMPTS", "2")
     provider = FakeModelProvider(["{}", "{}"])
     generated = TestDataGenerator(settings=load_settings(), model_provider=provider).generate(
@@ -97,12 +98,22 @@ def test_schema_rejects_extra_fields():
         BusinessTestData.model_validate(payload)
 
 
-def test_response_text_extractor_supports_common_shapes():
-    assert extract_response_text({"output_text": json.dumps(VALID_PAYLOAD)}) == json.dumps(VALID_PAYLOAD)
+def test_gemini_text_extractor_supports_generate_content_shape():
     assert (
-        extract_response_text({"output": [{"content": [{"type": "output_text", "text": "from-output"}]}]})
-        == "from-output"
+        extract_gemini_text({"candidates": [{"content": {"parts": [{"text": json.dumps(VALID_PAYLOAD)}]}}]})
+        == json.dumps(VALID_PAYLOAD)
     )
+
+
+def test_gemini_key_is_preferred_for_test_data(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
+    monkeypatch.setenv("GEMINI_TEST_DATA_MODEL", "gemini-2.5-flash-lite")
+    settings = load_settings()
+
+    provider = TestDataGenerator(settings=settings)._default_model_provider()
+
+    assert provider is not None
+    assert provider[1] == "gemini-2.5-flash-lite"
 
 
 def test_prompt_keeps_guardrails():
@@ -118,7 +129,7 @@ def test_generated_data_model_forbids_extra_fields():
             {
                 "data": VALID_PAYLOAD,
                 "source": "ai_model",
-                "model": "gpt-5-nano",
+                "model": "gemini-2.5-flash-lite",
                 "attempts": 1,
                 "run_id": "abc12345",
                 "extra": "not allowed",
@@ -134,8 +145,16 @@ def test_model_schema_is_strict_and_flat():
     assert schema["properties"]["customer"]["additionalProperties"] is False
 
 
+def test_gemini_response_schema_removes_unsupported_strict_keyword():
+    schema = gemini_response_schema(business_test_data_json_schema())
+    encoded = json.dumps(schema)
+
+    assert "additionalProperties" not in encoded
+    assert schema["properties"]["company"]["required"] == ["legal_name", "email", "phone", "street_address", "industry"]
+
+
 def test_generate_test_data_helper_uses_fallback_without_api_key(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     generated = generate_test_data("helper-run")
     assert generated.source == "faker_fallback:missing_api_key"
     assert generated.run_id == "helper-run"

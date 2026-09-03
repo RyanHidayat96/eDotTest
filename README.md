@@ -9,8 +9,8 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 - Manual test case workbook: `test_cases/eDOT_QA_Automation_Test_Cases.xlsx`
 - Web automation: eSuite at `https://esuite.edot.id` using Playwright, Pytest, Page Object Model, and Allure.
 - Mobile automation: eWork SFA using Maestro YAML flows wrapped by Pytest so web and mobile share Allure output.
-- AI test data: optional OpenAI Responses API call with deterministic Faker fallback.
-- AI failure triage: deterministic Allure parser first, optional OpenAI note second, Markdown output.
+- AI test data: optional Gemini model call with deterministic Faker fallback.
+- AI failure triage: deterministic Allure parser first, optional Gemini note second, Markdown output.
 
 ## Project Structure
 
@@ -79,9 +79,9 @@ ESUITE_COMPANY_POSTAL_CODE=12190
 AI values:
 
 ```text
-OPENAI_API_KEY=
-OPENAI_TEST_DATA_MODEL=gpt-5-nano
-OPENAI_TRIAGE_MODEL=gpt-5-nano
+GEMINI_API_KEY=
+GEMINI_TEST_DATA_MODEL=gemini-2.5-flash-lite
+GEMINI_TRIAGE_MODEL=gemini-2.5-flash-lite
 AI_TEST_DATA_MAX_ATTEMPTS=2
 AI_TEST_DATA_MAX_OUTPUT_TOKENS=700
 AI_TRIAGE_MAX_OUTPUT_TOKENS=900
@@ -240,7 +240,7 @@ Create a deterministic triage report from Allure results:
 .\.venv\Scripts\python.exe tools\triage_allure_failures.py --results-dir reports\allure-results --output reports\triage\triage-report.md --no-ai
 ```
 
-Use optional AI notes when `OPENAI_API_KEY` is set:
+Use optional AI notes when `GEMINI_API_KEY` is set:
 
 ```powershell
 .\.venv\Scripts\python.exe tools\triage_allure_failures.py --results-dir reports\allure-results --output reports\triage\triage-report.md
@@ -256,7 +256,7 @@ Triage verdicts are human-review proposals only. The script never changes tests,
 - No ready device: check `adb devices`; set `MOBILE_DEVICE_ID` when more than one device is attached.
 - eWork app not installed or wrong app ID: set `EWORK_APP_ID` from the installed package name.
 - Missing mobile selectors: discover stable IDs through Maestro and set the `EWORK_*_ID` variables.
-- Missing `OPENAI_API_KEY`: AI test data uses deterministic Faker fallback; triage still produces deterministic verdicts.
+- Missing `GEMINI_API_KEY`: AI test data uses deterministic Faker fallback; triage still produces deterministic verdicts.
 
 ## Current Local Verification Notes
 

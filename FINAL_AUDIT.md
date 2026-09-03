@@ -89,7 +89,8 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 - PASS - Customer schema includes name, contact, and address.
 - PASS - Model output is schema-validated with Pydantic before test consumption.
 - PASS - Invalid output retries, then falls back deterministically.
-- PASS - Missing `OPENAI_API_KEY` automatically uses deterministic Faker fallback.
+- PASS - Gemini test-data provider is supported through `GEMINI_API_KEY` and `GEMINI_TEST_DATA_MODEL`.
+- PASS - Missing `GEMINI_API_KEY` automatically uses deterministic Faker fallback.
 - PASS - Offline/CI behavior verified by unit tests using fake/no model provider.
 - PASS - Actual generated or fallback data attaches to Allure as `ai-test-data-used`.
 - PASS - Token cost controls exist: `AI_TEST_DATA_MAX_ATTEMPTS`, `AI_TEST_DATA_MAX_OUTPUT_TOKENS`, compact prompt.
@@ -103,7 +104,7 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 - PASS - Verdict categories are exactly `script/environment defect`, `product bug`, and `flaky`.
 - PASS - Markdown report includes verdict and evidence per failure.
 - PASS - AI prompt is token-limited and sends deterministic evidence only.
-- PASS - API key comes from `OPENAI_API_KEY` only.
+- PASS - API key comes from `GEMINI_API_KEY` only.
 - PASS - AI cannot override deterministic verdicts.
 - PASS - Dangerous AI notes are rejected when they suggest weakening/skipping assertions, swallowing failures, changing expected values, or auto-filing/closing bugs.
 - PASS - A failing test stays failing; triage only writes a report.

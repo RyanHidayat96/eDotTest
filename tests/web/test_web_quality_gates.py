@@ -46,7 +46,7 @@ def test_env_example_keeps_runtime_secrets_empty():
         key, value = line.split("=", 1)
         env_values[key] = value
 
-    for key in ("ESUITE_EMAIL", "ESUITE_PASSWORD", "OPENAI_API_KEY"):
+    for key in ("ESUITE_EMAIL", "ESUITE_PASSWORD", "GEMINI_API_KEY"):
         assert env_values[key] == ""
 
 

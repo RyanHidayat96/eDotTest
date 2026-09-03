@@ -88,42 +88,33 @@ class ModelProvider(Protocol):
         """Return raw model text."""
 
 
-class OpenAIResponsesProvider:
-    api_url = "https://api.openai.com/v1/responses"
+class GeminiGenerateContentProvider:
+    api_url_template = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
 
     def __init__(self, api_key: str) -> None:
         self.api_key = api_key
 
     def generate(self, prompt: str, schema: dict, *, model: str, max_output_tokens: int) -> str:
         payload = {
-            "model": model,
-            "input": prompt,
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": "edot_indonesian_test_data",
-                    "description": "Indonesian company and customer test data for eDOT QA automation.",
-                    "schema": schema,
-                    "strict": True,
-                }
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "responseSchema": gemini_response_schema(schema),
+                "maxOutputTokens": max_output_tokens,
             },
-            "max_output_tokens": max_output_tokens,
         }
         request = urllib.request.Request(
-            self.api_url,
+            self.api_url_template.format(model=model, api_key=self.api_key),
             data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
+            headers={"Content-Type": "application/json"},
             method="POST",
         )
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 body = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, OSError) as error:
-            raise RuntimeError(f"OpenAI Responses API request failed: {error}") from error
-        return extract_response_text(body)
+            raise RuntimeError(f"Gemini API request failed: {error}") from error
+        return extract_gemini_text(body)
 
 
 @dataclass
@@ -175,8 +166,11 @@ class TestDataGenerator:
     def generate(self, run_id: str | None = None, *, attach_to_allure: bool = True) -> GeneratedTestData:
         resolved_run_id = run_id or uuid.uuid4().hex
         provider = self.model_provider or self._default_model_provider()
+        model = self.settings.gemini_test_data_model
         if provider is None:
             return self._fallback(resolved_run_id, attach_to_allure=attach_to_allure, reason="missing_api_key")
+        if isinstance(provider, tuple):
+            provider, model = provider
 
         last_error: str | None = None
         schema = business_test_data_json_schema()
@@ -185,14 +179,14 @@ class TestDataGenerator:
                 raw_response = provider.generate(
                     build_prompt(resolved_run_id),
                     schema,
-                    model=self.settings.openai_test_data_model,
+                    model=model,
                     max_output_tokens=self.settings.ai_test_data_max_output_tokens,
                 )
                 parsed_data = BusinessTestData.model_validate(json.loads(raw_response))
                 generated = GeneratedTestData(
                     data=parsed_data,
                     source="ai_model",
-                    model=self.settings.openai_test_data_model,
+                    model=model,
                     attempts=attempt,
                     run_id=resolved_run_id,
                 )
@@ -208,10 +202,10 @@ class TestDataGenerator:
             reason=f"invalid_model_output_after_{self.settings.ai_test_data_max_attempts}_attempts",
         )
 
-    def _default_model_provider(self) -> ModelProvider | None:
-        if not self.settings.openai_api_key:
-            return None
-        return OpenAIResponsesProvider(self.settings.openai_api_key)
+    def _default_model_provider(self) -> tuple[ModelProvider, str] | None:
+        if self.settings.gemini_api_key:
+            return GeminiGenerateContentProvider(self.settings.gemini_api_key), self.settings.gemini_test_data_model
+        return None
 
     def _fallback(self, run_id: str, *, attach_to_allure: bool, reason: str) -> GeneratedTestData:
         generated = GeneratedTestData(
@@ -320,18 +314,29 @@ def business_test_data_json_schema() -> dict:
     }
 
 
-def extract_response_text(body: dict) -> str:
-    output_text = body.get("output_text")
-    if isinstance(output_text, str) and output_text.strip():
-        return output_text
+def gemini_response_schema(schema: dict) -> dict:
+    cleaned: dict = {}
+    for key, value in schema.items():
+        if key == "additionalProperties":
+            continue
+        if isinstance(value, dict):
+            cleaned[key] = gemini_response_schema(value)
+        elif isinstance(value, list):
+            cleaned[key] = [gemini_response_schema(item) if isinstance(item, dict) else item for item in value]
+        else:
+            cleaned[key] = value
+    return cleaned
 
-    for output_item in body.get("output", []):
-        for content_item in output_item.get("content", []):
-            text = content_item.get("text")
+
+def extract_gemini_text(body: dict) -> str:
+    for candidate in body.get("candidates", []):
+        content = candidate.get("content", {})
+        for part in content.get("parts", []):
+            text = part.get("text")
             if isinstance(text, str) and text.strip():
                 return text
 
-    raise RuntimeError("OpenAI Responses API returned no output text")
+    raise RuntimeError("Gemini API returned no output text")
 
 
 def generate_test_data(run_id: str | None = None, *, attach_to_allure: bool = True) -> GeneratedTestData:

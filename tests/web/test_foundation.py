@@ -12,8 +12,11 @@ def test_settings_default_to_assignment_target(monkeypatch):
 def test_settings_redacts_credentials(monkeypatch):
     monkeypatch.setenv("ESUITE_EMAIL", "secret@example.test")
     monkeypatch.setenv("ESUITE_PASSWORD", "secret-password")
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-secret")
     safe_settings = load_settings().as_safe_dict()
     assert safe_settings["ESUITE_EMAIL"] == "<set>"
     assert safe_settings["ESUITE_PASSWORD"] == "<set>"
+    assert safe_settings["GEMINI_API_KEY"] == "<set>"
     assert "secret@example.test" not in str(safe_settings)
     assert "secret-password" not in str(safe_settings)
+    assert "gemini-secret" not in str(safe_settings)

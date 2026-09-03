@@ -4,33 +4,36 @@ This project includes two runtime AI capabilities required by the eDOT QA Automa
 
 ## Model
 
-Default model: `gpt-5-nano`.
+Default test-data model: `gemini-2.5-flash-lite`.
+
+Default triage model: `gemini-2.5-flash-lite`.
 
 Why this model:
 
 - The tasks are structured and low-context: create one compact JSON test-data payload or summarize one already-classified failure.
 - Cost control matters more than long-form reasoning.
 - Deterministic code performs validation and classification first, so the model is never trusted as the only control.
+- `gemini-2.5-flash-lite` is used for test-data generation because it is a low-latency, cost-effective Gemini API model suitable for simple structured output.
 
 The model can be changed through environment variables:
 
 ```text
-OPENAI_TEST_DATA_MODEL=gpt-5-nano
-OPENAI_TRIAGE_MODEL=gpt-5-nano
+GEMINI_TEST_DATA_MODEL=gemini-2.5-flash-lite
+GEMINI_TRIAGE_MODEL=gemini-2.5-flash-lite
 ```
 
 ## Where AI Runs
 
 - While writing tests: AI-assisted development was used to draft and refine code, but no repository script rewrites submitted tests or assertions.
-- During test runs: `edot_qa.ai.test_data.TestDataGenerator` calls the OpenAI Responses API only when `OPENAI_API_KEY` is set. It generates Indonesian business data before web/mobile tests consume it.
+- During test runs: `edot_qa.ai.test_data.TestDataGenerator` calls the Gemini API when `GEMINI_API_KEY` is set. It generates Indonesian business data before web/mobile tests consume it.
 - After test runs: `tools/triage_allure_failures.py` reads Allure results. Deterministic evidence collection and verdict classification run first. Optional AI notes run only after that evidence exists.
 
 ## API Key Handling
 
-The only API key variable is:
+Supported API key variables are:
 
 ```text
-OPENAI_API_KEY=
+GEMINI_API_KEY=
 ```
 
 It must be set locally in `.env` or the process environment. `.env` is ignored by Git. API keys are never written to reports, handoff files, YAML flows, or tests.
@@ -56,7 +59,7 @@ AI_TEST_DATA_MAX_OUTPUT_TOKENS=700
 
 Unavailable or invalid behavior:
 
-- If `OPENAI_API_KEY` is absent, the generator uses deterministic Faker fallback.
+- If `GEMINI_API_KEY` is absent, the generator uses deterministic Faker fallback.
 - If the model returns malformed JSON or schema-invalid data, the generator retries up to `AI_TEST_DATA_MAX_ATTEMPTS`.
 - If all attempts fail, it uses deterministic Faker fallback.
 - The actual data used is attached to Allure as `ai-test-data-used`.
@@ -88,8 +91,8 @@ AI_TRIAGE_MAX_OUTPUT_TOKENS=900
 
 Unavailable or invalid behavior:
 
-- If `OPENAI_API_KEY` is absent, triage still writes a Markdown report using deterministic verdicts only.
-- If the OpenAI request fails, the report keeps the deterministic verdict and records that the AI note was unavailable.
+- If `GEMINI_API_KEY` is absent, triage still writes a Markdown report using deterministic verdicts only.
+- If the Gemini request fails, the report keeps the deterministic verdict and records that the AI note was unavailable.
 - If the AI note suggests a forbidden action, the note is rejected and the deterministic verdict remains unchanged.
 
 ## Deterministic Triage Order

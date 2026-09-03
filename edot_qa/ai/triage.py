@@ -9,7 +9,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable, Protocol
 
-from edot_qa.ai.test_data import extract_response_text
+from edot_qa.ai.test_data import extract_gemini_text
 from edot_qa.config import Settings, load_settings
 
 
@@ -137,33 +137,31 @@ class TriageAIProvider(Protocol):
         """Return a concise human-review note."""
 
 
-class OpenAITriageProvider:
-    api_url = "https://api.openai.com/v1/responses"
+class GeminiTriageProvider:
+    api_url_template = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
 
     def __init__(self, api_key: str) -> None:
         self.api_key = api_key
 
     def summarize(self, prompt: str, *, model: str, max_output_tokens: int) -> str:
         payload = {
-            "model": model,
-            "input": prompt,
-            "max_output_tokens": max_output_tokens,
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "maxOutputTokens": max_output_tokens,
+            },
         }
         request = urllib.request.Request(
-            self.api_url,
+            self.api_url_template.format(model=model, api_key=self.api_key),
             data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
+            headers={"Content-Type": "application/json"},
             method="POST",
         )
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 body = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, OSError) as error:
-            raise RuntimeError(f"OpenAI Responses API request failed: {error}") from error
-        return extract_response_text(body)
+            raise RuntimeError(f"Gemini API request failed: {error}") from error
+        return extract_gemini_text(body)
 
 
 def parse_allure_results(results_dir: Path) -> list[AllureFailure]:
@@ -387,7 +385,7 @@ def _add_ai_notes(
         try:
             note = provider.summarize(
                 build_triage_prompt(verdict),
-                model=settings.openai_triage_model,
+                model=settings.gemini_triage_model,
                 max_output_tokens=settings.ai_triage_max_output_tokens,
             )
         except RuntimeError as error:
@@ -411,9 +409,9 @@ def _add_ai_notes(
 
 
 def _default_ai_provider(settings: Settings) -> TriageAIProvider | None:
-    if not settings.openai_api_key:
+    if not settings.gemini_api_key:
         return None
-    return OpenAITriageProvider(settings.openai_api_key)
+    return GeminiTriageProvider(settings.gemini_api_key)
 
 
 def _read_json(path: Path) -> dict | None:

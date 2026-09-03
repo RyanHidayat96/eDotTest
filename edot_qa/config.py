@@ -15,7 +15,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_BASE_URL = "https://esuite.edot.id"
 DEFAULT_STORAGE_STATE = ROOT_DIR / "artifacts" / "auth" / "esuite_storage_state.json"
 DEFAULT_ALLURE_RESULTS = ROOT_DIR / "reports" / "allure-results"
+DEFAULT_TRIAGE_REPORT = ROOT_DIR / "reports" / "triage" / "triage-report.md"
 DEFAULT_OPENAI_TEST_DATA_MODEL = "gpt-5-nano"
+DEFAULT_OPENAI_TRIAGE_MODEL = "gpt-5-nano"
 
 
 def _load_dotenv() -> None:
@@ -55,10 +57,13 @@ class Settings:
     browser: str
     storage_state_path: Path
     allure_results_dir: Path
+    triage_report_path: Path
     openai_api_key: str | None
     openai_test_data_model: str
+    openai_triage_model: str
     ai_test_data_max_attempts: int
     ai_test_data_max_output_tokens: int
+    ai_triage_max_output_tokens: int
 
     @property
     def has_esuite_credentials(self) -> bool:
@@ -78,10 +83,13 @@ class Settings:
             "BROWSER": self.browser,
             "PLAYWRIGHT_STORAGE_STATE": str(self.storage_state_path),
             "ALLURE_RESULTS_DIR": str(self.allure_results_dir),
+            "TRIAGE_REPORT_PATH": str(self.triage_report_path),
             "OPENAI_API_KEY": "<set>" if self.openai_api_key else "<missing>",
             "OPENAI_TEST_DATA_MODEL": self.openai_test_data_model,
+            "OPENAI_TRIAGE_MODEL": self.openai_triage_model,
             "AI_TEST_DATA_MAX_ATTEMPTS": self.ai_test_data_max_attempts,
             "AI_TEST_DATA_MAX_OUTPUT_TOKENS": self.ai_test_data_max_output_tokens,
+            "AI_TRIAGE_MAX_OUTPUT_TOKENS": self.ai_triage_max_output_tokens,
         }
 
 
@@ -96,8 +104,11 @@ def load_settings() -> Settings:
         browser=os.getenv("BROWSER", "chromium"),
         storage_state_path=_path_from_env("PLAYWRIGHT_STORAGE_STATE", DEFAULT_STORAGE_STATE),
         allure_results_dir=_path_from_env("ALLURE_RESULTS_DIR", DEFAULT_ALLURE_RESULTS),
+        triage_report_path=_path_from_env("TRIAGE_REPORT_PATH", DEFAULT_TRIAGE_REPORT),
         openai_api_key=os.getenv("OPENAI_API_KEY") or None,
         openai_test_data_model=os.getenv("OPENAI_TEST_DATA_MODEL", DEFAULT_OPENAI_TEST_DATA_MODEL),
+        openai_triage_model=os.getenv("OPENAI_TRIAGE_MODEL", DEFAULT_OPENAI_TRIAGE_MODEL),
         ai_test_data_max_attempts=_int_from_env("AI_TEST_DATA_MAX_ATTEMPTS", 2),
         ai_test_data_max_output_tokens=_int_from_env("AI_TEST_DATA_MAX_OUTPUT_TOKENS", 700),
+        ai_triage_max_output_tokens=_int_from_env("AI_TRIAGE_MAX_OUTPUT_TOKENS", 900),
     )

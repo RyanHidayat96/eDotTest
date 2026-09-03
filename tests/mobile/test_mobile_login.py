@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+import pytest
+
+from edot_qa.mobile.device import adb_devices, command_available, package_installed, ready_device
+from edot_qa.reporting.allure_helpers import attach_json
+
+
+pytestmark = [
+    pytest.mark.mobile,
+    pytest.mark.requires_credentials,
+    pytest.mark.requires_device,
+    pytest.mark.requires_maestro,
+    pytest.mark.requires_mobile_app,
+]
+
+
+def test_ework_login_displays_dashboard(mobile_settings, run_maestro_flow):
+    missing = mobile_settings.missing_login_requirements()
+    if missing:
+        pytest.skip(f"Missing mobile login environment values: {', '.join(missing)}")
+    if not command_available(mobile_settings.maestro_cli):
+        pytest.skip("Maestro CLI not installed or not on PATH")
+    if not command_available(mobile_settings.adb_command):
+        pytest.skip("ADB command not installed or not on PATH")
+
+    devices = adb_devices(mobile_settings.adb_command, timeout_seconds=5)
+    device = ready_device(devices, mobile_settings.mobile_device_id)
+    if device is None:
+        pytest.skip("No adb-visible ready mobile device")
+
+    attach_json("mobile-login-device", {"serial": device.serial, "status": device.status})
+    if not package_installed(
+        mobile_settings.ework_app_id or "",
+        mobile_settings.adb_command,
+        device_id=mobile_settings.mobile_device_id or device.serial,
+        timeout_seconds=5,
+    ):
+        pytest.skip("eWork SFA app not installed or EWORK_APP_ID is incorrect")
+
+    run_maestro_flow("login.yaml")

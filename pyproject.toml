@@ -32,6 +32,7 @@ markers = [
     "requires_cleanup: test creates data and requires cleanup support",
     "requires_device: test requires an adb-visible mobile device",
     "requires_maestro: test requires Maestro CLI",
+    "requires_mobile_app: test requires eWork SFA installed on the device",
     "requires_storage_state: test requires an existing Playwright storage_state file",
 ]
 pythonpath = ["."]

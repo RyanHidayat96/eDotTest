@@ -21,13 +21,7 @@ def command_available(command: str) -> bool:
 
 def adb_devices(adb_command: str = "adb", *, timeout_seconds: int = 10) -> list[MobileDevice]:
     try:
-        completed = subprocess.run(
-            [adb_command, "devices"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-        )
+        completed = _run_adb([adb_command, "devices"], timeout_seconds=timeout_seconds)
     except FileNotFoundError as error:
         raise RuntimeError(f"ADB command not found: {adb_command}") from error
     except subprocess.TimeoutExpired as error:
@@ -35,6 +29,26 @@ def adb_devices(adb_command: str = "adb", *, timeout_seconds: int = 10) -> list[
     except subprocess.CalledProcessError as error:
         raise RuntimeError(f"ADB devices command failed: {error.stderr}") from error
     return parse_adb_devices(completed.stdout)
+
+
+def package_installed(
+    package_name: str,
+    adb_command: str = "adb",
+    *,
+    device_id: str | None = None,
+    timeout_seconds: int = 10,
+) -> bool:
+    command = [adb_command]
+    if device_id:
+        command.extend(["-s", device_id])
+    command.extend(["shell", "pm", "list", "packages", package_name])
+    try:
+        completed = _run_adb(command, timeout_seconds=timeout_seconds)
+    except RuntimeError:
+        return False
+
+    expected = f"package:{package_name}"
+    return any(line.strip() == expected for line in completed.stdout.splitlines())
 
 
 def parse_adb_devices(output: str) -> list[MobileDevice]:
@@ -56,3 +70,20 @@ def ready_device(devices: list[MobileDevice], requested_serial: str | None = Non
         if requested_serial is None or device.serial == requested_serial:
             return device
     return None
+
+
+def _run_adb(command: list[str], *, timeout_seconds: int) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except FileNotFoundError as error:
+        raise RuntimeError(f"ADB command not found: {command[0]}") from error
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"ADB command timed out after {timeout_seconds}s: {' '.join(command)}") from error
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(f"ADB command failed: {error.stderr}") from error

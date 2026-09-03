@@ -7,7 +7,7 @@ import pytest
 
 from edot_qa.config import ROOT_DIR
 from edot_qa.mobile.config import MobileSettings, load_mobile_settings
-from edot_qa.mobile.device import adb_devices, command_available, parse_adb_devices, ready_device
+from edot_qa.mobile.device import adb_devices, command_available, package_installed, parse_adb_devices, ready_device
 from edot_qa.mobile.maestro import MaestroResult, MaestroRunner, assert_maestro_passed
 
 
@@ -19,6 +19,11 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     monkeypatch.setenv("EWORK_EMAIL", "user@example.test")
     monkeypatch.setenv("EWORK_PASSWORD", "secret-value")
     monkeypatch.setenv("EWORK_COMPANY_CODE", "company-code")
+    monkeypatch.setenv("EWORK_LOGIN_SCREEN_TEXT", "Login")
+    monkeypatch.setenv("EWORK_USERNAME_FIELD_ID", "login-email")
+    monkeypatch.setenv("EWORK_PASSWORD_FIELD_ID", "login-password")
+    monkeypatch.setenv("EWORK_LOGIN_BUTTON_ID", "login-submit")
+    monkeypatch.setenv("EWORK_DASHBOARD_TEXT", "Dashboard")
 
     safe = load_mobile_settings().as_safe_dict()
 
@@ -26,7 +31,16 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_EMAIL"] == "<set>"
     assert safe["EWORK_PASSWORD"] == "<set>"
     assert safe["EWORK_COMPANY_CODE"] == "<set>"
+    assert safe["EWORK_DASHBOARD_TEXT"] == "Dashboard"
     assert "secret-value" not in str(safe)
+
+
+def test_mobile_settings_reports_missing_login_requirements(tmp_path):
+    settings = _mobile_settings(tmp_path)
+
+    assert settings.has_login_selectors
+    assert "EWORK_EMAIL" in settings.missing_login_requirements()
+    assert "EWORK_PASSWORD" in settings.missing_login_requirements()
 
 
 def test_adb_devices_parser_detects_ready_device():
@@ -39,6 +53,16 @@ R58M12345	offline
 
     assert ready_device(devices).serial == "emulator-5554"
     assert ready_device(devices, requested_serial="R58M12345") is None
+
+
+def test_package_installed_checks_exact_package(monkeypatch):
+    def fake_run(command, **kwargs):
+        assert command == ["adb", "-s", "emulator-5554", "shell", "pm", "list", "packages", "com.example.app"]
+        return subprocess.CompletedProcess(command, 0, stdout="package:com.example.app\n", stderr="")
+
+    monkeypatch.setattr("edot_qa.mobile.device.subprocess.run", fake_run)
+
+    assert package_installed("com.example.app", device_id="emulator-5554")
 
 
 def test_maestro_runner_builds_device_scoped_command(tmp_path):
@@ -92,6 +116,7 @@ def test_mobile_login_flow_uses_run_flow_and_environment_values():
     assert "${EWORK_APP_ID}" in combined
     assert "${EWORK_EMAIL}" in shared_flow
     assert "${EWORK_PASSWORD}" in shared_flow
+    assert "${EWORK_DASHBOARD_TEXT}" in entry_flow
     assert "@edot" not in combined.lower()
 
 
@@ -149,6 +174,11 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         ework_email=None,
         ework_password=None,
         ework_company_code=None,
+        ework_login_screen_text="Login",
+        ework_username_field_id="login-email",
+        ework_password_field_id="login-password",
+        ework_login_button_id="login-submit",
+        ework_dashboard_text="Dashboard",
         maestro_flow_dir=flow_dir,
         maestro_output_dir=tmp_path / "maestro-output",
         allure_results_dir=tmp_path / "allure-results",

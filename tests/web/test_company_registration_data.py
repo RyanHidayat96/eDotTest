@@ -78,7 +78,8 @@ def test_company_registration_allows_env_overrides(monkeypatch):
 
     registration = CompanyRegistrationData.from_generated_test_data(generated)
 
-    assert registration.company_name == "PT Data Mantap QA ABC12345"
+    assert registration.company_name == "PT Data QA ABC12345"
+    assert registration.industry_type == "Transportation and Logistics"
     assert registration.company_type == "Distributor"
     assert registration.language == "Indonesia"
     assert registration.location.city == "Jakarta Pusat"

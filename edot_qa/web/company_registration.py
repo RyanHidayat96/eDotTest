@@ -55,7 +55,7 @@ class CompanyRegistrationData(BaseModel):
             company_name = f"{company_name} QA {suffix}"
         return cls(
             company_name=company_name,
-            email=company.email,
+            email=normalize_email_for_web(company.email, suffix),
             phone=normalize_phone_for_web(company.phone),
             industry_type=normalize_industry_for_web(company.industry),
             company_type=os.getenv("ESUITE_COMPANY_TYPE", cls.model_fields["company_type"].default),
@@ -103,6 +103,13 @@ def normalize_phone_for_web(phone: str) -> str:
     if digits.startswith("0"):
         digits = digits[1:]
     return digits[:13]
+
+
+def normalize_email_for_web(email: str, suffix: str) -> str:
+    cleaned = email.strip().lower()
+    if len(cleaned) <= 30:
+        return cleaned
+    return f"qa{suffix.lower()}@qa.test"
 
 
 def normalize_industry_for_web(industry: str) -> str:

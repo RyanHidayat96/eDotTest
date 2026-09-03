@@ -175,6 +175,7 @@ class RegisterCompanyWizardPage(BasePage):
             [
                 (f"placeholder {spec.label}", self.page.get_by_placeholder(label_regex).first),
                 (f"placeholder Input {spec.label}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label)}", re.I)).first),
+                (f"placeholder Input {spec.label.removeprefix('Street ')}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label.removeprefix('Street '))}", re.I)).first),
                 (f"label {spec.label}", self.page.get_by_label(label_regex).first),
             ]
         )

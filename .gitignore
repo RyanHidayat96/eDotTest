@@ -2,17 +2,35 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv*/
+venv/
+env/
+ENV/
 *.egg-info/
+.eggs/
+build/
+dist/
+.tox/
+.nox/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.pyre/
+.hypothesis/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
+pip-wheel-metadata/
 
 # Secrets and local runtime configuration
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.crt
 
 # Playwright, reports, and runtime artifacts
 test-results/
@@ -20,8 +38,47 @@ playwright-report/
 reports/allure-results/
 reports/allure-report/
 artifacts/
+trace.zip
+*.trace.zip
+*.webm
+*.har
+*.png.tmp
 
-# Logs and local OS/editor noise
+# Generated spreadsheet lock/temp files
+~$*.xls
+~$*.xlsx
+~$*.xlsm
+
+# Logs, caches, and temporary files
 *.log
+*.out
+*.err
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+tmp/
+temp/
+.tmp/
+.cache/
+
+# Local AI/editor/tool artifacts
+.agents/
+.codex/
+.claude/
+.cursor/
+.continue/
+.aider*
+.openai/
+*.prompt.log
+*.ai.log
+
+# Local OS/editor noise
 .DS_Store
 Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo

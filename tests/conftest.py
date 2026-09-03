@@ -10,7 +10,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[object]):
     outcome = yield
     report = outcome.get_result()
     setattr(item, f"rep_{report.when}", report)
-    if report.when != "call" or not report.failed:
+    if not report.failed:
         return
 
     page = item.funcargs.get("page") or item.funcargs.get("authenticated_page")
@@ -19,6 +19,6 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[object]):
 
     try:
         if not page.is_closed():
-            attach_png("failure-screenshot", page.screenshot(full_page=True))
+            attach_png(f"failure-screenshot-{report.when}", page.screenshot(full_page=True))
     except Exception as error:
         report.sections.append(("screenshot attachment failed", str(error)))

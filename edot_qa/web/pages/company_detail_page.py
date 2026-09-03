@@ -14,6 +14,45 @@ from edot_qa.web.company_registration import CompanyRegistrationData
 DELETE_ACTION = re.compile(r"^(Delete|Hapus|Remove)$", re.I)
 CONFIRM_DELETE_ACTION = re.compile(r"^(Confirm|Delete|Hapus|Yes|Ya|OK)$", re.I)
 DELETE_AGREEMENT = re.compile(r"I understand\s*&\s*agree to delete", re.I)
+DETAIL_EMPTY_REFRESH_TIMEOUT_MS = 2_000
+DETAIL_VALUE_READY_SCRIPT = """
+(values) => {
+  const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim().toLowerCase();
+  const compact = (value) => normalize(value).replace(/[^a-z0-9]+/g, "");
+  const expected = values
+    .map((value) => ({ normalized: normalize(value), compacted: compact(value) }))
+    .filter((value) => value.normalized || value.compacted);
+  const visible = (element) => {
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const elements = Array.from(
+    document.querySelectorAll(
+      "input, textarea, select, button, [role='combobox'], [role='textbox'], [data-testid], [aria-label], p, span, div"
+    )
+  );
+  return expected.some((needle) =>
+    elements.some((element) => {
+      if (!visible(element)) return false;
+      const valuesToCheck = [
+        element.value,
+        element.textContent,
+        element.getAttribute("aria-label"),
+        element.getAttribute("title"),
+      ];
+      return valuesToCheck.some((candidate) => {
+        const normalizedCandidate = normalize(candidate);
+        const compactedCandidate = compact(candidate);
+        return (
+          (needle.normalized && normalizedCandidate.includes(needle.normalized)) ||
+          (needle.compacted && compactedCandidate.includes(needle.compacted))
+        );
+      });
+    })
+  );
+}
+"""
 
 
 @dataclass(frozen=True)
@@ -65,7 +104,9 @@ class CompanyDetailPage(BasePage):
         expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=20_000)
 
     def expect_company_values(self, data: CompanyRegistrationData) -> None:
-        attach_json("company-detail-expected-values", data.expected_detail_values())
+        expected_values = data.expected_detail_values()
+        self._refresh_once_if_detail_values_empty(data.company_name, expected_values)
+        attach_json("company-detail-expected-values", expected_values)
 
         # Tier 2: detail name must match submitted Company Name.
         self.expect_detail_value(self.name, data.company_name)
@@ -168,6 +209,30 @@ class CompanyDetailPage(BasePage):
             pass
         expect(locator).to_contain_text(expected_value, timeout=1_000)
 
+    def _refresh_once_if_detail_values_empty(self, company_name: str, expected_values: dict[str, str]) -> None:
+        values_to_probe = [value for label, value in expected_values.items() if label != "name"]
+        if self._has_any_expected_detail_value(values_to_probe, timeout_ms=DETAIL_EMPTY_REFRESH_TIMEOUT_MS):
+            return
+
+        attach_json(
+            "company-detail-refresh",
+            {
+                "company_name": company_name,
+                "reason": "detail values empty for 2 seconds after opening Manage",
+            },
+        )
+        self.page.reload(wait_until="domcontentloaded")
+        self.expect_loaded_for(company_name)
+        if not self._has_any_expected_detail_value(values_to_probe, timeout_ms=DETAIL_EMPTY_REFRESH_TIMEOUT_MS):
+            raise AssertionError("Company detail values stayed empty for 2 seconds after refresh")
+
+    def _has_any_expected_detail_value(self, values: list[str], timeout_ms: int) -> bool:
+        try:
+            self.page.wait_for_function(DETAIL_VALUE_READY_SCRIPT, arg=values, timeout=timeout_ms)
+            return True
+        except TimeoutError:
+            return False
+
 
 def stable_detail_selector(stable_name: str) -> str:
     return (
@@ -200,17 +265,28 @@ def confirm_delete_if_needed(page: Page) -> None:
             expect(locator).to_be_visible(timeout=3_000)
             expect(locator).to_be_enabled(timeout=3_000)
             locator.click()
+            _expect_delete_confirmation_closed(page)
             return
         except (AssertionError, PlaywrightError, TimeoutError):
             continue
+    if _delete_confirmation_is_visible(page):
+        raise AssertionError("Could not confirm company deletion; confirmation dialog is still visible")
 
 
 def _accept_delete_agreement_if_present(page: Page) -> None:
     candidates = [
+        (
+            "delete agreement row checkbox",
+            page.locator("div.align-center.flex.flex-row")
+            .filter(has_text=DELETE_AGREEMENT)
+            .locator("button[role='checkbox']")
+            .first,
+        ),
+        ("delete agreement stable checkbox", page.locator("button[role='checkbox']#select-all").last),
         ("delete agreement checkbox by label", page.get_by_label(DELETE_AGREEMENT).first),
         ("delete agreement checkbox role", page.get_by_role("checkbox", name=DELETE_AGREEMENT).first),
+        ("visible role checkbox", page.get_by_role("checkbox").last),
         ("visible delete checkbox", page.locator("input[type='checkbox']").last),
-        ("delete agreement text", page.get_by_text(DELETE_AGREEMENT).first),
     ]
     for _, locator in candidates:
         try:
@@ -219,6 +295,7 @@ def _accept_delete_agreement_if_present(page: Page) -> None:
             return
         except (AssertionError, PlaywrightError, TimeoutError):
             continue
+    _click_delete_agreement_box_by_text_position(page)
 
 
 def _check_or_click(locator: Locator) -> None:
@@ -231,3 +308,54 @@ def _check_or_click(locator: Locator) -> None:
         locator.check(timeout=1_000)
     except (PlaywrightError, TimeoutError):
         locator.click(timeout=1_000)
+
+
+def _click_delete_agreement_box_by_text_position(page: Page) -> None:
+    label = page.get_by_text(DELETE_AGREEMENT).first
+    expect(label).to_be_visible(timeout=1_000)
+    coordinates = page.evaluate(
+        """
+        () => {
+          const pattern = /I understand\\s*&\\s*agree to delete/i;
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          let node = walker.nextNode();
+          while (node) {
+            if (pattern.test(node.nodeValue || "")) {
+              const range = document.createRange();
+              range.selectNodeContents(node);
+              const rect = range.getBoundingClientRect();
+              range.detach();
+              if (rect.width > 0 && rect.height > 0) {
+                const offset = Math.max(18, Math.min(28, rect.height * 1.2));
+                return { x: Math.max(1, rect.left - offset), y: rect.top + rect.height / 2 };
+              }
+            }
+            node = walker.nextNode();
+          }
+          return null;
+        }
+        """
+    )
+    if not coordinates:
+        box = label.bounding_box()
+        if not box:
+            raise AssertionError("Delete agreement checkbox label has no visible box")
+        coordinates = {"x": box["x"] + 10, "y": box["y"] + (box["height"] / 2)}
+    page.mouse.click(coordinates["x"], coordinates["y"])
+
+
+def _expect_delete_confirmation_closed(page: Page) -> None:
+    if not _delete_confirmation_is_visible(page):
+        return
+    try:
+        expect(page.get_by_text("Confirmation Delete", exact=True).first).not_to_be_visible(timeout=5_000)
+    except AssertionError as error:
+        raise AssertionError("Delete confirmation stayed open after Confirm; delete agreement checkbox was not accepted") from error
+
+
+def _delete_confirmation_is_visible(page: Page) -> bool:
+    try:
+        expect(page.get_by_text("Confirmation Delete", exact=True).first).to_be_visible(timeout=500)
+        return True
+    except (AssertionError, PlaywrightError, TimeoutError):
+        return False

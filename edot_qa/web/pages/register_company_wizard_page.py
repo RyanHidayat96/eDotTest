@@ -150,6 +150,14 @@ class RegisterCompanyWizardPage(BasePage):
 
     def fill_required_step_three(self, data: CompanyRegistrationData) -> None:
         self.fill_text_field(self.branch_name, data.branch_name)
+        if not self._try_fill_branch_from_company_records():
+            self.fill_text_field(self.street_address, data.street_address)
+            self.choose_field_option(self.country, data.location.country)
+            self.choose_field_option(self.province, data.location.province)
+            self.choose_field_option(self.city, data.location.city)
+            self.choose_field_option(self.district, data.location.district)
+            self.choose_field_option(self.zone, data.location.zone)
+            self.choose_or_fill_field(self.postal_code, data.location.postal_code)
         self.accept_terms()
 
     def expect_submit_enabled(self) -> None:
@@ -166,6 +174,20 @@ class RegisterCompanyWizardPage(BasePage):
         )
         if not checkbox.is_checked():
             checkbox.check()
+
+    def _try_fill_branch_from_company_records(self) -> bool:
+        button = self.page.get_by_role(
+            "button",
+            # Text fallback in accessible name is justified because eSuite exposes this exact branch-copy action.
+            name=re.compile(r"Fill in with the same data from the Company records", re.I),
+        ).first
+        try:
+            expect(button).to_be_visible(timeout=5_000)
+            button.click()
+            self._after_selection()
+            return True
+        except (AssertionError, TimeoutError, PlaywrightError):
+            return False
 
     def fill_text_field(self, spec: FieldSpec, value: str) -> None:
         control = self._text_control(spec)

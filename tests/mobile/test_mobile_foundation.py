@@ -18,6 +18,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     monkeypatch.setenv("EWORK_APP_ID", "com.edot.ework")
     monkeypatch.setenv("EWORK_EMAIL", "user@example.test")
     monkeypatch.setenv("EWORK_PASSWORD", "secret-value")
+    monkeypatch.setenv("EWORK_COMPANY_NAME", "PT Example")
     monkeypatch.setenv("EWORK_COMPANY_CODE", "company-code")
     monkeypatch.setenv("EWORK_LOGIN_SCREEN_TEXT", "Login")
     monkeypatch.setenv("EWORK_USERNAME_FIELD_ID", "login-email")
@@ -37,6 +38,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_APP_ID"] == "com.edot.ework"
     assert safe["EWORK_EMAIL"] == "<set>"
     assert safe["EWORK_PASSWORD"] == "<set>"
+    assert safe["EWORK_COMPANY_NAME"] == "PT Example"
     assert safe["EWORK_COMPANY_CODE"] == "<set>"
     assert safe["EWORK_DASHBOARD_TEXT"] == "Dashboard"
     assert safe["EWORK_CUSTOMER_NAME_FIELD_ID"] == "customer-name"
@@ -219,6 +221,7 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         ework_app_id="com.edot.ework",
         ework_email=None,
         ework_password=None,
+        ework_company_name=None,
         ework_company_code=None,
         ework_login_screen_text="Login",
         ework_username_field_id="login-email",
@@ -235,6 +238,7 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         maestro_flow_dir=flow_dir,
         maestro_output_dir=tmp_path / "maestro-output",
         allure_results_dir=tmp_path / "allure-results",
+        company_handoff_path=tmp_path / "handoff.json",
     )
 
 

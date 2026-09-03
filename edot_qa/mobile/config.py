@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from edot_qa.config import DEFAULT_ALLURE_RESULTS, ROOT_DIR
+from edot_qa.handoff import DEFAULT_COMPANY_HANDOFF_PATH, read_company_handoff
 
 
 try:
@@ -25,6 +26,7 @@ class MobileSettings:
     ework_app_id: str | None
     ework_email: str | None
     ework_password: str | None
+    ework_company_name: str | None
     ework_company_code: str | None
     ework_login_screen_text: str | None
     ework_username_field_id: str | None
@@ -41,6 +43,7 @@ class MobileSettings:
     maestro_flow_dir: Path
     maestro_output_dir: Path
     allure_results_dir: Path
+    company_handoff_path: Path
 
     @property
     def has_ework_credentials(self) -> bool:
@@ -97,6 +100,7 @@ class MobileSettings:
             "EWORK_APP_ID": self.ework_app_id or "<missing>",
             "EWORK_EMAIL": "<set>" if self.ework_email else "<missing>",
             "EWORK_PASSWORD": "<set>" if self.ework_password else "<missing>",
+            "EWORK_COMPANY_NAME": self.ework_company_name or "<missing>",
             "EWORK_COMPANY_CODE": "<set>" if self.ework_company_code else "<missing>",
             "EWORK_LOGIN_SCREEN_TEXT": self.ework_login_screen_text or "<missing>",
             "EWORK_USERNAME_FIELD_ID": self.ework_username_field_id or "<missing>",
@@ -113,6 +117,7 @@ class MobileSettings:
             "MAESTRO_FLOW_DIR": str(self.maestro_flow_dir),
             "MAESTRO_OUTPUT_DIR": str(self.maestro_output_dir),
             "ALLURE_RESULTS_DIR": str(self.allure_results_dir),
+            "EWORK_COMPANY_HANDOFF_PATH": str(self.company_handoff_path),
         }
 
     def maestro_environment(self, extra_values: dict[str, str] | None = None) -> dict[str, str]:
@@ -121,6 +126,7 @@ class MobileSettings:
             "EWORK_APP_ID": self.ework_app_id,
             "EWORK_EMAIL": self.ework_email,
             "EWORK_PASSWORD": self.ework_password,
+            "EWORK_COMPANY_NAME": self.ework_company_name,
             "EWORK_COMPANY_CODE": self.ework_company_code,
             "EWORK_LOGIN_SCREEN_TEXT": self.ework_login_screen_text,
             "EWORK_USERNAME_FIELD_ID": self.ework_username_field_id,
@@ -146,14 +152,17 @@ class MobileSettings:
 
 def load_mobile_settings() -> MobileSettings:
     _load_dotenv()
+    handoff_path = _path_from_env("EWORK_COMPANY_HANDOFF_PATH", DEFAULT_COMPANY_HANDOFF_PATH)
+    handoff = read_company_handoff(handoff_path)
     return MobileSettings(
         maestro_cli=os.getenv("MAESTRO_CLI", "maestro"),
         adb_command=os.getenv("ADB_COMMAND", "adb"),
         mobile_device_id=os.getenv("MOBILE_DEVICE_ID") or None,
         ework_app_id=os.getenv("EWORK_APP_ID") or None,
-        ework_email=os.getenv("EWORK_EMAIL") or None,
+        ework_email=os.getenv("EWORK_EMAIL") or (handoff.company_email if handoff else None),
         ework_password=os.getenv("EWORK_PASSWORD") or None,
-        ework_company_code=os.getenv("EWORK_COMPANY_CODE") or None,
+        ework_company_name=os.getenv("EWORK_COMPANY_NAME") or (handoff.company_name if handoff else None),
+        ework_company_code=os.getenv("EWORK_COMPANY_CODE") or (handoff.company_code if handoff else None),
         ework_login_screen_text=os.getenv("EWORK_LOGIN_SCREEN_TEXT") or None,
         ework_username_field_id=os.getenv("EWORK_USERNAME_FIELD_ID") or None,
         ework_password_field_id=os.getenv("EWORK_PASSWORD_FIELD_ID") or None,
@@ -169,6 +178,7 @@ def load_mobile_settings() -> MobileSettings:
         maestro_flow_dir=_path_from_env("MAESTRO_FLOW_DIR", DEFAULT_MAESTRO_FLOW_DIR),
         maestro_output_dir=_path_from_env("MAESTRO_OUTPUT_DIR", DEFAULT_MAESTRO_OUTPUT_DIR),
         allure_results_dir=_path_from_env("ALLURE_RESULTS_DIR", DEFAULT_ALLURE_RESULTS),
+        company_handoff_path=handoff_path,
     )
 
 

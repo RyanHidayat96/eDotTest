@@ -112,6 +112,20 @@ def test_assertion_failure_without_script_evidence_is_product_bug_proposal(tmp_p
     assert "human-review proposal" in report.markdown
 
 
+def test_pytest_metadata_labels_do_not_override_product_assertion(tmp_path):
+    _write_result(
+        tmp_path,
+        "mandatory-field",
+        "failed",
+        message="AssertionError: Product bug candidate: mandatory field 'Postal Code' is disabled or read-only",
+        labels=[{"name": "tag", "value": "requires_credentials"}],
+    )
+
+    report = triage_allure_results(tmp_path, tmp_path / "triage.md", use_ai=False)
+
+    assert report.verdicts[0].verdict == PRODUCT_BUG
+
+
 def test_mixed_pass_fail_history_is_flaky(tmp_path):
     _write_result(
         tmp_path,
@@ -198,6 +212,7 @@ def _write_result(
     trace: str = "",
     history_id: str | None = None,
     steps: list[dict] | None = None,
+    labels: list[dict] | None = None,
 ) -> Path:
     path = directory / f"{name}-result.json"
     path.write_text(
@@ -210,7 +225,7 @@ def _write_result(
                 "statusDetails": {"message": message, "trace": trace},
                 "steps": steps or [],
                 "attachments": [{"name": "failure-screenshot"}] if status in {"failed", "broken"} else [],
-                "labels": [{"name": "suite", "value": "example"}],
+                "labels": labels or [{"name": "suite", "value": "example"}],
             }
         ),
         encoding="utf-8",

@@ -46,8 +46,9 @@ class RegisterCompanyWizardPage(BasePage):
     province = FieldSpec("Province", ("province",), ("province", "state"))
     city = FieldSpec("City", ("city",), ("city",))
     district = FieldSpec("District", ("district",), ("district",))
-    zone = FieldSpec("Zone", ("zone",), ("zone",))
+    zone = FieldSpec("Sub District", ("zone", "sub-district", "subDistrict"), ("zone", "subDistrict", "sub_district"))
     postal_code = FieldSpec("Postal Code", ("postal-code", "postalCode"), ("postalCode", "postal_code", "zip"))
+    branch_name = FieldSpec("Branch Name", ("branch-name", "branchName"), ("branchName", "branch_name"))
 
     @property
     def heading(self) -> Locator:
@@ -95,10 +96,12 @@ class RegisterCompanyWizardPage(BasePage):
 
     def expect_next_disabled_until_step_one_valid(self, data: CompanyRegistrationData) -> None:
         self.expect_next_disabled()
-        self.fill_required_step_one(data)
+        self.choose_field_option(self.country, data.location.country)
+        self.expect_location_dependents_disabled_after_country_only()
+        self.fill_required_step_one(data, country_already_selected=True)
         self.expect_next_enabled()
 
-    def fill_required_step_one(self, data: CompanyRegistrationData) -> None:
+    def fill_required_step_one(self, data: CompanyRegistrationData, *, country_already_selected: bool = False) -> None:
         self.fill_text_field(self.company_name, data.company_name)
         self.fill_text_field(self.email, data.email)
         self.fill_text_field(self.phone, data.phone)
@@ -106,19 +109,31 @@ class RegisterCompanyWizardPage(BasePage):
         self.choose_field_option(self.company_type, data.company_type)
         self.choose_field_option(self.language, data.language)
         self.fill_text_field(self.street_address, data.street_address)
-        self.choose_field_option(self.country, data.location.country)
+        if not country_already_selected:
+            self.choose_field_option(self.country, data.location.country)
         self.choose_field_option(self.province, data.location.province)
         self.choose_field_option(self.city, data.location.city)
         self.choose_field_option(self.district, data.location.district)
         self.choose_field_option(self.zone, data.location.zone)
         self.choose_or_fill_field(self.postal_code, data.location.postal_code)
 
+    def expect_location_dependents_disabled_after_country_only(self) -> None:
+        for spec, placeholder in (
+            (self.city, "Choose City"),
+            (self.district, "Choose District"),
+            (self.zone, "Choose Sub District"),
+            (self.postal_code, "Choose Postal Code"),
+        ):
+            control = self._choice_control_by_visible_text(spec, placeholder)
+            self._expect_required_control_disabled(control, spec)
+
     def complete_three_step_registration(self, data: CompanyRegistrationData) -> None:
         self.expect_next_disabled_until_step_one_valid(data)
         self.next_button.click()
         self.assert_step_can_continue(step_name="Register Company step 2")
         self.next_button.click()
-        self.assert_step_can_continue(step_name="Register Company step 3")
+        self.fill_required_step_three(data)
+        self.expect_submit_enabled()
         self.submit_button.click()
 
     def expect_created_company_visible(self, company_name: str) -> None:
@@ -133,18 +148,43 @@ class RegisterCompanyWizardPage(BasePage):
                 f"{step_name} has disabled Next. Product-required fields must be discovered and filled before submission."
             ) from error
 
+    def fill_required_step_three(self, data: CompanyRegistrationData) -> None:
+        self.fill_text_field(self.branch_name, data.branch_name)
+        self.accept_terms()
+
+    def expect_submit_enabled(self) -> None:
+        expect(self.submit_button).to_be_enabled(timeout=10_000)
+
+    def accept_terms(self) -> None:
+        checkbox = self.first_visible(
+            [
+                ("terms checkbox role", self.page.get_by_role("checkbox").first),
+                ("stable terms checkbox", self.page.locator("input[type='checkbox']").first),
+            ],
+            "terms and conditions checkbox",
+            timeout_ms=10_000,
+        )
+        if not checkbox.is_checked():
+            checkbox.check()
+
     def fill_text_field(self, spec: FieldSpec, value: str) -> None:
         control = self._text_control(spec)
+        self._assert_required_control_editable(control, spec)
         control.fill(value)
         self._expect_text_value(control, value, spec.label)
 
     def choose_or_fill_field(self, spec: FieldSpec, value: str) -> None:
+        if spec.label == "Postal Code":
+            if self._field_value_is_visible(value):
+                return
         try:
             self.choose_field_option(spec, value)
         except AssertionError as choice_error:
             try:
                 self.fill_text_field(spec, value)
             except AssertionError as fill_error:
+                if spec.label == "Postal Code" and self._field_value_is_visible(value):
+                    return
                 raise AssertionError(
                     f"Could not choose or fill {spec.label}. Choice error: {choice_error}. Fill error: {fill_error}"
                 ) from fill_error
@@ -153,15 +193,16 @@ class RegisterCompanyWizardPage(BasePage):
         errors: list[str] = []
         for description, control in self._choice_controls(spec):
             try:
-                expect(control).to_be_visible(timeout=3_000)
+                expect(control).to_be_visible(timeout=1_000)
+                self._assert_required_control_editable(control, spec)
                 if self._try_native_select(control, value):
                     self._after_selection()
                     return
                 control.click()
-                self._visible_option(value).click()
-                self._after_selection()
-                return
-            except (AssertionError, TimeoutError) as error:
+                if self._try_click_visible_option(value, timeout_ms=1_500) or self._try_filter_and_click_option(value):
+                    self._after_selection()
+                    return
+            except (AssertionError, TimeoutError, PlaywrightError) as error:
                 errors.append(f"{description}: {error}")
         raise AssertionError(f"Could not choose {value!r} for {spec.label}; tried {len(errors)} controls")
 
@@ -211,18 +252,104 @@ class RegisterCompanyWizardPage(BasePage):
         candidates.append((f"assignment dropdown Choose {spec.label}", self.page.get_by_text(f"Choose {spec.label}", exact=True).first))
         return candidates
 
-    def _visible_option(self, value: str) -> Locator:
+    def _choice_control_by_visible_text(self, spec: FieldSpec, text: str) -> Locator:
+        return self.first_visible(
+            [
+                ("button containing visible choice text", self.page.get_by_role("button").filter(has_text=text).first),
+                ("combobox containing visible choice text", self.page.get_by_role("combobox").filter(has_text=text).first),
+                # Text fallback is justified because eSuite cascade controls expose selected placeholder text.
+                (f"visible {spec.label} placeholder", self.page.get_by_text(text, exact=True).first),
+            ],
+            f"{spec.label} disabled cascade control",
+            timeout_ms=5_000,
+        )
+
+    def _visible_option(self, value: str, *, timeout_ms: int = 10_000) -> Locator:
         exact = re.compile(rf"^{re.escape(value)}$", re.I)
         return self.first_visible(
             [
                 ("option with exact value", self.page.get_by_role("option", name=exact).first),
                 ("menu item with exact value", self.page.get_by_role("menuitem", name=exact).first),
                 # Text fallback is justified because dropdown option markup often lacks ARIA roles.
+                ("visible option text regex", self.page.get_by_text(exact).last),
+                # Text fallback is justified because dropdown option markup often lacks ARIA roles.
                 ("visible option text", self.page.get_by_text(value, exact=True).last),
             ],
             f"option {value}",
-            timeout_ms=10_000,
+            timeout_ms=timeout_ms,
         )
+
+    def _try_click_visible_option(self, value: str, *, timeout_ms: int = 10_000) -> bool:
+        try:
+            self._visible_option(value, timeout_ms=timeout_ms).click()
+            return True
+        except (AssertionError, TimeoutError, PlaywrightError):
+            return False
+
+    def _try_filter_and_click_option(self, value: str) -> bool:
+        search_regex = re.compile(r"^Search$", re.I)
+        search_controls = [
+            ("dropdown searchbox", self.page.get_by_role("searchbox").last),
+            ("dropdown search placeholder", self.page.get_by_placeholder(search_regex).last),
+            ("dropdown search input", self.page.locator("input[placeholder='Search']").last),
+        ]
+        for _, search_control in search_controls:
+            try:
+                expect(search_control).to_be_visible(timeout=2_000)
+                search_control.fill(value)
+                return self._try_click_visible_option(value, timeout_ms=5_000)
+            except (AssertionError, TimeoutError, PlaywrightError):
+                continue
+        return False
+
+    def _field_value_is_visible(self, value: str) -> bool:
+        exact_value = re.compile(rf"^\s*{re.escape(value)}\s*$", re.I)
+        try:
+            # Text fallback is justified because some eSuite cascade fields render selected read-only values as plain text.
+            expect(self.page.get_by_text(exact_value).last).to_be_visible(timeout=3_000)
+            return True
+        except (AssertionError, TimeoutError, PlaywrightError):
+            return False
+
+    def _assert_required_control_editable(self, control: Locator, spec: FieldSpec) -> None:
+        try:
+            expect(control).to_be_enabled(timeout=1_000)
+            readonly = control.evaluate(
+                """element => {
+                    const control = element.closest('input,textarea,select,button,[role="combobox"],[aria-disabled]');
+                    if (!control) return false;
+                    return Boolean(control.readOnly)
+                        || Boolean(control.disabled)
+                        || control.getAttribute('aria-disabled') === 'true';
+                }"""
+            )
+            if not readonly:
+                return
+        except (AssertionError, TimeoutError, PlaywrightError):
+            pass
+        raise AssertionError(
+            f"Product bug candidate: mandatory field {spec.label!r} is disabled or read-only when automation must enter/choose a value."
+        )
+
+    def _expect_required_control_disabled(self, control: Locator, spec: FieldSpec) -> None:
+        try:
+            expect(control).to_be_disabled(timeout=1_000)
+            return
+        except (AssertionError, TimeoutError, PlaywrightError):
+            pass
+        try:
+            disabled = control.evaluate(
+                """element => {
+                    const control = element.closest('input,textarea,select,button,[role="combobox"],[aria-disabled]');
+                    if (!control) return false;
+                    return Boolean(control.disabled) || control.getAttribute('aria-disabled') === 'true';
+                }"""
+            )
+            if disabled:
+                return
+        except PlaywrightError:
+            pass
+        raise AssertionError(f"Expected mandatory dependent field {spec.label!r} to stay disabled until its parent value is selected.")
 
     def _try_native_select(self, control: Locator, value: str) -> bool:
         try:
@@ -241,9 +368,9 @@ class RegisterCompanyWizardPage(BasePage):
 
     def _after_selection(self) -> None:
         try:
-            self.page.wait_for_load_state("networkidle", timeout=10_000)
+            self.page.wait_for_load_state("domcontentloaded", timeout=1_000)
         except TimeoutError:
-            self.page.wait_for_load_state("domcontentloaded")
+            pass
 
     @staticmethod
     def _expect_text_value(control: Locator, value: str, label: str) -> None:

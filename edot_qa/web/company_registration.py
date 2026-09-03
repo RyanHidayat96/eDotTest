@@ -44,6 +44,7 @@ class CompanyRegistrationData(BaseModel):
     company_type: str = Field(default="Retailer", min_length=2, max_length=60)
     language: str = Field(default="English", min_length=2, max_length=60)
     street_address: str = Field(min_length=10, max_length=180)
+    branch_name: str = Field(default="Main", min_length=2, max_length=60)
     location: LocationCascade = Field(default_factory=LocationCascade.from_env)
 
     @classmethod
@@ -61,6 +62,7 @@ class CompanyRegistrationData(BaseModel):
             company_type=os.getenv("ESUITE_COMPANY_TYPE", cls.model_fields["company_type"].default),
             language=os.getenv("ESUITE_COMPANY_LANGUAGE", cls.model_fields["language"].default),
             street_address=company.street_address,
+            branch_name=os.getenv("ESUITE_BRANCH_NAME", cls.model_fields["branch_name"].default),
         )
 
     def as_allure_payload(self) -> dict[str, Any]:

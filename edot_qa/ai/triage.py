@@ -201,10 +201,11 @@ def parse_allure_results(results_dir: Path) -> list[AllureFailure]:
 
 def classify_failure(failure: AllureFailure, previous_outcomes: Iterable[str] = ()) -> TriageVerdict:
     text = _combined_failure_text(failure)
+    precondition_text = _precondition_failure_text(failure)
     evidence = [_failure_type_evidence(failure, text)]
 
     has_locator_signal = _contains_any(text, LOCATOR_PATTERNS)
-    has_precondition_signal = _contains_any(text, PRECONDITION_PATTERNS) or _has_failed_setup_step(failure)
+    has_precondition_signal = _contains_any(precondition_text, PRECONDITION_PATTERNS) or _has_failed_setup_step(failure)
     has_expected_value_signal = _contains_any(text, EXPECTED_VALUE_PATTERNS)
     looks_like_assertion = _contains_any(text, ASSERTION_PATTERNS) or failure.status == "failed"
     looks_like_exception = failure.status == "broken" or (
@@ -487,10 +488,17 @@ def _combined_failure_text(failure: AllureFailure) -> str:
         failure.message,
         failure.trace,
         *failure.attachments,
-        *failure.labels.values(),
     ]
     for step in failure.steps:
         parts.extend([step.name, step.status or "", step.message or ""])
+    return "\n".join(parts).lower()
+
+
+def _precondition_failure_text(failure: AllureFailure) -> str:
+    parts = [failure.message]
+    for step in failure.steps:
+        if step.status in FAILURE_STATUSES:
+            parts.extend([step.name, step.message or ""])
     return "\n".join(parts).lower()
 
 

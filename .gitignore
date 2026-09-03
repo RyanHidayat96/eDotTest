@@ -35,7 +35,7 @@ pip-wheel-metadata/
 # Playwright, reports, and runtime artifacts
 test-results/
 playwright-report/
-reports/allure-results/
+reports/allure-results*/
 reports/allure-report/
 reports/triage/
 artifacts/

@@ -29,8 +29,9 @@ tools/                 Workbook builder and Allure triage CLI
 ## Prerequisites
 
 - Python 3.11 or newer.
+- Node.js and npm for the local Allure commandline dependency.
 - Playwright browsers.
-- Java plus Allure CLI for report generation.
+- Java for Allure report generation.
 - Android platform-tools with `adb` on `PATH`.
 - Maestro CLI on `PATH`. On Windows, Maestro is normally run through WSL.
 - Android emulator or physical device visible in `adb devices`.
@@ -42,6 +43,7 @@ tools/                 Workbook builder and Allure triage CLI
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe -m playwright install chromium
+npm install
 Copy-Item .env.example .env
 ```
 
@@ -192,14 +194,21 @@ Pytest writes Allure results to `reports/allure-results` by default:
 .\.venv\Scripts\python.exe -m pytest tests --alluredir reports/allure-results
 ```
 
-Generate and open the HTML report:
+Generate and open the HTML report through the repository-local Allure CLI:
 
 ```powershell
-allure generate reports/allure-results -o reports/allure-report --clean
-allure open reports/allure-report
+npm run allure:generate
+npm run allure:open
 ```
 
-If `allure` is missing, install Allure CLI locally and verify Java is available.
+Generate the latest mobile live report:
+
+```powershell
+npm run allure:generate:mobile
+npm run allure:open:mobile
+```
+
+The Allure binary comes from `allure-commandline` in `devDependencies`, same as a local Node-based automation project. No global Allure PATH is required.
 
 ## AI Failure Triage
 

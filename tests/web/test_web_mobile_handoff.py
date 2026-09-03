@@ -10,6 +10,7 @@ from edot_qa.handoff import (
     read_company_handoff,
     write_company_handoff,
 )
+from edot_qa.mobile import config as mobile_config
 from edot_qa.mobile.config import load_mobile_settings
 from edot_qa.mobile.device import adb_devices, command_available, package_installed, ready_device
 from edot_qa.mobile.maestro import MaestroRunner, assert_maestro_passed
@@ -52,6 +53,7 @@ def test_company_handoff_file_is_secret_free(tmp_path):
 
 
 def test_mobile_settings_consumes_company_handoff(monkeypatch, tmp_path):
+    monkeypatch.setattr(mobile_config, "_load_dotenv", lambda: None)
     monkeypatch.delenv("EWORK_EMAIL", raising=False)
     monkeypatch.delenv("EWORK_COMPANY_NAME", raising=False)
     handoff = CompanyHandoff(
@@ -62,7 +64,7 @@ def test_mobile_settings_consumes_company_handoff(monkeypatch, tmp_path):
     path = write_company_handoff(handoff, tmp_path / "handoff.json", attach_to_allure=False)
     monkeypatch.setenv("EWORK_COMPANY_HANDOFF_PATH", str(path))
 
-    settings = load_mobile_settings()
+    settings = mobile_config.load_mobile_settings()
 
     assert settings.ework_email == "qa.company.abc12345@example.test"
     assert settings.ework_company_name == "PT Handoff Nusantara QA ABC12345"

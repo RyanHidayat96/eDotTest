@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -50,8 +50,8 @@ def _path_from_env(name: str, default: Path) -> Path:
 @dataclass(frozen=True)
 class Settings:
     esuite_base_url: str
-    esuite_email: str | None
-    esuite_password: str | None
+    esuite_email: str | None = field(repr=False)
+    esuite_password: str | None = field(repr=False)
     headless: bool
     slow_mo_ms: int
     browser: str

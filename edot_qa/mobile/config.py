@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from edot_qa.config import DEFAULT_ALLURE_RESULTS, ROOT_DIR
@@ -24,8 +24,8 @@ class MobileSettings:
     adb_command: str
     mobile_device_id: str | None
     ework_app_id: str | None
-    ework_email: str | None
-    ework_password: str | None
+    ework_email: str | None = field(repr=False)
+    ework_password: str | None = field(repr=False)
     ework_company_name: str | None
     ework_company_code: str | None
     ework_login_screen_text: str | None

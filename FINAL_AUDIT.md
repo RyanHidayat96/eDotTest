@@ -15,13 +15,13 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 
 ## Verification Snapshot
 
-- PASS - Local suite: `.\.venv\Scripts\python.exe -m pytest tests` returned `43 passed, 7 skipped`.
+- PASS - Local suite: `.\.venv\Scripts\python.exe -m pytest tests` returned `48 passed, 5 skipped`.
 - PASS - Syntax: `.\.venv\Scripts\python.exe -m compileall edot_qa tools tests` completed.
 - PASS - Sleep scan: `rg -n "time\.sleep|sleep\(" edot_qa tests mobile tools` returned no matches.
 - PASS - Secret scan: literal assignment/fallback credentials returned no matches in tracked project files; `.env.example` keeps secret values empty.
 - PASS - Workbook structure: XLSX ZIP/XML check passed; required headers present; repository link present; no tool-name author metadata remains.
 - PASS - Deliberate triage evidence: `reports/triage/step14-deliberate-triage.md` exists and classifies the broken wrong locator as `script/environment defect`.
-- BLOCKED - Allure HTML CLI: `allure` is not on PATH, so raw Allure results exist but HTML generation cannot be verified locally.
+- PASS - Allure HTML reports: repository-local `allure-commandline` generated `reports/allure-report` and `reports/allure-report-mobile`.
 - PASS - Maestro CLI: after refreshing the Windows PATH, `maestro --version` reports `2.10.0`.
 - PASS - Mobile device/app: `adb devices` shows ready device `6a0706f0`; `id.edot.ework` is installed and launches to the login screen.
 - PASS - Mobile login live flow: fallback credentials from the assignment PDF were used in local `.env`; login passed and dashboard text `Revenue` was asserted.
@@ -120,7 +120,7 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 - PASS - Mobile Maestro YAML + Pytest wrapper implementation exists.
 - PASS - Both AI modules exist.
 - PASS - Allure Pytest setup exists and raw result directories are generated during test runs.
-- BLOCKED - Allure HTML report cannot be generated locally until Allure CLI is installed.
+- PASS - Allure HTML reports generated locally through `npm run allure:generate` and `npm run allure:generate:mobile`.
 - PASS - Deliberate failing run evidence exists and triage report was generated.
 
 ## Non-Negotiables
@@ -139,8 +139,6 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 
 ## Open Blockers Before Submission
 
-- Install Allure CLI and generate/open `reports/allure-report`.
-- Reopen PowerShell or refresh PATH so `C:\maestro\bin` is visible without manual PATH reload.
 - Keep physical device `6a0706f0` visible in `adb devices`.
 - Confirm customer selectors after a valid eWork login.
 - Provide valid local eSuite credentials or storage state to run live web login/create/detail/delete.

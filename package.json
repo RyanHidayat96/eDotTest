@@ -1,0 +1,15 @@
+{
+  "name": "edot-qa-automation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Allure commandline tooling for the eDOT QA automation take-home project.",
+  "scripts": {
+    "allure:generate": "allure generate reports/allure-results --clean -o reports/allure-report",
+    "allure:generate:mobile": "allure generate reports/allure-results-mobile-live --clean -o reports/allure-report-mobile",
+    "allure:open": "allure open reports/allure-report",
+    "allure:open:mobile": "allure open reports/allure-report-mobile"
+  },
+  "devDependencies": {
+    "allure-commandline": "^2.43.0"
+  }
+}

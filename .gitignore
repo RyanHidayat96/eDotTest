@@ -36,7 +36,7 @@ pip-wheel-metadata/
 test-results/
 playwright-report/
 reports/allure-results*/
-reports/allure-report/
+reports/allure-report*/
 reports/triage/
 artifacts/
 maestro-output/
@@ -53,6 +53,7 @@ trace.zip
 ~$*.xlsm
 
 # Logs, caches, and temporary files
+node_modules/
 *.log
 *.out
 *.err

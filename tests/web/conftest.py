@@ -100,7 +100,9 @@ def page(context: BrowserContext) -> Page:
 
 
 @pytest.fixture()
-def authenticated_page(authenticated_context: BrowserContext) -> Page:
+def authenticated_page(authenticated_context: BrowserContext, settings: Settings) -> Page:
     page_instance = authenticated_context.new_page()
+    page_instance.goto(settings.esuite_base_url)
+    page_instance.wait_for_load_state("domcontentloaded")
     yield page_instance
     page_instance.close()

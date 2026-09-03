@@ -92,7 +92,7 @@ Mobile values:
 MAESTRO_CLI=maestro
 ADB_COMMAND=adb
 MOBILE_DEVICE_ID=
-EWORK_APP_ID=
+EWORK_APP_ID=id.edot.ework
 EWORK_EMAIL=
 EWORK_PASSWORD=
 EWORK_COMPANY_NAME=
@@ -100,10 +100,11 @@ EWORK_COMPANY_CODE=
 EWORK_COMPANY_HANDOFF_PATH=artifacts/handoff/web_company.json
 MAESTRO_FLOW_DIR=mobile/flows
 MAESTRO_OUTPUT_DIR=artifacts/maestro
-EWORK_LOGIN_SCREEN_TEXT=
-EWORK_USERNAME_FIELD_ID=
-EWORK_PASSWORD_FIELD_ID=
-EWORK_LOGIN_BUTTON_ID=
+EWORK_LOGIN_SCREEN_TEXT=Login
+EWORK_COMPANY_ID_FIELD_ID=id.edot.ework:id/tv_company_id
+EWORK_USERNAME_FIELD_ID=id.edot.ework:id/tv_username
+EWORK_PASSWORD_FIELD_ID=id.edot.ework:id/tv_password
+EWORK_LOGIN_BUTTON_ID=id.edot.ework:id/btn_signin
 EWORK_DASHBOARD_TEXT=
 EWORK_CUSTOMERS_MENU_ID=
 EWORK_ADD_CUSTOMER_BUTTON_ID=
@@ -170,7 +171,7 @@ maestro --version
 adb devices
 ```
 
-Use Maestro Studio or hierarchy inspection to discover stable app IDs, then place them in `.env`. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
+The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Use Maestro Studio or hierarchy inspection to discover dashboard/customer selectors, then place them in `.env`. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
 
 Implemented mobile behaviors:
 

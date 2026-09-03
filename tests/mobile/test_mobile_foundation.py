@@ -15,12 +15,13 @@ pytestmark = pytest.mark.mobile
 
 
 def test_mobile_settings_are_secret_safe(monkeypatch):
-    monkeypatch.setenv("EWORK_APP_ID", "com.edot.ework")
+    monkeypatch.setenv("EWORK_APP_ID", "id.edot.ework")
     monkeypatch.setenv("EWORK_EMAIL", "user@example.test")
     monkeypatch.setenv("EWORK_PASSWORD", "secret-value")
     monkeypatch.setenv("EWORK_COMPANY_NAME", "PT Example")
     monkeypatch.setenv("EWORK_COMPANY_CODE", "company-code")
     monkeypatch.setenv("EWORK_LOGIN_SCREEN_TEXT", "Login")
+    monkeypatch.setenv("EWORK_COMPANY_ID_FIELD_ID", "company-id")
     monkeypatch.setenv("EWORK_USERNAME_FIELD_ID", "login-email")
     monkeypatch.setenv("EWORK_PASSWORD_FIELD_ID", "login-password")
     monkeypatch.setenv("EWORK_LOGIN_BUTTON_ID", "login-submit")
@@ -35,11 +36,12 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
 
     safe = load_mobile_settings().as_safe_dict()
 
-    assert safe["EWORK_APP_ID"] == "com.edot.ework"
+    assert safe["EWORK_APP_ID"] == "id.edot.ework"
     assert safe["EWORK_EMAIL"] == "<set>"
     assert safe["EWORK_PASSWORD"] == "<set>"
     assert safe["EWORK_COMPANY_NAME"] == "PT Example"
     assert safe["EWORK_COMPANY_CODE"] == "<set>"
+    assert safe["EWORK_COMPANY_ID_FIELD_ID"] == "company-id"
     assert safe["EWORK_DASHBOARD_TEXT"] == "Dashboard"
     assert safe["EWORK_CUSTOMER_NAME_FIELD_ID"] == "customer-name"
     assert "secret-value" not in str(safe)
@@ -49,6 +51,7 @@ def test_mobile_settings_reports_missing_login_requirements(tmp_path):
     settings = _mobile_settings(tmp_path)
 
     assert settings.has_login_selectors
+    assert "EWORK_COMPANY_CODE" in settings.missing_login_requirements()
     assert "EWORK_EMAIL" in settings.missing_login_requirements()
     assert "EWORK_PASSWORD" in settings.missing_login_requirements()
     assert "EWORK_EMAIL" in settings.missing_customer_requirements()
@@ -146,6 +149,8 @@ def test_mobile_login_flow_uses_run_flow_and_environment_values():
 
     assert "runFlow: common/login.yaml" in entry_flow
     assert "${EWORK_APP_ID}" in combined
+    assert "${EWORK_COMPANY_CODE}" in shared_flow
+    assert "${EWORK_COMPANY_ID_FIELD_ID}" in shared_flow
     assert "${EWORK_EMAIL}" in shared_flow
     assert "${EWORK_PASSWORD}" in shared_flow
     assert "${EWORK_DASHBOARD_TEXT}" in entry_flow
@@ -218,12 +223,13 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         maestro_cli="maestro",
         adb_command="adb",
         mobile_device_id=mobile_device_id,
-        ework_app_id="com.edot.ework",
+        ework_app_id="id.edot.ework",
         ework_email=None,
         ework_password=None,
         ework_company_name=None,
         ework_company_code=None,
         ework_login_screen_text="Login",
+        ework_company_id_field_id="company-id",
         ework_username_field_id="login-email",
         ework_password_field_id="login-password",
         ework_login_button_id="login-submit",

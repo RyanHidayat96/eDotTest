@@ -29,6 +29,7 @@ class MobileSettings:
     ework_company_name: str | None
     ework_company_code: str | None
     ework_login_screen_text: str | None
+    ework_company_id_field_id: str | None
     ework_username_field_id: str | None
     ework_password_field_id: str | None
     ework_login_button_id: str | None
@@ -57,6 +58,7 @@ class MobileSettings:
     def has_login_selectors(self) -> bool:
         return bool(
             self.ework_login_screen_text
+            and self.ework_company_id_field_id
             and self.ework_username_field_id
             and self.ework_password_field_id
             and self.ework_login_button_id
@@ -66,9 +68,11 @@ class MobileSettings:
     def missing_login_requirements(self) -> list[str]:
         requirements = {
             "EWORK_APP_ID": self.ework_app_id,
+            "EWORK_COMPANY_CODE": self.ework_company_code,
             "EWORK_EMAIL": self.ework_email,
             "EWORK_PASSWORD": self.ework_password,
             "EWORK_LOGIN_SCREEN_TEXT": self.ework_login_screen_text,
+            "EWORK_COMPANY_ID_FIELD_ID": self.ework_company_id_field_id,
             "EWORK_USERNAME_FIELD_ID": self.ework_username_field_id,
             "EWORK_PASSWORD_FIELD_ID": self.ework_password_field_id,
             "EWORK_LOGIN_BUTTON_ID": self.ework_login_button_id,
@@ -103,6 +107,7 @@ class MobileSettings:
             "EWORK_COMPANY_NAME": self.ework_company_name or "<missing>",
             "EWORK_COMPANY_CODE": "<set>" if self.ework_company_code else "<missing>",
             "EWORK_LOGIN_SCREEN_TEXT": self.ework_login_screen_text or "<missing>",
+            "EWORK_COMPANY_ID_FIELD_ID": self.ework_company_id_field_id or "<missing>",
             "EWORK_USERNAME_FIELD_ID": self.ework_username_field_id or "<missing>",
             "EWORK_PASSWORD_FIELD_ID": self.ework_password_field_id or "<missing>",
             "EWORK_LOGIN_BUTTON_ID": self.ework_login_button_id or "<missing>",
@@ -129,6 +134,7 @@ class MobileSettings:
             "EWORK_COMPANY_NAME": self.ework_company_name,
             "EWORK_COMPANY_CODE": self.ework_company_code,
             "EWORK_LOGIN_SCREEN_TEXT": self.ework_login_screen_text,
+            "EWORK_COMPANY_ID_FIELD_ID": self.ework_company_id_field_id,
             "EWORK_USERNAME_FIELD_ID": self.ework_username_field_id,
             "EWORK_PASSWORD_FIELD_ID": self.ework_password_field_id,
             "EWORK_LOGIN_BUTTON_ID": self.ework_login_button_id,
@@ -164,6 +170,7 @@ def load_mobile_settings() -> MobileSettings:
         ework_company_name=os.getenv("EWORK_COMPANY_NAME") or (handoff.company_name if handoff else None),
         ework_company_code=os.getenv("EWORK_COMPANY_CODE") or (handoff.company_code if handoff else None),
         ework_login_screen_text=os.getenv("EWORK_LOGIN_SCREEN_TEXT") or None,
+        ework_company_id_field_id=os.getenv("EWORK_COMPANY_ID_FIELD_ID") or None,
         ework_username_field_id=os.getenv("EWORK_USERNAME_FIELD_ID") or None,
         ework_password_field_id=os.getenv("EWORK_PASSWORD_FIELD_ID") or None,
         ework_login_button_id=os.getenv("EWORK_LOGIN_BUTTON_ID") or None,

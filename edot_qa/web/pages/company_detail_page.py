@@ -15,6 +15,57 @@ DELETE_ACTION = re.compile(r"^(Delete|Hapus|Remove)$", re.I)
 CONFIRM_DELETE_ACTION = re.compile(r"^(Confirm|Delete|Hapus|Yes|Ya|OK)$", re.I)
 DELETE_AGREEMENT = re.compile(r"I understand\s*&\s*agree to delete", re.I)
 DETAIL_EMPTY_REFRESH_TIMEOUT_MS = 2_000
+DETAIL_COMPANY_NAME_FIELD_SCRIPT = """
+(payload) => {
+  const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim();
+  const expected = normalize(payload.expected);
+  const visible = (element) => {
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const meaningful = (value) => {
+    const text = normalize(value);
+    return (
+      text.length > 0 &&
+      !/^choose\\b/i.test(text) &&
+      !/^input\\b/i.test(text) &&
+      !/^select\\b/i.test(text)
+    );
+  };
+  const fields = Array.from(
+    document.querySelectorAll(
+      [
+        "input[placeholder='Input Company Name']",
+        "textarea[placeholder='Input Company Name']",
+        "input[name='companyName']",
+        "textarea[name='companyName']",
+        "input[name='company_name']",
+        "textarea[name='company_name']",
+        "input[id='companyName']",
+        "textarea[id='companyName']",
+        "input[id='company_name']",
+        "textarea[id='company_name']",
+        "[data-testid='company-name']",
+        "[data-testid='companyName']",
+      ].join(",")
+    )
+  );
+  return fields.some((element) => {
+    if (!visible(element)) return false;
+    const rawValue =
+      element.value ||
+      element.textContent ||
+      element.getAttribute("aria-label") ||
+      element.getAttribute("title");
+    const value = normalize(rawValue);
+    if (payload.requireExpected) {
+      return expected.length > 0 && (value === expected || value.includes(expected));
+    }
+    return meaningful(value);
+  });
+}
+"""
 DETAIL_VALUE_READY_SCRIPT = """
 (values) => {
   const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim().toLowerCase();
@@ -101,15 +152,28 @@ class CompanyDetailPage(BasePage):
     )
 
     def expect_loaded_for(self, company_name: str) -> None:
-        expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=20_000)
+        self.expect_detail_shell_loaded()
+        self._expect_company_name_field_matches(company_name, timeout_ms=5_000)
+
+    def expect_detail_shell_loaded(self) -> None:
+        self.first_visible(
+            [
+                ("Company Details heading", self.page.get_by_role("heading", name=re.compile(r"Company Details", re.I)).first),
+                # Text fallback is justified because this is the assignment-required profile page title.
+                ("Company Details text", self.page.get_by_text("Company Details", exact=True).first),
+                ("Profile Account tab", self.page.get_by_text("Profile Account", exact=True).first),
+            ],
+            "company detail shell",
+            timeout_ms=10_000,
+        )
 
     def expect_company_values(self, data: CompanyRegistrationData) -> None:
         expected_values = data.expected_detail_values()
-        self._refresh_once_if_detail_values_empty(data.company_name, expected_values)
+        self.refresh_once_if_company_name_empty(data.company_name)
         attach_json("company-detail-expected-values", expected_values)
 
-        # Tier 2: detail name must match submitted Company Name.
-        self.expect_detail_value(self.name, data.company_name)
+        # Tier 2: detail name is checked first and must match before other fields.
+        self._expect_company_name_field_matches(data.company_name, timeout_ms=5_000)
         # Tier 2: detail industry type must match submitted Industry Type.
         self.expect_detail_value(self.industry_type, data.industry_type)
         # Tier 2: detail company type must match submitted Company Type.
@@ -209,22 +273,37 @@ class CompanyDetailPage(BasePage):
             pass
         expect(locator).to_contain_text(expected_value, timeout=1_000)
 
-    def _refresh_once_if_detail_values_empty(self, company_name: str, expected_values: dict[str, str]) -> None:
-        values_to_probe = [value for label, value in expected_values.items() if label != "name"]
-        if self._has_any_expected_detail_value(values_to_probe, timeout_ms=DETAIL_EMPTY_REFRESH_TIMEOUT_MS):
-            return
+    def refresh_once_if_company_name_empty(self, company_name: str) -> None:
+        self.expect_detail_shell_loaded()
+        if not self._company_name_field_has_value(timeout_ms=DETAIL_EMPTY_REFRESH_TIMEOUT_MS):
+            attach_json(
+                "company-detail-refresh",
+                {
+                    "company_name": company_name,
+                    "reason": "company_name field empty for 2 seconds after opening Manage",
+                },
+            )
+            self.page.reload(wait_until="domcontentloaded")
+            self.expect_detail_shell_loaded()
+        self._expect_company_name_field_matches(company_name, timeout_ms=5_000)
 
-        attach_json(
-            "company-detail-refresh",
-            {
-                "company_name": company_name,
-                "reason": "detail values empty for 2 seconds after opening Manage",
-            },
-        )
-        self.page.reload(wait_until="domcontentloaded")
-        self.expect_loaded_for(company_name)
-        if not self._has_any_expected_detail_value(values_to_probe, timeout_ms=DETAIL_EMPTY_REFRESH_TIMEOUT_MS):
-            raise AssertionError("Company detail values stayed empty for 2 seconds after refresh")
+    def _company_name_field_has_value(self, timeout_ms: int) -> bool:
+        return self._company_name_field_ready("", require_expected=False, timeout_ms=timeout_ms)
+
+    def _expect_company_name_field_matches(self, company_name: str, timeout_ms: int) -> None:
+        if not self._company_name_field_ready(company_name, require_expected=True, timeout_ms=timeout_ms):
+            raise AssertionError(f"Company Name field did not match {company_name!r}")
+
+    def _company_name_field_ready(self, company_name: str, require_expected: bool, timeout_ms: int) -> bool:
+        try:
+            self.page.wait_for_function(
+                DETAIL_COMPANY_NAME_FIELD_SCRIPT,
+                arg={"expected": company_name, "requireExpected": require_expected},
+                timeout=timeout_ms,
+            )
+            return True
+        except TimeoutError:
+            return False
 
     def _has_any_expected_detail_value(self, values: list[str], timeout_ms: int) -> bool:
         try:

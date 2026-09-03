@@ -99,7 +99,7 @@ class CompanyManagePage(BasePage):
 
                 self._wait_after_table_action()
                 detail = CompanyDetailPage(self.page, self.settings)
-                detail.expect_loaded_for(company_name)
+                detail.refresh_once_if_company_name_empty(company_name)
                 attach_json("company-detail-opened", {"company_name": company_name})
                 return detail
             except (AssertionError, PlaywrightError, TimeoutError) as error:

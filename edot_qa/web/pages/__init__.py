@@ -1,0 +1,2 @@
+"""Page objects for eSuite."""
+

@@ -1,0 +1,336 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import urllib.error
+import urllib.request
+import uuid
+from dataclasses import dataclass
+from typing import Protocol
+
+from faker import Faker
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+
+from edot_qa.config import Settings, load_settings
+from edot_qa.reporting.allure_helpers import attach_json, attach_text
+
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+INDONESIAN_PHONE_RE = re.compile(r"^\+62\d{8,13}$")
+
+
+class CompanyData(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    legal_name: str = Field(min_length=5, max_length=120)
+    email: str = Field(min_length=6, max_length=120)
+    phone: str = Field(min_length=10, max_length=16)
+    street_address: str = Field(min_length=10, max_length=180)
+    industry: str = Field(min_length=3, max_length=60)
+
+    @field_validator("legal_name")
+    @classmethod
+    def legal_name_must_look_indonesian(cls, value: str) -> str:
+        if not value.upper().startswith(("PT ", "CV ")):
+            raise ValueError("legal_name must start with PT or CV")
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def email_must_be_valid(cls, value: str) -> str:
+        if not EMAIL_RE.match(value):
+            raise ValueError("email must be valid")
+        return value
+
+    @field_validator("phone")
+    @classmethod
+    def phone_must_be_indonesian(cls, value: str) -> str:
+        if not INDONESIAN_PHONE_RE.match(value):
+            raise ValueError("phone must use +62 format")
+        return value
+
+
+class CustomerData(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=3, max_length=100)
+    contact: str = Field(min_length=10, max_length=120)
+    address: str = Field(min_length=10, max_length=180)
+
+    @field_validator("contact")
+    @classmethod
+    def contact_must_be_valid(cls, value: str) -> str:
+        if not (INDONESIAN_PHONE_RE.match(value) or EMAIL_RE.match(value)):
+            raise ValueError("contact must be +62 phone or email")
+        return value
+
+
+class BusinessTestData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    company: CompanyData
+    customer: CustomerData
+
+
+class GeneratedTestData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    data: BusinessTestData
+    source: str
+    model: str | None = None
+    attempts: int = 0
+    run_id: str
+
+
+class ModelProvider(Protocol):
+    def generate(self, prompt: str, schema: dict, *, model: str, max_output_tokens: int) -> str:
+        """Return raw model text."""
+
+
+class OpenAIResponsesProvider:
+    api_url = "https://api.openai.com/v1/responses"
+
+    def __init__(self, api_key: str) -> None:
+        self.api_key = api_key
+
+    def generate(self, prompt: str, schema: dict, *, model: str, max_output_tokens: int) -> str:
+        payload = {
+            "model": model,
+            "input": prompt,
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "edot_indonesian_test_data",
+                    "description": "Indonesian company and customer test data for eDOT QA automation.",
+                    "schema": schema,
+                    "strict": True,
+                }
+            },
+            "max_output_tokens": max_output_tokens,
+        }
+        request = urllib.request.Request(
+            self.api_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            raise RuntimeError(f"OpenAI Responses API request failed: {error}") from error
+        return extract_response_text(body)
+
+
+@dataclass
+class FakerFallbackProvider:
+    locale: str = "id_ID"
+
+    def generate(self, run_id: str) -> BusinessTestData:
+        fake = Faker(self.locale)
+        fake.seed_instance(stable_seed(run_id))
+        suffix = run_id[-8:].upper()
+        company_prefix = fake.random_element(elements=("PT", "CV"))
+        company_root = fake.company().replace(",", "")
+        customer_name = fake.name()
+        return BusinessTestData.model_validate(
+            {
+                "company": {
+                    "legal_name": f"{company_prefix} {company_root} QA {suffix}",
+                    "email": f"qa.company.{suffix.lower()}@example.test",
+                    "phone": f"+628{fake.msisdn()[-9:]}",
+                    "street_address": fake.street_address(),
+                    "industry": fake.random_element(
+                        elements=("Retail", "Distribution", "Manufacturing", "Food and Beverage")
+                    ),
+                },
+                "customer": {
+                    "name": f"{customer_name} QA {suffix}",
+                    "contact": f"+628{fake.msisdn()[-9:]}",
+                    "address": fake.address().replace("\n", ", "),
+                },
+            }
+        )
+
+
+class TestDataGenerator:
+    __test__ = False
+
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        model_provider: ModelProvider | None = None,
+        fallback_provider: FakerFallbackProvider | None = None,
+    ) -> None:
+        self.settings = settings or load_settings()
+        self.model_provider = model_provider
+        self.fallback_provider = fallback_provider or FakerFallbackProvider()
+
+    def generate(self, run_id: str | None = None, *, attach_to_allure: bool = True) -> GeneratedTestData:
+        resolved_run_id = run_id or uuid.uuid4().hex
+        provider = self.model_provider or self._default_model_provider()
+        if provider is None:
+            return self._fallback(resolved_run_id, attach_to_allure=attach_to_allure, reason="missing_api_key")
+
+        last_error: str | None = None
+        schema = business_test_data_json_schema()
+        for attempt in range(1, self.settings.ai_test_data_max_attempts + 1):
+            try:
+                raw_response = provider.generate(
+                    build_prompt(resolved_run_id),
+                    schema,
+                    model=self.settings.openai_test_data_model,
+                    max_output_tokens=self.settings.ai_test_data_max_output_tokens,
+                )
+                parsed_data = BusinessTestData.model_validate(json.loads(raw_response))
+                generated = GeneratedTestData(
+                    data=parsed_data,
+                    source="ai_model",
+                    model=self.settings.openai_test_data_model,
+                    attempts=attempt,
+                    run_id=resolved_run_id,
+                )
+                self._attach(generated, attach_to_allure)
+                return generated
+            except (json.JSONDecodeError, ValidationError, RuntimeError) as error:
+                last_error = str(error)
+                attach_text("ai-test-data-invalid-output", last_error)
+
+        return self._fallback(
+            resolved_run_id,
+            attach_to_allure=attach_to_allure,
+            reason=f"invalid_model_output_after_{self.settings.ai_test_data_max_attempts}_attempts",
+        )
+
+    def _default_model_provider(self) -> ModelProvider | None:
+        if not self.settings.openai_api_key:
+            return None
+        return OpenAIResponsesProvider(self.settings.openai_api_key)
+
+    def _fallback(self, run_id: str, *, attach_to_allure: bool, reason: str) -> GeneratedTestData:
+        generated = GeneratedTestData(
+            data=self.fallback_provider.generate(run_id),
+            source=f"faker_fallback:{reason}",
+            model=None,
+            attempts=0,
+            run_id=run_id,
+        )
+        self._attach(generated, attach_to_allure)
+        return generated
+
+    @staticmethod
+    def _attach(generated: GeneratedTestData, attach_to_allure: bool) -> None:
+        if not attach_to_allure:
+            return
+        attach_json("ai-test-data-used", generated.model_dump())
+
+
+def stable_seed(run_id: str) -> int:
+    digest = hashlib.sha256(run_id.encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
+
+
+def build_prompt(run_id: str) -> str:
+    return (
+        "Generate coherent realistic Indonesian business test data for eDOT QA automation. "
+        "Return only JSON matching the provided schema. "
+        "Use safe dummy domains and phone numbers. "
+        f"Make values unique for run_id {run_id}. "
+        "Company must include legal_name, email, phone, street_address, industry. "
+        "Customer must include name, contact, address. "
+        "Do not include credentials, API keys, real private personal data, or extra fields."
+    )
+
+
+def business_test_data_json_schema() -> dict:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "company": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "legal_name": {
+                        "type": "string",
+                        "minLength": 5,
+                        "maxLength": 120,
+                        "description": "Indonesian legal company name starting with PT or CV.",
+                    },
+                    "email": {
+                        "type": "string",
+                        "minLength": 6,
+                        "maxLength": 120,
+                        "description": "Safe dummy email address.",
+                    },
+                    "phone": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 16,
+                        "description": "Indonesian phone number in +62 format.",
+                    },
+                    "street_address": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 180,
+                        "description": "Realistic Indonesian street address.",
+                    },
+                    "industry": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 60,
+                        "description": "Business industry such as Retail or Distribution.",
+                    },
+                },
+                "required": ["legal_name", "email", "phone", "street_address", "industry"],
+            },
+            "customer": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 100,
+                        "description": "Indonesian customer name.",
+                    },
+                    "contact": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 120,
+                        "description": "Indonesian phone number in +62 format, or safe dummy email.",
+                    },
+                    "address": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 180,
+                        "description": "Realistic Indonesian customer address.",
+                    },
+                },
+                "required": ["name", "contact", "address"],
+            },
+        },
+        "required": ["company", "customer"],
+    }
+
+
+def extract_response_text(body: dict) -> str:
+    output_text = body.get("output_text")
+    if isinstance(output_text, str) and output_text.strip():
+        return output_text
+
+    for output_item in body.get("output", []):
+        for content_item in output_item.get("content", []):
+            text = content_item.get("text")
+            if isinstance(text, str) and text.strip():
+                return text
+
+    raise RuntimeError("OpenAI Responses API returned no output text")
+
+
+def generate_test_data(run_id: str | None = None, *, attach_to_allure: bool = True) -> GeneratedTestData:
+    return TestDataGenerator().generate(run_id=run_id, attach_to_allure=attach_to_allure)

@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+import re
+from urllib.parse import urlparse
+
+from playwright.sync_api import Locator, TimeoutError
+
+from edot_qa.web.base_page import BasePage
+
+
+EMAIL_OR_USERNAME = re.compile(r"use email or username", re.I)
+EMAIL_FIELD = re.compile(r"(email|e-mail|username|user name)", re.I)
+PASSWORD_FIELD = re.compile(r"(password|kata sandi)", re.I)
+SUBMIT_ACTION = re.compile(r"^(continue|next|submit|login|log in|sign in|masuk|lanjut)$", re.I)
+
+
+class LoginPage(BasePage):
+    def open(self) -> None:
+        self.page.goto(self.settings.esuite_base_url)
+        self.page.wait_for_load_state("domcontentloaded")
+
+    @property
+    def use_email_or_username_button(self) -> Locator:
+        role_button = self.page.get_by_role("button", name=EMAIL_OR_USERNAME).first
+        # Text fallback is justified because the assignment names this exact login action.
+        exact_text = self.page.get_by_text("Use Email or Username", exact=True).first
+        return self.first_visible(
+            [
+                ("button named Use Email or Username", role_button),
+                ("assignment-required action text", exact_text),
+            ],
+            "Use Email or Username action",
+            timeout_ms=10_000,
+        )
+
+    @property
+    def email_or_username_input(self) -> Locator:
+        return self.first_visible(
+            [
+                ("textbox named email or username", self.page.get_by_role("textbox", name=EMAIL_FIELD).first),
+                ("placeholder email or username", self.page.get_by_placeholder(EMAIL_FIELD).first),
+                ("input with stable email name", self.page.locator("input[name*='email' i]").first),
+                ("input with stable username name", self.page.locator("input[name*='username' i]").first),
+                ("input with stable email type", self.page.locator("input[type='email']").first),
+            ],
+            "email or username input",
+            timeout_ms=10_000,
+        )
+
+    @property
+    def password_input(self) -> Locator:
+        return self.first_visible(
+            [
+                ("textbox named password", self.page.get_by_role("textbox", name=PASSWORD_FIELD).first),
+                ("placeholder password", self.page.get_by_placeholder(PASSWORD_FIELD).first),
+                ("input with stable password name", self.page.locator("input[name*='password' i]").first),
+                ("input with stable password type", self.page.locator("input[type='password']").first),
+            ],
+            "password input",
+            timeout_ms=10_000,
+        )
+
+    @property
+    def submit_button(self) -> Locator:
+        return self.first_visible(
+            [
+                ("button with login submit action", self.page.get_by_role("button", name=SUBMIT_ACTION).first),
+                ("button with stable submit type", self.page.locator("button[type='submit']").first),
+                ("input with stable submit type", self.page.locator("input[type='submit']").first),
+            ],
+            "form submit action",
+            timeout_ms=10_000,
+        )
+
+    def choose_email_or_username(self) -> None:
+        self.use_email_or_username_button.click()
+
+    def submit_email(self, email: str) -> None:
+        self.email_or_username_input.fill(email)
+        self.submit_button.click()
+
+    def submit_password(self, password: str) -> None:
+        self.password_input.fill(password)
+        self.submit_button.click()
+
+    def wait_for_esuite_return(self) -> None:
+        expected_host = urlparse(self.settings.esuite_base_url).netloc
+
+        def is_esuite_url(url: str) -> bool:
+            return urlparse(url).netloc == expected_host
+
+        try:
+            self.page.wait_for_url(is_esuite_url, timeout=60_000)
+        except TimeoutError:
+            current_host = urlparse(self.page.url).netloc
+            raise AssertionError(
+                f"Expected redirect back to {expected_host}; current host is {current_host}"
+            ) from None
+        self.page.wait_for_load_state("domcontentloaded")
+
+    def login(self, email: str, password: str) -> None:
+        self.open()
+        self.choose_email_or_username()
+        self.submit_email(email)
+        self.submit_password(password)
+        self.wait_for_esuite_return()

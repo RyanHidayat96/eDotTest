@@ -7,12 +7,11 @@ from playwright.sync_api import Locator, TimeoutError, expect
 
 from edot_qa.reporting.allure_helpers import attach_json, attach_text
 from edot_qa.web.base_page import BasePage
-from edot_qa.web.pages.company_detail_page import CompanyDetailPage
+from edot_qa.web.pages.company_detail_page import CompanyDetailPage, confirm_delete_if_needed
 
 
 DETAIL_ACTION = re.compile(r"^(Manage|Detail|View|Open|Lihat|Kelola)$", re.I)
 DELETE_ACTION = re.compile(r"^(Delete|Hapus|Remove)$", re.I)
-CONFIRM_DELETE_ACTION = re.compile(r"^(Delete|Hapus|Yes|Ya|Confirm|OK)$", re.I)
 
 
 class CompanyManagePage(BasePage):
@@ -208,20 +207,7 @@ class CompanyManagePage(BasePage):
         ]
 
     def _confirm_delete_if_needed(self) -> None:
-        candidates = [
-            ("confirmation button", self.page.get_by_role("button", name=CONFIRM_DELETE_ACTION).first),
-            # Text fallback is justified because confirmation dialogs often lack stable roles.
-            ("confirmation Delete text", self.page.get_by_text("Delete", exact=True).last),
-            # Text fallback is justified because eSuite may localize confirmation text.
-            ("confirmation Hapus text", self.page.get_by_text("Hapus", exact=True).last),
-        ]
-        for _, locator in candidates:
-            try:
-                expect(locator).to_be_visible(timeout=3_000)
-                locator.click()
-                return
-            except (AssertionError, PlaywrightError, TimeoutError):
-                continue
+        confirm_delete_if_needed(self.page)
 
     def _wait_after_table_action(self) -> None:
         try:

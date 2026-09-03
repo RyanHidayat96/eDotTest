@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 
 from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import Locator, TimeoutError, expect
+from playwright.sync_api import Locator, Page, TimeoutError, expect
 
 from edot_qa.reporting.allure_helpers import attach_json
 from edot_qa.web.base_page import BasePage
@@ -12,7 +12,8 @@ from edot_qa.web.company_registration import CompanyRegistrationData
 
 
 DELETE_ACTION = re.compile(r"^(Delete|Hapus|Remove)$", re.I)
-CONFIRM_DELETE_ACTION = re.compile(r"^(Delete|Hapus|Yes|Ya|Confirm|OK)$", re.I)
+CONFIRM_DELETE_ACTION = re.compile(r"^(Confirm|Delete|Hapus|Yes|Ya|OK)$", re.I)
+DELETE_AGREEMENT = re.compile(r"I understand\s*&\s*agree to delete", re.I)
 
 
 @dataclass(frozen=True)
@@ -114,20 +115,7 @@ class CompanyDetailPage(BasePage):
         )
 
     def _confirm_delete_if_needed(self) -> None:
-        candidates = [
-            ("confirmation button", self.page.get_by_role("button", name=CONFIRM_DELETE_ACTION).first),
-            # Text fallback is justified because confirmation dialogs often lack stable roles.
-            ("confirmation Delete text", self.page.get_by_text("Delete", exact=True).last),
-            # Text fallback is justified because eSuite may localize confirmation text.
-            ("confirmation Hapus text", self.page.get_by_text("Hapus", exact=True).last),
-        ]
-        for _, locator in candidates:
-            try:
-                expect(locator).to_be_visible(timeout=3_000)
-                locator.click()
-                return
-            except (AssertionError, PlaywrightError, TimeoutError):
-                continue
+        confirm_delete_if_needed(self.page)
 
     def _wait_after_delete(self) -> None:
         try:
@@ -195,3 +183,51 @@ def stable_action_selector(action_name: str) -> str:
         f"button[aria-label='{action_name}'], a[name='{action_name}'], "
         f"a[id='{action_name}'], a[aria-label='{action_name}']"
     )
+
+
+def confirm_delete_if_needed(page: Page) -> None:
+    _accept_delete_agreement_if_present(page)
+    candidates = [
+        ("confirmation Confirm button", page.get_by_role("button", name=re.compile(r"^Confirm$", re.I)).first),
+        ("confirmation button", page.get_by_role("button", name=CONFIRM_DELETE_ACTION).first),
+        # Text fallback is justified because confirmation dialogs often lack stable roles.
+        ("confirmation Delete text", page.get_by_text("Delete", exact=True).last),
+        # Text fallback is justified because eSuite may localize confirmation text.
+        ("confirmation Hapus text", page.get_by_text("Hapus", exact=True).last),
+    ]
+    for _, locator in candidates:
+        try:
+            expect(locator).to_be_visible(timeout=3_000)
+            expect(locator).to_be_enabled(timeout=3_000)
+            locator.click()
+            return
+        except (AssertionError, PlaywrightError, TimeoutError):
+            continue
+
+
+def _accept_delete_agreement_if_present(page: Page) -> None:
+    candidates = [
+        ("delete agreement checkbox by label", page.get_by_label(DELETE_AGREEMENT).first),
+        ("delete agreement checkbox role", page.get_by_role("checkbox", name=DELETE_AGREEMENT).first),
+        ("visible delete checkbox", page.locator("input[type='checkbox']").last),
+        ("delete agreement text", page.get_by_text(DELETE_AGREEMENT).first),
+    ]
+    for _, locator in candidates:
+        try:
+            expect(locator).to_be_visible(timeout=1_000)
+            _check_or_click(locator)
+            return
+        except (AssertionError, PlaywrightError, TimeoutError):
+            continue
+
+
+def _check_or_click(locator: Locator) -> None:
+    try:
+        if locator.is_checked(timeout=500):
+            return
+    except (PlaywrightError, TimeoutError):
+        pass
+    try:
+        locator.check(timeout=1_000)
+    except (PlaywrightError, TimeoutError):
+        locator.click(timeout=1_000)

@@ -123,6 +123,8 @@ class RegisterCompanyWizardPage(BasePage):
             (self.zone, "Choose Sub District"),
             (self.postal_code, "Choose Postal Code"),
         ):
+            if self._visible_control_is_disabled(placeholder):
+                continue
             control = self._choice_control_by_visible_text(spec, placeholder)
             self._expect_required_control_disabled(control, spec)
 
@@ -220,7 +222,11 @@ class RegisterCompanyWizardPage(BasePage):
                     self._after_selection()
                     return
                 control.click()
-                if self._try_click_visible_option(value, timeout_ms=1_500) or self._try_filter_and_click_option(value):
+                if (
+                    self._try_click_visible_option(value, timeout_ms=750)
+                    or self._try_filter_and_click_option(value)
+                    or self._try_click_visible_option(value, timeout_ms=3_000)
+                ):
                     self._after_selection()
                     return
             except (AssertionError, TimeoutError, PlaywrightError) as error:
@@ -237,9 +243,9 @@ class RegisterCompanyWizardPage(BasePage):
         )
         candidates.extend(
             [
+                (f"placeholder Input {spec.label.removeprefix('Street ')}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label.removeprefix('Street '))}", re.I)).first),
                 (f"placeholder {spec.label}", self.page.get_by_placeholder(label_regex).first),
                 (f"placeholder Input {spec.label}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label)}", re.I)).first),
-                (f"placeholder Input {spec.label.removeprefix('Street ')}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label.removeprefix('Street '))}", re.I)).first),
                 (f"label {spec.label}", self.page.get_by_label(label_regex).first),
             ]
         )
@@ -263,13 +269,15 @@ class RegisterCompanyWizardPage(BasePage):
             ]
         )
         candidates.extend(
-            [
+            existing_locator_candidates(
+                [
                 (f"combobox containing Choose {spec.label}", self.page.get_by_role("combobox").filter(has_text=f"Choose {spec.label}").first),
                 (f"button containing Choose {spec.label}", self.page.get_by_role("button").filter(has_text=f"Choose {spec.label}").first),
                 (f"combobox named {spec.label}", self.page.get_by_role("combobox", name=label_regex).first),
                 (f"button named {spec.label}", self.page.get_by_role("button", name=label_regex).first),
                 (f"label {spec.label}", self.page.get_by_label(label_regex).first),
-            ]
+                ]
+            )
         )
         candidates.extend(
             existing_locator_candidates(
@@ -286,13 +294,13 @@ class RegisterCompanyWizardPage(BasePage):
     def _choice_control_by_visible_text(self, spec: FieldSpec, text: str) -> Locator:
         return self.first_visible(
             [
-                ("button containing visible choice text", self.page.get_by_role("button").filter(has_text=text).first),
-                ("combobox containing visible choice text", self.page.get_by_role("combobox").filter(has_text=text).first),
                 # Text fallback is justified because eSuite cascade controls expose selected placeholder text.
                 (f"visible {spec.label} placeholder", self.page.get_by_text(text, exact=True).first),
+                ("button containing visible choice text", self.page.get_by_role("button").filter(has_text=text).first),
+                ("combobox containing visible choice text", self.page.get_by_role("combobox").filter(has_text=text).first),
             ],
             f"{spec.label} disabled cascade control",
-            timeout_ms=5_000,
+            timeout_ms=1_000,
         )
 
     def _visible_option(self, value: str, *, timeout_ms: int = 10_000) -> Locator:
@@ -308,8 +316,6 @@ class RegisterCompanyWizardPage(BasePage):
             + [
                 # Text fallback is justified because dropdown option markup often lacks ARIA roles.
                 ("visible option text regex", self.page.get_by_text(exact).last),
-                # Text fallback is justified because dropdown option markup often lacks ARIA roles.
-                ("visible option text", self.page.get_by_text(value, exact=True).last),
             ],
             f"option {value}",
             timeout_ms=timeout_ms,
@@ -325,15 +331,15 @@ class RegisterCompanyWizardPage(BasePage):
     def _try_filter_and_click_option(self, value: str) -> bool:
         search_regex = re.compile(r"^Search$", re.I)
         search_controls = [
+            ("dropdown search input", self.page.locator("input[placeholder='Search']").last),
             ("dropdown searchbox", self.page.get_by_role("searchbox").last),
             ("dropdown search placeholder", self.page.get_by_placeholder(search_regex).last),
-            ("dropdown search input", self.page.locator("input[placeholder='Search']").last),
         ]
         for _, search_control in search_controls:
             try:
-                expect(search_control).to_be_visible(timeout=2_000)
-                search_control.fill(value)
-                return self._try_click_visible_option(value, timeout_ms=5_000)
+                expect(search_control).to_be_visible(timeout=500)
+                search_control.fill(value, timeout=1_000)
+                return self._try_click_visible_option(value, timeout_ms=2_000)
             except (AssertionError, TimeoutError, PlaywrightError):
                 continue
         return False
@@ -345,6 +351,30 @@ class RegisterCompanyWizardPage(BasePage):
             expect(self.page.get_by_text(exact_value).last).to_be_visible(timeout=3_000)
             return True
         except (AssertionError, TimeoutError, PlaywrightError):
+            return False
+
+    def _visible_control_is_disabled(self, text: str) -> bool:
+        try:
+            return bool(
+                self.page.evaluate(
+                    """text => {
+                        const controls = Array.from(
+                            document.querySelectorAll('button,input,textarea,select,[role="combobox"]')
+                        );
+                        return controls.some(element => {
+                            const visible = Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+                            if (!visible) return false;
+                            const value = element.value || element.innerText || element.textContent || element.getAttribute('placeholder') || '';
+                            if (!value.toLowerCase().includes(text.toLowerCase())) return false;
+                            return Boolean(element.disabled)
+                                || element.readOnly === true
+                                || element.getAttribute('aria-disabled') === 'true';
+                        });
+                    }""",
+                    text,
+                )
+            )
+        except PlaywrightError:
             return False
 
     def _assert_required_control_editable(self, control: Locator, spec: FieldSpec) -> None:

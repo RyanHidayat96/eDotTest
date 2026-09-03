@@ -206,6 +206,8 @@ class RegisterCompanyWizardPage(BasePage):
                 for stable_name in spec.stable_names
             ]
         )
+        # Text fallback is justified because current eSuite dropdown buttons expose visible text but no stable name/id.
+        candidates.append((f"assignment dropdown Choose {spec.label}", self.page.get_by_text(f"Choose {spec.label}", exact=True).first))
         return candidates
 
     def _visible_option(self, value: str) -> Locator:

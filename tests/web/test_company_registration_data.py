@@ -30,7 +30,7 @@ def test_company_registration_maps_ai_data_and_defaults():
 
     registration = CompanyRegistrationData.from_generated_test_data(generated)
 
-    assert registration.company_name == "PT Ritel Nusantara QA ABC12345"
+    assert registration.company_name == "PT Ritel QA ABC12345"
     assert registration.email == "qa.company@example.test"
     assert registration.phone == "8123456789"
     assert registration.industry_type == "Retail"
@@ -38,7 +38,7 @@ def test_company_registration_maps_ai_data_and_defaults():
     assert registration.language == "English"
     assert registration.location == LocationCascade()
     assert registration.expected_detail_values() == {
-        "name": "PT Ritel Nusantara QA ABC12345",
+        "name": "PT Ritel QA ABC12345",
         "industry type": "Retail",
         "company type": "Retailer",
         "address": "Jl. Sudirman No. 10, Jakarta Selatan",

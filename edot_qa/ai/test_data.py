@@ -136,7 +136,7 @@ class FakerFallbackProvider:
         suffix = run_id[-8:].upper()
         company_prefix = fake.random_element(elements=("PT", "CV"))
         company_root = fake.random_element(
-            elements=("Nusantara Ritel Mandiri", "Sumber Makmur Sentosa", "Cahaya Niaga Abadi")
+            elements=("Ritel", "Niaga", "Makmur")
         )
         customer_name = fake.name()
         return BusinessTestData.model_validate(

@@ -57,7 +57,7 @@ class CompanyRegistrationData(BaseModel):
             company_name=company_name,
             email=company.email,
             phone=normalize_phone_for_web(company.phone),
-            industry_type=company.industry,
+            industry_type=normalize_industry_for_web(company.industry),
             company_type=os.getenv("ESUITE_COMPANY_TYPE", cls.model_fields["company_type"].default),
             language=os.getenv("ESUITE_COMPANY_LANGUAGE", cls.model_fields["language"].default),
             street_address=company.street_address,
@@ -92,7 +92,7 @@ def normalize_company_name_for_web(company_name: str, suffix: str) -> str:
         if upper_word in {"PT", "CV", "PERSERO", "TBK", "QA", suffix.upper()}:
             continue
         root_words.append(word.title())
-    root = " ".join(root_words[:4]) or "Nusantara Ritel Mandiri"
+    root = root_words[0] if root_words else "Ritel"
     return f"{words[0].upper()} {root} QA {suffix}"
 
 
@@ -103,3 +103,16 @@ def normalize_phone_for_web(phone: str) -> str:
     if digits.startswith("0"):
         digits = digits[1:]
     return digits[:13]
+
+
+def normalize_industry_for_web(industry: str) -> str:
+    lowered = industry.strip().lower()
+    if "food" in lowered or "beverage" in lowered:
+        return "Food & Beverage"
+    if "manufact" in lowered:
+        return "Manufacturing"
+    if "transport" in lowered or "logistic" in lowered or "distribut" in lowered:
+        return "Transportation and Logistics"
+    if "tech" in lowered:
+        return "Technology"
+    return "Retail"

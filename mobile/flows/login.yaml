@@ -1,0 +1,4 @@
+appId: ${EWORK_APP_ID}
+---
+- launchApp
+- runFlow: common/login.yaml

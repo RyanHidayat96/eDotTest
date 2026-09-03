@@ -38,6 +38,8 @@ playwright-report/
 reports/allure-results/
 reports/allure-report/
 artifacts/
+maestro-output/
+.maestro/
 trace.zip
 *.trace.zip
 *.webm

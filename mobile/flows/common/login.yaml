@@ -1,0 +1,12 @@
+appId: ${EWORK_APP_ID}
+---
+# STEP 9 replaces selector env IDs with confirmed eWork SFA selectors after device/app inspection.
+- assertVisible: ${EWORK_LOGIN_SCREEN_TEXT}
+- tapOn:
+    id: ${EWORK_USERNAME_FIELD_ID}
+- inputText: ${EWORK_EMAIL}
+- tapOn:
+    id: ${EWORK_PASSWORD_FIELD_ID}
+- inputText: ${EWORK_PASSWORD}
+- tapOn:
+    id: ${EWORK_LOGIN_BUTTON_ID}

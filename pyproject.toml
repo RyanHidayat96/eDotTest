@@ -26,9 +26,12 @@ include = ["edot_qa*"]
 addopts = "--strict-config --strict-markers --alluredir=reports/allure-results"
 markers = [
     "ai: AI data generation and triage tests",
+    "mobile: mobile eWork SFA tests",
     "web: web eSuite tests",
     "requires_credentials: test requires secure runtime credentials",
     "requires_cleanup: test creates data and requires cleanup support",
+    "requires_device: test requires an adb-visible mobile device",
+    "requires_maestro: test requires Maestro CLI",
     "requires_storage_state: test requires an existing Playwright storage_state file",
 ]
 pythonpath = ["."]

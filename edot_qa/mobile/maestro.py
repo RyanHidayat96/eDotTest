@@ -43,7 +43,13 @@ class MaestroRunner:
             return self.settings.maestro_flow_dir / flow_path
         return ROOT_DIR / flow_path
 
-    def run_flow(self, flow: str | Path, *, timeout_seconds: int = 300) -> MaestroResult:
+    def run_flow(
+        self,
+        flow: str | Path,
+        *,
+        timeout_seconds: int = 300,
+        extra_env: dict[str, str] | None = None,
+    ) -> MaestroResult:
         if not command_available(self.settings.maestro_cli):
             raise RuntimeError(f"Maestro CLI not found: {self.settings.maestro_cli}")
 
@@ -58,7 +64,7 @@ class MaestroRunner:
         completed = subprocess.run(
             command,
             cwd=ROOT_DIR,
-            env=self.settings.maestro_environment(),
+            env=self.settings.maestro_environment(extra_env),
             capture_output=True,
             text=True,
             timeout=timeout_seconds,

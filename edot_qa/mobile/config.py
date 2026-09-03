@@ -31,6 +31,13 @@ class MobileSettings:
     ework_password_field_id: str | None
     ework_login_button_id: str | None
     ework_dashboard_text: str | None
+    ework_customers_menu_id: str | None
+    ework_add_customer_button_id: str | None
+    ework_customer_name_field_id: str | None
+    ework_customer_contact_field_id: str | None
+    ework_customer_address_field_id: str | None
+    ework_customer_save_button_id: str | None
+    ework_customer_search_field_id: str | None
     maestro_flow_dir: Path
     maestro_output_dir: Path
     allure_results_dir: Path
@@ -66,6 +73,18 @@ class MobileSettings:
         }
         return [key for key, value in requirements.items() if not value]
 
+    def missing_customer_requirements(self) -> list[str]:
+        requirements = {
+            "EWORK_CUSTOMERS_MENU_ID": self.ework_customers_menu_id,
+            "EWORK_ADD_CUSTOMER_BUTTON_ID": self.ework_add_customer_button_id,
+            "EWORK_CUSTOMER_NAME_FIELD_ID": self.ework_customer_name_field_id,
+            "EWORK_CUSTOMER_CONTACT_FIELD_ID": self.ework_customer_contact_field_id,
+            "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id,
+            "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id,
+            "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id,
+        }
+        return self.missing_login_requirements() + [key for key, value in requirements.items() if not value]
+
     def ensure_runtime_dirs(self) -> None:
         self.maestro_output_dir.mkdir(parents=True, exist_ok=True)
         self.allure_results_dir.mkdir(parents=True, exist_ok=True)
@@ -84,12 +103,19 @@ class MobileSettings:
             "EWORK_PASSWORD_FIELD_ID": self.ework_password_field_id or "<missing>",
             "EWORK_LOGIN_BUTTON_ID": self.ework_login_button_id or "<missing>",
             "EWORK_DASHBOARD_TEXT": self.ework_dashboard_text or "<missing>",
+            "EWORK_CUSTOMERS_MENU_ID": self.ework_customers_menu_id or "<missing>",
+            "EWORK_ADD_CUSTOMER_BUTTON_ID": self.ework_add_customer_button_id or "<missing>",
+            "EWORK_CUSTOMER_NAME_FIELD_ID": self.ework_customer_name_field_id or "<missing>",
+            "EWORK_CUSTOMER_CONTACT_FIELD_ID": self.ework_customer_contact_field_id or "<missing>",
+            "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id or "<missing>",
+            "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id or "<missing>",
+            "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id or "<missing>",
             "MAESTRO_FLOW_DIR": str(self.maestro_flow_dir),
             "MAESTRO_OUTPUT_DIR": str(self.maestro_output_dir),
             "ALLURE_RESULTS_DIR": str(self.allure_results_dir),
         }
 
-    def maestro_environment(self) -> dict[str, str]:
+    def maestro_environment(self, extra_values: dict[str, str] | None = None) -> dict[str, str]:
         env = os.environ.copy()
         optional_values = {
             "EWORK_APP_ID": self.ework_app_id,
@@ -101,8 +127,18 @@ class MobileSettings:
             "EWORK_PASSWORD_FIELD_ID": self.ework_password_field_id,
             "EWORK_LOGIN_BUTTON_ID": self.ework_login_button_id,
             "EWORK_DASHBOARD_TEXT": self.ework_dashboard_text,
+            "EWORK_CUSTOMERS_MENU_ID": self.ework_customers_menu_id,
+            "EWORK_ADD_CUSTOMER_BUTTON_ID": self.ework_add_customer_button_id,
+            "EWORK_CUSTOMER_NAME_FIELD_ID": self.ework_customer_name_field_id,
+            "EWORK_CUSTOMER_CONTACT_FIELD_ID": self.ework_customer_contact_field_id,
+            "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id,
+            "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id,
+            "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id,
         }
         for key, value in optional_values.items():
+            if value:
+                env[key] = value
+        for key, value in (extra_values or {}).items():
             if value:
                 env[key] = value
         return env
@@ -123,6 +159,13 @@ def load_mobile_settings() -> MobileSettings:
         ework_password_field_id=os.getenv("EWORK_PASSWORD_FIELD_ID") or None,
         ework_login_button_id=os.getenv("EWORK_LOGIN_BUTTON_ID") or None,
         ework_dashboard_text=os.getenv("EWORK_DASHBOARD_TEXT") or None,
+        ework_customers_menu_id=os.getenv("EWORK_CUSTOMERS_MENU_ID") or None,
+        ework_add_customer_button_id=os.getenv("EWORK_ADD_CUSTOMER_BUTTON_ID") or None,
+        ework_customer_name_field_id=os.getenv("EWORK_CUSTOMER_NAME_FIELD_ID") or None,
+        ework_customer_contact_field_id=os.getenv("EWORK_CUSTOMER_CONTACT_FIELD_ID") or None,
+        ework_customer_address_field_id=os.getenv("EWORK_CUSTOMER_ADDRESS_FIELD_ID") or None,
+        ework_customer_save_button_id=os.getenv("EWORK_CUSTOMER_SAVE_BUTTON_ID") or None,
+        ework_customer_search_field_id=os.getenv("EWORK_CUSTOMER_SEARCH_FIELD_ID") or None,
         maestro_flow_dir=_path_from_env("MAESTRO_FLOW_DIR", DEFAULT_MAESTRO_FLOW_DIR),
         maestro_output_dir=_path_from_env("MAESTRO_OUTPUT_DIR", DEFAULT_MAESTRO_OUTPUT_DIR),
         allure_results_dir=_path_from_env("ALLURE_RESULTS_DIR", DEFAULT_ALLURE_RESULTS),

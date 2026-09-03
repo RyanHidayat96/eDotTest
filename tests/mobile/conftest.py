@@ -22,7 +22,14 @@ def maestro_runner(mobile_settings: MobileSettings) -> MaestroRunner:
 
 @pytest.fixture()
 def run_maestro_flow(maestro_runner: MaestroRunner):
-    def _run(flow: str, *, timeout_seconds: int = 300) -> MaestroResult:
-        return assert_maestro_passed(maestro_runner.run_flow(flow, timeout_seconds=timeout_seconds))
+    def _run(
+        flow: str,
+        *,
+        timeout_seconds: int = 300,
+        extra_env: dict[str, str] | None = None,
+    ) -> MaestroResult:
+        return assert_maestro_passed(
+            maestro_runner.run_flow(flow, timeout_seconds=timeout_seconds, extra_env=extra_env)
+        )
 
     return _run

@@ -24,6 +24,13 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     monkeypatch.setenv("EWORK_PASSWORD_FIELD_ID", "login-password")
     monkeypatch.setenv("EWORK_LOGIN_BUTTON_ID", "login-submit")
     monkeypatch.setenv("EWORK_DASHBOARD_TEXT", "Dashboard")
+    monkeypatch.setenv("EWORK_CUSTOMERS_MENU_ID", "customers-menu")
+    monkeypatch.setenv("EWORK_ADD_CUSTOMER_BUTTON_ID", "customer-add")
+    monkeypatch.setenv("EWORK_CUSTOMER_NAME_FIELD_ID", "customer-name")
+    monkeypatch.setenv("EWORK_CUSTOMER_CONTACT_FIELD_ID", "customer-contact")
+    monkeypatch.setenv("EWORK_CUSTOMER_ADDRESS_FIELD_ID", "customer-address")
+    monkeypatch.setenv("EWORK_CUSTOMER_SAVE_BUTTON_ID", "customer-save")
+    monkeypatch.setenv("EWORK_CUSTOMER_SEARCH_FIELD_ID", "customer-search")
 
     safe = load_mobile_settings().as_safe_dict()
 
@@ -32,6 +39,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_PASSWORD"] == "<set>"
     assert safe["EWORK_COMPANY_CODE"] == "<set>"
     assert safe["EWORK_DASHBOARD_TEXT"] == "Dashboard"
+    assert safe["EWORK_CUSTOMER_NAME_FIELD_ID"] == "customer-name"
     assert "secret-value" not in str(safe)
 
 
@@ -41,6 +49,8 @@ def test_mobile_settings_reports_missing_login_requirements(tmp_path):
     assert settings.has_login_selectors
     assert "EWORK_EMAIL" in settings.missing_login_requirements()
     assert "EWORK_PASSWORD" in settings.missing_login_requirements()
+    assert "EWORK_EMAIL" in settings.missing_customer_requirements()
+    assert "EWORK_CUSTOMER_NAME_FIELD_ID" not in settings.missing_customer_requirements()
 
 
 def test_adb_devices_parser_detects_ready_device():
@@ -94,6 +104,26 @@ def test_maestro_runner_returns_failed_result_without_swallowing(monkeypatch, tm
     assert result.stderr == "bad selector"
 
 
+def test_maestro_runner_merges_generated_data_env(monkeypatch, tmp_path):
+    settings = _mobile_settings(tmp_path)
+    flow_path = settings.maestro_flow_dir / "create_customer.yaml"
+    flow_path.write_text("appId: ${EWORK_APP_ID}\n---\n- launchApp\n", encoding="utf-8")
+    monkeypatch.setattr("edot_qa.mobile.maestro.command_available", lambda _: True)
+
+    def fake_run(*args, **kwargs):
+        assert kwargs["env"]["EWORK_CUSTOMER_NAME"] == "Budi QA"
+        return subprocess.CompletedProcess(args=args[0], returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr("edot_qa.mobile.maestro.subprocess.run", fake_run)
+
+    result = MaestroRunner(settings).run_flow(
+        "create_customer.yaml",
+        extra_env={"EWORK_CUSTOMER_NAME": "Budi QA"},
+    )
+
+    assert result.passed
+
+
 def test_maestro_assertion_helper_fails_pytest_on_failed_flow(tmp_path):
     result = MaestroResult(
         flow_path=tmp_path / "login.yaml",
@@ -117,6 +147,22 @@ def test_mobile_login_flow_uses_run_flow_and_environment_values():
     assert "${EWORK_EMAIL}" in shared_flow
     assert "${EWORK_PASSWORD}" in shared_flow
     assert "${EWORK_DASHBOARD_TEXT}" in entry_flow
+    assert "@edot" not in combined.lower()
+
+
+def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
+    entry_flow = (ROOT_DIR / "mobile" / "flows" / "create_customer.yaml").read_text(encoding="utf-8")
+    shared_flow = (ROOT_DIR / "mobile" / "flows" / "common" / "create_customer.yaml").read_text(encoding="utf-8")
+    combined = f"{entry_flow}\n{shared_flow}"
+
+    assert "runFlow: common/login.yaml" in entry_flow
+    assert "runFlow: common/create_customer.yaml" in entry_flow
+    assert "${EWORK_CUSTOMER_NAME}" in shared_flow
+    assert "${EWORK_CUSTOMER_CONTACT}" in shared_flow
+    assert "${EWORK_CUSTOMER_ADDRESS}" in shared_flow
+    assert "Tier 2: created customer name" in shared_flow
+    assert "Tier 2: created customer contact" in shared_flow
+    assert "Tier 2: created customer address" in shared_flow
     assert "@edot" not in combined.lower()
 
 
@@ -179,6 +225,13 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         ework_password_field_id="login-password",
         ework_login_button_id="login-submit",
         ework_dashboard_text="Dashboard",
+        ework_customers_menu_id="customers-menu",
+        ework_add_customer_button_id="customer-add",
+        ework_customer_name_field_id="customer-name",
+        ework_customer_contact_field_id="customer-contact",
+        ework_customer_address_field_id="customer-address",
+        ework_customer_save_button_id="customer-save",
+        ework_customer_search_field_id="customer-search",
         maestro_flow_dir=flow_dir,
         maestro_output_dir=tmp_path / "maestro-output",
         allure_results_dir=tmp_path / "allure-results",

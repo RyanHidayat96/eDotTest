@@ -92,3 +92,11 @@ class MaestroRunner:
         for path in sorted(self.settings.maestro_output_dir.rglob("*")):
             if path.is_file() and path.suffix.lower() in {".log", ".mp4", ".png", ".txt", ".webm"}:
                 attach_file(f"maestro-artifact-{path.name}", path)
+
+
+def assert_maestro_passed(result: MaestroResult) -> MaestroResult:
+    if result.passed:
+        return result
+    raise AssertionError(
+        f"Maestro flow failed with exit code {result.returncode}: {result.flow_path.name}\n{result.stderr}".strip()
+    )

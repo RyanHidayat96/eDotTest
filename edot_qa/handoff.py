@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from edot_qa.config import ROOT_DIR
 from edot_qa.reporting.allure_helpers import allure_step, attach_json
 from edot_qa.web.company_registration import CompanyRegistrationData
+from edot_qa.web.company_user import CompanyUserData
 
 
 DEFAULT_COMPANY_HANDOFF_PATH = ROOT_DIR / "artifacts" / "handoff" / "web_company.json"
@@ -23,10 +24,13 @@ def current_utc_timestamp() -> str:
 class CompanyHandoff(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    schema_version: int = Field(default=1)
+    schema_version: int = Field(default=2)
     company_name: str = Field(min_length=5, max_length=140)
     company_email: str = Field(min_length=6, max_length=120)
     company_code: str | None = Field(default=None, min_length=2, max_length=140)
+    company_user_name: str | None = Field(default=None, min_length=3, max_length=100)
+    company_user_username: str | None = Field(default=None, min_length=5, max_length=32)
+    company_user_email: str | None = Field(default=None, min_length=6, max_length=120)
     source_run_id: str = Field(min_length=1, max_length=80)
     trial_days: int = Field(default=30, ge=1, le=60)
     created_at_utc: str = Field(default_factory=current_utc_timestamp)
@@ -38,18 +42,26 @@ class CompanyHandoff(BaseModel):
         *,
         source_run_id: str,
         company_code: str | None = None,
+        company_user: CompanyUserData | None = None,
     ) -> "CompanyHandoff":
         return cls(
             company_name=registration.company_name,
             company_email=registration.email,
             company_code=company_code,
+            company_user_name=company_user.name if company_user else None,
+            company_user_username=company_user.username if company_user else None,
+            company_user_email=company_user.email if company_user else None,
             source_run_id=source_run_id,
         )
+
+    @property
+    def mobile_username(self) -> str:
+        return self.company_user_username or self.company_email
 
     def as_mobile_environment(self) -> dict[str, str]:
         values = {
             "EWORK_COMPANY_NAME": self.company_name,
-            "EWORK_EMAIL": self.company_email,
+            "EWORK_EMAIL": self.mobile_username,
         }
         if self.company_code:
             values["EWORK_COMPANY_CODE"] = self.company_code

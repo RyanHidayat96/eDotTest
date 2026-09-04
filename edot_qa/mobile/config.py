@@ -295,7 +295,7 @@ def load_mobile_settings(*, prefer_handoff: bool | None = None) -> MobileSetting
     handoff_path = _path_from_env("EWORK_COMPANY_HANDOFF_PATH", DEFAULT_COMPANY_HANDOFF_PATH)
     handoff = read_company_handoff(handoff_path)
     prefer_company_handoff = _bool_from_env("EWORK_PREFER_HANDOFF") if prefer_handoff is None else prefer_handoff
-    handoff_email = handoff.company_email if handoff else None
+    handoff_username = handoff.mobile_username if handoff else None
     handoff_name = handoff.company_name if handoff else None
     handoff_code = handoff.company_code if handoff else None
     return MobileSettings(
@@ -306,7 +306,7 @@ def load_mobile_settings(*, prefer_handoff: bool | None = None) -> MobileSetting
         edot_live=_bool_from_env("EDOT_LIVE"),
         prefer_company_handoff=prefer_company_handoff,
         ework_app_id=os.getenv("EWORK_APP_ID") or None,
-        ework_email=_company_identity_value("EWORK_EMAIL", handoff_email, prefer_company_handoff),
+        ework_email=_company_identity_value("EWORK_EMAIL", handoff_username, prefer_company_handoff),
         ework_password=os.getenv("EWORK_PASSWORD") or None,
         ework_company_name=_company_identity_value("EWORK_COMPANY_NAME", handoff_name, prefer_company_handoff),
         ework_company_code=_company_identity_value("EWORK_COMPANY_CODE", handoff_code, prefer_company_handoff),

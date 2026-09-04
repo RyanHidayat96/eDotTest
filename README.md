@@ -268,7 +268,7 @@ Direct Pytest forms:
 
 ## Web-to-Mobile Handoff
 
-When a web company is created, `edot_qa.handoff` can write non-secret runtime company data to `artifacts/handoff/web_company.json`, including company name, company email, and captured Company ID/code. Mobile config normally reads this only when explicit mobile environment values are absent. In the dedicated handoff proof, `EWORK_PREFER_HANDOFF=true` makes handoff company identity override fallback identity. Passwords are never written to handoff files, and company email is not assumed to be a valid mobile username unless the live mobile login succeeds with it.
+When a web company is created, `edot_qa.handoff` can write non-secret runtime company data to `artifacts/handoff/web_company.json`, including company name, company email, captured Company ID/code, and the web-created Company User username. Mobile config normally reads this only when explicit mobile environment values are absent. In the dedicated handoff proof, `EWORK_PREFER_HANDOFF=true` makes the handoff company identity override fallback identity. The handoff flow creates a Company User under Manage > Company User > Add User, then logs in to eWork with that username and the local `EWORK_PASSWORD`. Passwords are never written to handoff files.
 
 Run the dedicated live handoff proof:
 
@@ -281,7 +281,7 @@ npm run test:handoff
 Implemented bonus scope:
 
 - Parallel execution: `npm run test:parallel` runs safe non-live Pytest checks with `pytest-xdist -n auto`. Live web/mobile/device flows stay outside that script because they share external accounts, storage state, browser state, and a single Android device.
-- Genuine web-to-mobile handoff: `npm run test:handoff` creates a company through eSuite web, verifies Tier 2 web detail, writes only non-secret handoff data, then attempts eWork login using that created company identity. Treat this bonus as proven only when the live run passes.
+- Genuine web-to-mobile handoff: `npm run test:handoff` creates a company through eSuite web, verifies Tier 2 web detail, creates a Company User for that company, writes only non-secret handoff data, then attempts eWork login using that created Company User identity. Treat this bonus as proven only when the live run passes.
 
 Run safe parallel checks locally:
 

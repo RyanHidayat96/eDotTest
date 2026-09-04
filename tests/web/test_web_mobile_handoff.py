@@ -14,9 +14,12 @@ from edot_qa.mobile import config as mobile_config
 from edot_qa.mobile.config import load_mobile_settings
 from edot_qa.mobile.device import adb_devices, command_available, package_installed, ready_device
 from edot_qa.mobile.maestro import MaestroRunner, assert_maestro_passed
+from edot_qa.mobile.runtime import MobileRuntimeContext, reset_app_data_for_login
 from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_text
 from edot_qa.web.company_registration import CompanyRegistrationData
+from edot_qa.web.company_user import CompanyUserData
 from edot_qa.web.pages.companies_page import CompaniesPage
+from edot_qa.web.pages.company_user_page import CompanyUserPage
 from edot_qa.web.session_state import has_storage_state
 
 
@@ -55,6 +58,40 @@ def test_company_handoff_file_is_secret_free(tmp_path):
     }
     assert loaded.trial_days == 30
     assert "password" not in path.read_text(encoding="utf-8").lower()
+
+
+def test_company_handoff_uses_company_user_username_for_mobile_login(tmp_path):
+    registration = CompanyRegistrationData(
+        company_name="PT Handoff Nusantara QA ABC12345",
+        email="qa.company.abc12345@example.test",
+        phone="+628123456789",
+        industry_type="Retail",
+        company_type="Retailer",
+        language="English",
+        street_address="Jl. Sudirman No. 10, Jakarta Selatan",
+    )
+    company_user = CompanyUserData(
+        name="QA User ABC12345",
+        username="qauserabc12345",
+        employee_id="EMPABC12345",
+        email="qauserabc12345@gmail.com",
+        phone="81234567890",
+        password="secret-password",
+    )
+    handoff = CompanyHandoff.from_registration(
+        registration,
+        source_run_id="abc12345",
+        company_code="5120380",
+        company_user=company_user,
+    )
+    path = write_company_handoff(handoff, tmp_path / "handoff.json", attach_to_allure=False)
+
+    loaded = read_company_handoff(path)
+
+    assert loaded is not None
+    assert loaded.as_mobile_environment()["EWORK_EMAIL"] == "qauserabc12345"
+    assert loaded.company_user_email == "qauserabc12345@gmail.com"
+    assert "secret-password" not in path.read_text(encoding="utf-8")
 
 
 def test_mobile_settings_consumes_company_handoff(monkeypatch, tmp_path):
@@ -115,6 +152,9 @@ def test_mobile_settings_handoff_mode_prefers_handoff_identity(monkeypatch, tmp_
         company_name="PT Handoff Nusantara QA ABC12345",
         company_email="qa.company.abc12345@example.test",
         company_code="5120380",
+        company_user_name="QA User ABC12345",
+        company_user_username="qauserabc12345",
+        company_user_email="qauserabc12345@gmail.com",
         source_run_id="abc12345",
     )
     path = write_company_handoff(handoff, tmp_path / "handoff.json", attach_to_allure=False)
@@ -123,7 +163,7 @@ def test_mobile_settings_handoff_mode_prefers_handoff_identity(monkeypatch, tmp_
     settings = mobile_config.load_mobile_settings()
 
     assert settings.prefer_company_handoff is True
-    assert settings.ework_email == "qa.company.abc12345@example.test"
+    assert settings.ework_email == "qauserabc12345"
     assert settings.ework_password == "secret-value"
     assert settings.ework_company_name == "PT Handoff Nusantara QA ABC12345"
     assert settings.ework_company_code == "5120380"
@@ -170,7 +210,12 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
     with allure_step("Prepare handoff company data", screenshot=False):
         generated_data = generate_test_data()
         registration = CompanyRegistrationData.from_generated_test_data(generated_data)
+        company_user = CompanyUserData.from_generated_test_data(
+            generated_data,
+            password=mobile_probe.ework_password or "",
+        )
         attach_json("handoff-company-registration-data", registration.as_allure_payload())
+        attach_json("handoff-company-user-data", company_user.as_allure_payload())
 
     primary_error: Exception | None = None
     created_company_id: str | None = None
@@ -187,19 +232,24 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
             detail_page.expect_company_values(registration)
             created_company_id = detail_page.company_id_value()
 
+        with allure_step("Create handoff company user on web", page=authenticated_page, screenshot=True):
+            CompanyUserPage(authenticated_page, settings).open().create_user(company_user)
+
         with allure_step("Create and verify company handoff file", screenshot=False):
             handoff = CompanyHandoff.from_registration(
                 registration,
                 source_run_id=generated_data.run_id,
                 company_code=created_company_id,
+                company_user=company_user,
             )
             write_company_handoff(handoff, mobile_probe.company_handoff_path)
             mobile_settings = load_mobile_settings(prefer_handoff=True)
             assert mobile_settings.prefer_company_handoff is True
-            assert mobile_settings.ework_email == registration.email
+            assert mobile_settings.ework_email == company_user.username
             assert mobile_settings.ework_company_name == registration.company_name
             assert mobile_settings.ework_company_code == created_company_id
 
+        reset_app_data_for_login(MobileRuntimeContext(settings=mobile_settings, device=device))
         assert_maestro_passed(MaestroRunner(mobile_settings).run_flow("login.yaml"))
     except Exception as error:
         primary_error = error

@@ -7,6 +7,7 @@ from edot_qa.mobile.customer import MobileCustomerData, generate_mobile_customer
 from edot_qa.mobile.customer_list import customer_card_address_from_maestro_result, find_created_customer_card
 from edot_qa.mobile.runtime import require_customer_runtime, start_app_from_stored_session
 from edot_qa.mobile.scenarios.types import MaestroFlow
+from edot_qa.reporting.allure_helpers import allure_step, attach_json
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,11 @@ class MobileCreateCustomerScenario:
         customer_env = customer.as_maestro_env()
         create_result = self.run_flow("create_customer.yaml", extra_env=customer_env)
         customer_card_address = customer_card_address_from_maestro_result(create_result)
+        with allure_step("Record mobile customer address mapping", screenshot=False):
+            attach_json(
+                "mobile-customer-address-mapping",
+                customer.as_persistence_payload(customer_card_address),
+            )
 
         find_created_customer_card(
             customer,

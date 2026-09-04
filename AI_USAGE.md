@@ -74,6 +74,8 @@ Customer data validates:
 - `contact` is either Indonesian `+62` phone or email
 - required fields: `name`, `contact`, `address`
 
+For mobile eWork customer creation, `customer.address` stays in the generated schema to satisfy the assignment data contract. The real app currently resolves the saved address from `Use my current location`, so the suite records the generated address as context and verifies the captured persisted address from the app instead of claiming direct equality.
+
 The Gemini request also sends a JSON response schema derived from `business_test_data_json_schema()`. The returned text is parsed as JSON and then validated with Pydantic before any test uses it.
 
 ## Test Data Retry And Fallback

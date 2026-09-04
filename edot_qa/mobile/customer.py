@@ -41,17 +41,52 @@ class MobileCustomerData:
             "EWORK_CUSTOMER_NAME": self.name,
             "EWORK_CUSTOMER_CONTACT": _mobile_phone_input(self.contact),
             "EWORK_CUSTOMER_CONTACT_PERSON": self.contact_person,
-            "EWORK_CUSTOMER_ADDRESS": self.address,
             "EWORK_CUSTOMER_KTP_NUMBER": self.ktp_number,
         }
 
     def as_allure_payload(self) -> dict[str, Any]:
         return {
-            "name": self.name,
-            "contact": self.contact,
-            "contact_person": self.contact_person,
-            "address": self.address,
+            "generated_customer": {
+                "name": self.name,
+                "contact": self.contact,
+                "address": self.address,
+            },
+            "submitted_customer": {
+                "name": self.name,
+                "contact": self.contact,
+                "contact_person": self.contact_person,
+            },
+            "mobile_address_mapping": {
+                "generated_address_directly_entered": False,
+                "persisted_address_source": "current-location address field",
+            },
             "ktp_number": self.ktp_number,
+            "run_id": self.run_id,
+            "source": self.source,
+        }
+
+    def as_persistence_payload(self, persisted_address: str) -> dict[str, Any]:
+        return {
+            "generated_customer": {
+                "name": self.name,
+                "contact": self.contact,
+                "address": self.address,
+            },
+            "persisted_customer": {
+                "name": self.name,
+                "contact": self.contact,
+                "address": persisted_address,
+                "address_source": "current-location address field",
+            },
+            "address_mapping": {
+                "generated_address_directly_entered": False,
+                "generated_address_equals_persisted_address": _normalize_text(self.address)
+                == _normalize_text(persisted_address),
+                "verification_rule": (
+                    "Tier 2 mobile address assertion uses the address captured from the app "
+                    "after current-location selection."
+                ),
+            },
             "run_id": self.run_id,
             "source": self.source,
         }
@@ -98,3 +133,7 @@ def _unique_contact_person_name(run_id: str) -> str:
     name = names[int(digest[:2], 16) % len(names)]
     suffix = digest[2:8].upper()
     return f"{name} QA PIC {suffix}"
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join(value.split()).casefold()

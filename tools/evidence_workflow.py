@@ -9,7 +9,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -108,10 +108,6 @@ def build_full_web_plan() -> EvidencePlan:
                     _rel(WEB_REPORT_DIR),
                 ),
             ),
-            EvidenceCommand(
-                name="scan preserved evidence for secrets",
-                command=(_python(), "tools/evidence_workflow.py", "scan", "--evidence-dir", _rel(EVIDENCE_DIR)),
-            ),
         ),
     )
 
@@ -157,10 +153,6 @@ def build_deliberate_failure_plan() -> EvidencePlan:
                     "--report-dir",
                     _rel(DELIBERATE_REPORT_DIR),
                 ),
-            ),
-            EvidenceCommand(
-                name="scan preserved evidence for secrets",
-                command=(_python(), "tools/evidence_workflow.py", "scan", "--evidence-dir", _rel(EVIDENCE_DIR)),
             ),
         ),
     )
@@ -221,22 +213,9 @@ def known_secret_values(root: Path = ROOT_DIR, env: Mapping[str, str] | None = N
     return tuple(sorted(set(values), key=len, reverse=True))
 
 
-def run_plan(plan: EvidencePlan, *, dry_run: bool) -> int:
+def run_plan(plan: EvidencePlan) -> int:
     for path in plan.clean_paths:
         validate_generated_path(path)
-
-    if dry_run:
-        print(f"plan={plan.name}")
-        print("prepare=evidence/README.md")
-        for path in plan.clean_paths:
-            print(f"clean={_rel(path)}")
-        for step in plan.commands:
-            env_prefix = " ".join(f"{key}={value}" for key, value in step.env)
-            command = _display_command(step.command)
-            expected = " expected_failure=true" if step.expected_failure else ""
-            print(f"step={step.name}{expected}")
-            print(f"command={env_prefix + ' ' if env_prefix else ''}{command}")
-        return 0
 
     _write_evidence_readme()
     for path in plan.clean_paths:
@@ -257,16 +236,12 @@ def run_plan(plan: EvidencePlan, *, dry_run: bool) -> int:
                 exit_code = exit_code or result.returncode
                 continue
             return result.returncode
+    findings = scan_evidence_dir(EVIDENCE_DIR)
+    if findings:
+        print(render_findings(findings))
+        return 1
+    print("Evidence safety scan passed.")
     return exit_code
-
-
-def validate_paths(plans: Sequence[EvidencePlan]) -> list[str]:
-    messages: list[str] = []
-    for plan in plans:
-        for path in plan.clean_paths:
-            resolved = validate_generated_path(path)
-            messages.append(f"{plan.name}:{_rel(resolved)}")
-    return messages
 
 
 def render_findings(findings: Iterable[EvidenceFinding]) -> str:
@@ -274,42 +249,17 @@ def render_findings(findings: Iterable[EvidenceFinding]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Prepare and run safe eDOT evidence workflows.")
+    parser = argparse.ArgumentParser(description="Generate required eDOT execution evidence.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    full_web = subparsers.add_parser("full-web", help="Run required web scenarios and preserve Allure evidence.")
-    full_web.add_argument("--dry-run", action="store_true", help="Validate paths and print commands only.")
-
-    deliberate = subparsers.add_parser("deliberate-failure", help="Run isolated wrong-locator evidence and triage.")
-    deliberate.add_argument("--dry-run", action="store_true", help="Validate paths and print commands only.")
-
-    scan = subparsers.add_parser("scan", help="Scan evidence files for secrets without printing values.")
-    scan.add_argument("--evidence-dir", type=Path, default=EVIDENCE_DIR)
-
-    validate = subparsers.add_parser("validate-paths", help="Validate generated evidence paths.")
-    validate.add_argument("--plan", choices=("all", "full-web", "deliberate-failure"), default="all")
+    subparsers.add_parser("full-web", help="Run full web scenarios and preserve Allure evidence.")
+    subparsers.add_parser("deliberate-failure", help="Run isolated wrong-locator evidence and triage.")
 
     args = parser.parse_args()
     if args.command == "full-web":
-        return run_plan(build_full_web_plan(), dry_run=args.dry_run)
+        return run_plan(build_full_web_plan())
     if args.command == "deliberate-failure":
-        return run_plan(build_deliberate_failure_plan(), dry_run=args.dry_run)
-    if args.command == "scan":
-        findings = scan_evidence_dir(args.evidence_dir)
-        if findings:
-            print(render_findings(findings))
-            return 1
-        print("Evidence safety scan passed.")
-        return 0
-    if args.command == "validate-paths":
-        plans = []
-        if args.plan in {"all", "full-web"}:
-            plans.append(build_full_web_plan())
-        if args.plan in {"all", "deliberate-failure"}:
-            plans.append(build_deliberate_failure_plan())
-        for message in validate_paths(plans):
-            print(f"OK {message}")
-        return 0
+        return run_plan(build_deliberate_failure_plan())
     raise AssertionError(args.command)
 
 
@@ -368,11 +318,6 @@ def _allure_failure_result_exists(results_dir: Path) -> bool:
     return False
 
 
-def _display_command(command: Sequence[str]) -> str:
-    display = ["python" if index == 0 and value == _python() else value for index, value in enumerate(command)]
-    return subprocess.list2cmdline(display)
-
-
 def _write_evidence_readme() -> None:
     EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
     (EVIDENCE_DIR / "README.md").write_text(
@@ -387,7 +332,7 @@ def _write_evidence_readme() -> None:
                 "- `triage/triage-report.md`: human-review triage proposal for the deliberate failure.",
                 "",
                 "Do not place `.env`, storage state, cookies, API keys, passwords, or raw secret headers here.",
-                "Run `npm run evidence:scan` before packaging or sharing evidence.",
+                "Evidence commands run a secret scan automatically before finishing.",
                 "",
             ]
         ),

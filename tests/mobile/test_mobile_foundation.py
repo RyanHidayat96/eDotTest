@@ -104,7 +104,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID"] == "customer-camera-capture"
     assert safe["EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID"] == "customer-document-submit"
     assert safe["EWORK_CUSTOMER_SAVE_BUTTON_ID"] == "customer-register"
-    assert safe["EWORK_STORAGE_STATE"].endswith("artifacts\\auth\\ework_session_state.json")
+    assert Path(safe["EWORK_STORAGE_STATE"]).parts[-3:] == ("artifacts", "auth", "ework_session_state.json")
     assert "secret-value" not in str(safe)
 
 
@@ -590,6 +590,7 @@ def test_mobile_create_customer_scenario_runs_create_then_validate(monkeypatch, 
     assert result == customer
     assert [flow for flow, _ in flows] == ["create_customer.yaml", "validate_customer_list_card.yaml"]
     assert flows[0][1]["EWORK_CUSTOMER_NAME"] == customer.name
+    assert "EWORK_CUSTOMER_ADDRESS" not in flows[0][1]
     assert flows[1][1]["EWORK_CUSTOMER_CARD_ADDRESS"] == "Jl. Saved From Location"
     assert card_checks[0][1]["customer_card_address"] == "Jl. Saved From Location"
 
@@ -632,6 +633,7 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "text: OK" in open_flow
     assert "optional: true" in open_flow
     assert "${EWORK_CUSTOMER_NAME}" in shared_flow
+    assert "${EWORK_CUSTOMER_ADDRESS}" not in combined
     assert "runFlow: open_customer_list.yaml" in shared_flow
     assert "runFlow: go_to_customer_list_bottom.yaml" not in shared_flow
     assert "${EWORK_CUSTOMER_CONTACT}" in shared_flow

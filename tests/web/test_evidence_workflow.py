@@ -10,7 +10,6 @@ from tools.evidence_workflow import (
     render_findings,
     scan_evidence_dir,
     validate_generated_path,
-    validate_paths,
 )
 
 
@@ -35,7 +34,12 @@ def test_deliberate_failure_plan_sets_isolated_expected_failure() -> None:
 
 
 def test_evidence_generated_paths_are_limited_to_reports_or_evidence() -> None:
-    messages = validate_paths([build_full_web_plan(), build_deliberate_failure_plan()])
+    plans = [build_full_web_plan(), build_deliberate_failure_plan()]
+    messages = []
+    for plan in plans:
+        for path in plan.clean_paths:
+            validate_generated_path(path)
+            messages.append(f"{plan.name}:{path.as_posix()}")
 
     assert any("evidence/web-allure" in message for message in messages)
     assert any("reports/allure-results-deliberate" in message for message in messages)

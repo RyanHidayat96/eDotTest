@@ -20,11 +20,7 @@
     "triage": ".venv\\Scripts\\python.exe tools/triage_allure_failures.py --results-dir reports/allure-results --output reports/triage/triage-report.md",
     "triage:no-ai": ".venv\\Scripts\\python.exe tools/triage_allure_failures.py --results-dir reports/allure-results --output reports/triage/triage-report.md --no-ai",
     "evidence:web": ".venv\\Scripts\\python.exe tools/evidence_workflow.py full-web",
-    "evidence:web:dry-run": ".venv\\Scripts\\python.exe tools/evidence_workflow.py full-web --dry-run",
     "evidence:deliberate": ".venv\\Scripts\\python.exe tools/evidence_workflow.py deliberate-failure",
-    "evidence:deliberate:dry-run": ".venv\\Scripts\\python.exe tools/evidence_workflow.py deliberate-failure --dry-run",
-    "evidence:validate": ".venv\\Scripts\\python.exe tools/evidence_workflow.py validate-paths",
-    "evidence:scan": ".venv\\Scripts\\python.exe tools/evidence_workflow.py scan --evidence-dir evidence",
     "allure:clean": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -LiteralPath 'reports/allure-results','reports/allure-report' -Recurse -Force -ErrorAction SilentlyContinue\"",
     "allure:generate": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --open"
   },

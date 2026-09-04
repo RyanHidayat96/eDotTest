@@ -220,7 +220,7 @@ maestro --version
 adb devices
 ```
 
-The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Dashboard text `Revenue` and the customer path through `New Customer`, `New Customer Registration`, Basic fields, channel/type dropdowns, location dropdowns, KTP document upload, signature, register, confirmation, and success screen were captured from the real app. The Home menu uses shared menu containers, so `New Customer` is opened through parent id `home_container_menu` plus exact child text to avoid tapping nearby menu items. The New Customer List screen did not expose a search input in hierarchy, and cards do not open a detail page, so the flow checks the current list view first, then fast-scrolls to the bottom, then searches upward at most four slow swipes while validating the saved name, address, and customer type exposed by the card. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
+The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Dashboard text `Revenue` and the customer path through `New Customer`, `New Customer Registration`, Basic fields, channel/type dropdowns, location dropdowns, KTP document upload, signature, register, confirmation, and success screen were captured from the real app. The Home menu uses shared menu containers, so `New Customer` is opened through parent id `home_container_menu` plus exact child text to avoid tapping nearby menu items. The New Customer List screen did not expose a search input in hierarchy, and cards do not open a detail page, so the flow checks the current list view first, then fast-scrolls to the bottom, then searches upward at most four slow swipes while validating the saved name, current-location address, and customer type exposed by the card. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
 
 Run mobile checks:
 
@@ -249,7 +249,7 @@ Ordinary developer mobile runs skip external checks with an explicit reason when
 Implemented mobile behaviors:
 
 - Login flow launches eWork SFA, runs the shared login sub-flow, and asserts dashboard text.
-- Customer creation flow runs login, creates a customer from AI-generated or fallback data, jumps to the bottom of the customer list, and asserts the saved name, address, and customer type currently exposed by the card.
+- Customer creation flow consumes AI-generated or fallback customer name/contact/address data. The real eWork form resolves the saved address from `Use my current location`, so the generated address is recorded as generated context while the captured current-location address is used for persisted card validation.
 - Maestro stdout, stderr, command details, and supported output artifacts are attached to Allure.
 
 For local live mobile verification in this repository, the assignment-provided fallback eWork account was used because no web-created company handoff was available. The fallback password is not stored in this README and must stay only in ignored local environment configuration.
@@ -316,14 +316,6 @@ Triage verdicts are human-review proposals only. The script never changes tests,
 
 ## Evidence Commands
 
-Dry-run evidence commands first:
-
-```powershell
-npm run evidence:web:dry-run
-npm run evidence:deliberate:dry-run
-npm run evidence:validate
-```
-
 Final web evidence command:
 
 ```powershell
@@ -340,17 +332,13 @@ npm run evidence:deliberate
 
 This runs only the isolated wrong-locator evidence test with `EDOT_DELIBERATE_FAILURE=wrong_locator`, expects that test to fail, writes triage to `evidence/triage/triage-report.md`, generates `evidence/deliberate-allure`, then scans preserved evidence for secrets. Normal suites do not enable this flag.
 
-Manual evidence safety scan:
-
-```powershell
-npm run evidence:scan
-```
+Both evidence commands scan preserved evidence for secrets before finishing.
 
 ## Test Data Cleanup
 
 Web company tests create unique company names per run. The full company flow deletes only the company it created, then verifies both the company name and captured Company ID are absent from Companies results. If eSuite still shows the deleted company after confirmation, the cleanup assertion remains failed so the shared-environment data issue is visible.
 
-Mobile customer tests use AI-generated or deterministic fallback customer data. The mandatory customer scenario should be run only after real customer selectors are configured so created data can be tied back to the exact saved record.
+Mobile customer tests use AI-generated or deterministic fallback customer data. eWork currently stores the customer address from current-location resolution, so Allure distinguishes generated customer address from the persisted address captured from the app.
 
 ## Evidence
 
@@ -365,7 +353,7 @@ reports/allure-results/
 reports/allure-results-deliberate/
 ```
 
-Generated evidence folders are ignored by Git and must be scanned with `npm run evidence:scan` plus `python tools/check_submission_safety.py` before any submission archive is created.
+Generated evidence folders are ignored by Git. Evidence commands scan their output automatically; run `python tools/check_submission_safety.py` before any submission archive is created.
 
 ## Troubleshooting
 

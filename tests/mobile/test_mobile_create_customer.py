@@ -55,9 +55,31 @@ def test_mobile_customer_data_maps_ai_payload():
         "EWORK_CUSTOMER_NAME": customer.name,
         "EWORK_CUSTOMER_CONTACT": "81299900111",
         "EWORK_CUSTOMER_CONTACT_PERSON": "Bima QA PIC 849275",
-        "EWORK_CUSTOMER_ADDRESS": "Jl. Melati Raya No. 8, Jakarta Selatan",
         "EWORK_CUSTOMER_KTP_NUMBER": customer.ktp_number,
     }
+    allure_payload = customer.as_allure_payload()
+    assert allure_payload["generated_customer"]["address"] == "Jl. Melati Raya No. 8, Jakarta Selatan"
+    assert allure_payload["mobile_address_mapping"]["generated_address_directly_entered"] is False
+
+
+def test_mobile_customer_persistence_payload_distinguishes_generated_and_persisted_address():
+    customer = MobileCustomerData(
+        name="Budi QA",
+        contact="+6281299900111",
+        contact_person="Raka QA PIC 123456",
+        address="Jl. Generated From AI",
+        ktp_number="3175070101909999",
+        run_id="mobile-address-map",
+        source="faker_fallback:unit",
+    )
+
+    payload = customer.as_persistence_payload("Jl. Saved From Location")
+
+    assert payload["generated_customer"]["address"] == "Jl. Generated From AI"
+    assert payload["persisted_customer"]["address"] == "Jl. Saved From Location"
+    assert payload["persisted_customer"]["address_source"] == "current-location address field"
+    assert payload["address_mapping"]["generated_address_directly_entered"] is False
+    assert payload["address_mapping"]["generated_address_equals_persisted_address"] is False
 
 
 def test_mobile_customer_contact_uses_phone_when_ai_returns_email():

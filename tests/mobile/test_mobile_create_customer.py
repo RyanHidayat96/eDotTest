@@ -54,17 +54,20 @@ def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_ma
     with allure_step("Validate mobile customer prerequisites", screenshot=False):
         missing = mobile_settings.missing_customer_requirements()
         if missing:
-            pytest.skip(f"Missing mobile customer environment values: {', '.join(missing)}")
+            _skip_or_fail_live(
+                mobile_settings,
+                f"Missing mobile customer environment values: {', '.join(missing)}",
+            )
         if not command_available(mobile_settings.maestro_cli):
-            pytest.skip("Maestro CLI not installed or not on PATH")
+            _skip_or_fail_live(mobile_settings, "Maestro CLI not installed or not on PATH")
         if not command_available(mobile_settings.adb_command):
-            pytest.skip("ADB command not installed or not on PATH")
+            _skip_or_fail_live(mobile_settings, "ADB command not installed or not on PATH")
 
     with allure_step("Validate adb ready device", data=mobile_settings.as_safe_dict(), screenshot=False):
         devices = adb_devices(mobile_settings.adb_command, timeout_seconds=5)
         device = ready_device(devices, mobile_settings.mobile_device_id)
         if device is None:
-            pytest.skip("No adb-visible ready mobile device")
+            _skip_or_fail_live(mobile_settings, "No adb-visible ready mobile device")
         attach_json("mobile-create-customer-device", {"serial": device.serial, "status": device.status})
 
     with allure_step("Validate eWork app installed", data={"package": mobile_settings.ework_app_id}, screenshot=False):
@@ -74,8 +77,14 @@ def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_ma
             device_id=mobile_settings.mobile_device_id or device.serial,
             timeout_seconds=5,
         ):
-            pytest.skip("eWork SFA app not installed or EWORK_APP_ID is incorrect")
+            _skip_or_fail_live(mobile_settings, "eWork SFA app not installed or EWORK_APP_ID is incorrect")
 
     customer = generate_mobile_customer_data()
     # Tier 2: create-customer flow asserts persisted customer name, contact, and address after save.
     run_maestro_flow("create_customer.yaml", extra_env=customer.as_maestro_env())
+
+
+def _skip_or_fail_live(mobile_settings, message: str) -> None:
+    if mobile_settings.edot_live:
+        pytest.fail(message)
+    pytest.skip(message)

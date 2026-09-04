@@ -23,6 +23,7 @@ class MobileSettings:
     maestro_cli: str
     adb_command: str
     mobile_device_id: str | None
+    edot_live: bool
     ework_app_id: str | None
     ework_email: str | None = field(repr=False)
     ework_password: str | None = field(repr=False)
@@ -101,6 +102,7 @@ class MobileSettings:
             "MAESTRO_CLI": self.maestro_cli,
             "ADB_COMMAND": self.adb_command,
             "MOBILE_DEVICE_ID": self.mobile_device_id or "<auto>",
+            "EDOT_LIVE": str(self.edot_live).lower(),
             "EWORK_APP_ID": self.ework_app_id or "<missing>",
             "EWORK_EMAIL": "<set>" if self.ework_email else "<missing>",
             "EWORK_PASSWORD": "<set>" if self.ework_password else "<missing>",
@@ -169,6 +171,7 @@ def load_mobile_settings() -> MobileSettings:
         maestro_cli=os.getenv("MAESTRO_CLI", "maestro"),
         adb_command=os.getenv("ADB_COMMAND", "adb"),
         mobile_device_id=os.getenv("MOBILE_DEVICE_ID") or None,
+        edot_live=_bool_from_env("EDOT_LIVE"),
         ework_app_id=os.getenv("EWORK_APP_ID") or None,
         ework_email=os.getenv("EWORK_EMAIL") or (handoff.company_email if handoff else None),
         ework_password=os.getenv("EWORK_PASSWORD") or None,
@@ -205,3 +208,8 @@ def _path_from_env(name: str, default: Path) -> Path:
         return default
     path = Path(raw_value)
     return path if path.is_absolute() else ROOT_DIR / path
+
+
+def _bool_from_env(name: str) -> bool:
+    value = os.getenv(name, "").strip().lower()
+    return value in {"1", "true", "yes", "y", "on"}

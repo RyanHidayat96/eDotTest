@@ -116,6 +116,7 @@ Mobile values:
 MAESTRO_CLI=maestro
 ADB_COMMAND=adb
 MOBILE_DEVICE_ID=
+EDOT_LIVE=false
 EWORK_APP_ID=id.edot.ework
 EWORK_EMAIL=
 EWORK_PASSWORD=
@@ -205,7 +206,7 @@ Portable form:
 python -m pytest tests/mobile -q -rs
 ```
 
-Tests that require credentials, storage state, Maestro, a device, or the installed mobile app skip with an explicit reason when prerequisites are missing.
+Ordinary developer mobile runs skip external checks with an explicit reason when prerequisites are missing. Set `EDOT_LIVE=true` for a declared live/submission run; missing mobile selectors, Maestro, ADB, device, app, or credentials then fail the mandatory scenario instead of producing a misleading green skip.
 
 Implemented mobile behaviors:
 
@@ -309,5 +310,5 @@ Evidence folders are ignored by Git and must be scanned with `python tools/check
 
 - Windows mobile execution usually needs Maestro through WSL, while `adb` must still see the target Android device.
 - Live web tests need valid eSuite credentials or a valid storage state.
-- Live mobile tests need eWork SFA installed, an ADB-visible device, valid mobile credentials, and configured dashboard/customer selectors.
+- Live mobile tests need eWork SFA installed, an ADB-visible device, valid mobile credentials, and configured dashboard/customer selectors. Use `EDOT_LIVE=true` for submission evidence so missing mobile prerequisites fail visibly.
 - The full web company flow can fail cleanup when eSuite continues showing a deleted company in Companies results after confirmation. That assertion is intentionally preserved as an application-visible defect, not hidden.

@@ -23,6 +23,7 @@ pytestmark = pytest.mark.mobile
 
 
 def test_mobile_settings_are_secret_safe(monkeypatch):
+    monkeypatch.setenv("EDOT_LIVE", "true")
     monkeypatch.setenv("EWORK_APP_ID", "id.edot.ework")
     monkeypatch.setenv("EWORK_EMAIL", "user@example.test")
     monkeypatch.setenv("EWORK_PASSWORD", "secret-value")
@@ -45,6 +46,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     safe = load_mobile_settings().as_safe_dict()
 
     assert safe["EWORK_APP_ID"] == "id.edot.ework"
+    assert safe["EDOT_LIVE"] == "true"
     assert safe["EWORK_EMAIL"] == "<set>"
     assert safe["EWORK_PASSWORD"] == "<set>"
     assert safe["EWORK_COMPANY_NAME"] == "PT Example"
@@ -53,6 +55,16 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_DASHBOARD_TEXT"] == "Dashboard"
     assert safe["EWORK_CUSTOMER_NAME_FIELD_ID"] == "customer-name"
     assert "secret-value" not in str(safe)
+
+
+def test_mobile_settings_reads_edot_live_flag(monkeypatch):
+    monkeypatch.setenv("EDOT_LIVE", "true")
+
+    assert load_mobile_settings().edot_live is True
+
+    monkeypatch.setenv("EDOT_LIVE", "0")
+
+    assert load_mobile_settings().edot_live is False
 
 
 def test_mobile_settings_reports_missing_login_requirements(tmp_path):
@@ -295,6 +307,7 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         maestro_cli="maestro",
         adb_command="adb",
         mobile_device_id=mobile_device_id,
+        edot_live=False,
         ework_app_id="id.edot.ework",
         ework_email=None,
         ework_password=None,

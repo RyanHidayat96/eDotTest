@@ -1,5 +1,11 @@
 appId: ${EWORK_APP_ID}
 ---
 - launchApp
+- tapOn:
+    text: Always allow
+    optional: true
+- tapOn:
+    text: Allow once
+    optional: true
 - runFlow: common/login.yaml
 - assertVisible: ${EWORK_DASHBOARD_TEXT}

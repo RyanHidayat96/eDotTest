@@ -329,6 +329,7 @@ def test_mobile_login_flow_uses_run_flow_and_environment_values():
     combined = f"{entry_flow}\n{shared_flow}"
 
     assert "runFlow: common/login.yaml" in entry_flow
+    assert "Always allow" in entry_flow
     assert "${EWORK_APP_ID}" in combined
     assert "${EWORK_COMPANY_CODE}" in shared_flow
     assert "${EWORK_COMPANY_ID_FIELD_ID}" in shared_flow
@@ -345,6 +346,7 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
 
     assert "runFlow: common/login.yaml" not in entry_flow
     assert "runFlow: common/create_customer.yaml" in entry_flow
+    assert "Always allow" in entry_flow
     assert "${EWORK_DASHBOARD_TEXT}" in entry_flow
     assert "${EWORK_COMPANY_CODE}" not in combined
     assert "${EWORK_EMAIL}" not in combined
@@ -360,7 +362,6 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "${EWORK_CUSTOMER_TYPE_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID}" in shared_flow
-    assert "${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_PROVINCE_OPTION_TEXT}" in shared_flow
     assert "${EWORK_CUSTOMER_CITY_OPTION_TEXT}" in shared_flow
     assert "${EWORK_CUSTOMER_DISTRICT_OPTION_TEXT}" in shared_flow

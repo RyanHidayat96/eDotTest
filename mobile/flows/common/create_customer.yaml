@@ -58,26 +58,37 @@ appId: ${EWORK_APP_ID}
     text: ${EWORK_CUSTOMER_PROVINCE_FIELD_TEXT}
 - tapOn:
     text: ${EWORK_CUSTOMER_PROVINCE_OPTION_TEXT}
-- tapOn:
-    id: ${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}
+- assertVisible: ${EWORK_CUSTOMER_PROVINCE_OPTION_TEXT}
+- scrollUntilVisible:
+    element:
+      text: ${EWORK_CUSTOMER_CITY_FIELD_TEXT}
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     text: ${EWORK_CUSTOMER_CITY_FIELD_TEXT}
 - tapOn:
     text: ${EWORK_CUSTOMER_CITY_OPTION_TEXT}
-- tapOn:
-    id: ${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}
+- assertVisible: ${EWORK_CUSTOMER_CITY_OPTION_TEXT}
+- scrollUntilVisible:
+    element:
+      text: ${EWORK_CUSTOMER_DISTRICT_FIELD_TEXT}
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     text: ${EWORK_CUSTOMER_DISTRICT_FIELD_TEXT}
 - tapOn:
     text: ${EWORK_CUSTOMER_DISTRICT_OPTION_TEXT}
-- tapOn:
-    id: ${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}
+- assertVisible: ${EWORK_CUSTOMER_DISTRICT_OPTION_TEXT}
+- scrollUntilVisible:
+    element:
+      text: ${EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT}
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     text: ${EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT}
 - tapOn:
     text: ${EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT}
-- tapOn:
-    id: ${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}
+- assertVisible: ${EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT}
 # The app may advance to Documents after the final location choice; otherwise Continue is the only exposed stable text.
 - tapOn:
     text: Continue

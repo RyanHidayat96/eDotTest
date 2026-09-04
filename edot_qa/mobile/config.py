@@ -126,7 +126,6 @@ class MobileSettings:
             "EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID": self.ework_customer_address_type_field_id,
             "EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT": self.ework_customer_address_type_option_text,
             "EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID": self.ework_customer_current_location_button_id,
-            "EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID": self.ework_customer_location_apply_button_id,
             "EWORK_CUSTOMER_PROVINCE_FIELD_TEXT": self.ework_customer_province_field_text,
             "EWORK_CUSTOMER_PROVINCE_OPTION_TEXT": self.ework_customer_province_option_text,
             "EWORK_CUSTOMER_CITY_FIELD_TEXT": self.ework_customer_city_field_text,

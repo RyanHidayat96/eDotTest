@@ -60,6 +60,8 @@ class MobileSettings:
     ework_customer_district_option_text: str | None
     ework_customer_subdistrict_field_text: str | None
     ework_customer_subdistrict_option_text: str | None
+    ework_customer_postal_code_field_text: str | None
+    ework_customer_postal_code_option_text: str | None
     ework_customer_address_field_id: str | None
     ework_customer_ktp_field_id: str | None
     ework_customer_upload_button_id: str | None
@@ -134,6 +136,8 @@ class MobileSettings:
             "EWORK_CUSTOMER_DISTRICT_OPTION_TEXT": self.ework_customer_district_option_text,
             "EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT": self.ework_customer_subdistrict_field_text,
             "EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT": self.ework_customer_subdistrict_option_text,
+            "EWORK_CUSTOMER_POSTAL_CODE_FIELD_TEXT": self.ework_customer_postal_code_field_text,
+            "EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT": self.ework_customer_postal_code_option_text,
             "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id,
             "EWORK_CUSTOMER_KTP_FIELD_ID": self.ework_customer_ktp_field_id,
             "EWORK_CUSTOMER_UPLOAD_BUTTON_ID": self.ework_customer_upload_button_id,
@@ -197,6 +201,8 @@ class MobileSettings:
             "EWORK_CUSTOMER_DISTRICT_OPTION_TEXT": self.ework_customer_district_option_text or "<missing>",
             "EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT": self.ework_customer_subdistrict_field_text or "<missing>",
             "EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT": self.ework_customer_subdistrict_option_text or "<missing>",
+            "EWORK_CUSTOMER_POSTAL_CODE_FIELD_TEXT": self.ework_customer_postal_code_field_text or "<missing>",
+            "EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT": self.ework_customer_postal_code_option_text or "<missing>",
             "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id or "<missing>",
             "EWORK_CUSTOMER_KTP_FIELD_ID": self.ework_customer_ktp_field_id or "<missing>",
             "EWORK_CUSTOMER_UPLOAD_BUTTON_ID": self.ework_customer_upload_button_id or "<missing>",
@@ -257,6 +263,8 @@ class MobileSettings:
             "EWORK_CUSTOMER_DISTRICT_OPTION_TEXT": self.ework_customer_district_option_text,
             "EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT": self.ework_customer_subdistrict_field_text,
             "EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT": self.ework_customer_subdistrict_option_text,
+            "EWORK_CUSTOMER_POSTAL_CODE_FIELD_TEXT": self.ework_customer_postal_code_field_text,
+            "EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT": self.ework_customer_postal_code_option_text,
             "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id,
             "EWORK_CUSTOMER_KTP_FIELD_ID": self.ework_customer_ktp_field_id,
             "EWORK_CUSTOMER_UPLOAD_BUTTON_ID": self.ework_customer_upload_button_id,
@@ -324,6 +332,8 @@ def load_mobile_settings() -> MobileSettings:
         ework_customer_district_option_text=os.getenv("EWORK_CUSTOMER_DISTRICT_OPTION_TEXT") or None,
         ework_customer_subdistrict_field_text=os.getenv("EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT") or None,
         ework_customer_subdistrict_option_text=os.getenv("EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT") or None,
+        ework_customer_postal_code_field_text=os.getenv("EWORK_CUSTOMER_POSTAL_CODE_FIELD_TEXT") or None,
+        ework_customer_postal_code_option_text=os.getenv("EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT") or None,
         ework_customer_address_field_id=os.getenv("EWORK_CUSTOMER_ADDRESS_FIELD_ID") or None,
         ework_customer_ktp_field_id=os.getenv("EWORK_CUSTOMER_KTP_FIELD_ID") or None,
         ework_customer_upload_button_id=os.getenv("EWORK_CUSTOMER_UPLOAD_BUTTON_ID") or None,

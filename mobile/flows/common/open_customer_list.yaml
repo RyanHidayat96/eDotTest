@@ -1,11 +1,32 @@
 appId: ${EWORK_APP_ID}
 ---
-# Home menu item has repeated generic IDs in hierarchy; text fallback is the captured stable locator.
+# Home menu items share generic container IDs; anchored text avoids tapping nearby Store Visit.
+- tapOn:
+    text: OK
+    optional: true
+- tapOn:
+    text: Close
+    optional: true
 - scrollUntilVisible:
     element:
       text: ${EWORK_CUSTOMERS_MENU_TEXT}
     direction: DOWN
     timeout: 15000
+    centerElement: true
+    waitToSettleTimeoutMs: 1000
+- assertVisible:
+    text: ${EWORK_CUSTOMERS_MENU_TEXT}
 - tapOn:
     text: ${EWORK_CUSTOMERS_MENU_TEXT}
+    waitToSettleTimeoutMs: 1000
+- tapOn:
+    text: OK
+    optional: true
+- tapOn:
+    text: Close
+    optional: true
+- tapOn:
+    text: ${EWORK_CUSTOMERS_MENU_TEXT}
+    optional: true
+    waitToSettleTimeoutMs: 1000
 - assertVisible: New Customer List

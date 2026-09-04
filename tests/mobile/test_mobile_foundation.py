@@ -64,6 +64,8 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     monkeypatch.setenv("EWORK_CUSTOMER_DISTRICT_OPTION_TEXT", "KEBON JERUK")
     monkeypatch.setenv("EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT", "Choose Sub district")
     monkeypatch.setenv("EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT", "KEBON JERUK")
+    monkeypatch.setenv("EWORK_CUSTOMER_POSTAL_CODE_FIELD_TEXT", "Choose Postal code")
+    monkeypatch.setenv("EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT", "11530")
     monkeypatch.setenv("EWORK_CUSTOMER_ADDRESS_FIELD_ID", "customer-address")
     monkeypatch.setenv("EWORK_CUSTOMER_KTP_FIELD_ID", "customer-ktp")
     monkeypatch.setenv("EWORK_CUSTOMER_UPLOAD_BUTTON_ID", "customer-upload")
@@ -90,6 +92,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_CUSTOMERS_MENU_TEXT"] == "New Customer"
     assert safe["EWORK_CUSTOMER_NAME_FIELD_ID"] == "customer-name"
     assert safe["EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID"] == "customer-address-type"
+    assert safe["EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT"] == "11530"
     assert safe["EWORK_CUSTOMER_KTP_FIELD_ID"] == "customer-ktp"
     assert safe["EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID"] == "customer-camera-capture"
     assert safe["EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID"] == "customer-document-submit"
@@ -546,6 +549,10 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "${EWORK_EMAIL}" not in combined
     assert "${EWORK_PASSWORD}" not in combined
     assert "${EWORK_CUSTOMERS_MENU_TEXT}" in open_flow
+    assert "centerElement: true" in open_flow
+    assert "waitToSettleTimeoutMs: 1000" in open_flow
+    assert "text: OK" in open_flow
+    assert "optional: true" in open_flow
     assert "${EWORK_CUSTOMER_NAME}" in shared_flow
     assert "runFlow: open_customer_list.yaml" in shared_flow
     assert "runFlow: go_to_customer_list_bottom.yaml" not in shared_flow
@@ -563,6 +570,10 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "${EWORK_CUSTOMER_CITY_OPTION_TEXT}" in shared_flow
     assert "${EWORK_CUSTOMER_DISTRICT_OPTION_TEXT}" in shared_flow
     assert "${EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT}" in shared_flow
+    assert "${EWORK_CUSTOMER_POSTAL_CODE_FIELD_TEXT}" in shared_flow
+    assert "${EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT}" in shared_flow
+    assert "when:" in shared_flow
+    assert "visible: ${EWORK_CUSTOMER_POSTAL_CODE_FIELD_TEXT}" in shared_flow
     assert "${EWORK_CUSTOMER_KTP_NUMBER}" in shared_flow
     assert "${EWORK_CUSTOMER_KTP_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_UPLOAD_BUTTON_ID}" in shared_flow
@@ -676,6 +687,8 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         ework_customer_district_option_text="KEBON JERUK",
         ework_customer_subdistrict_field_text="Choose Sub district",
         ework_customer_subdistrict_option_text="KEBON JERUK",
+        ework_customer_postal_code_field_text="Choose Postal code",
+        ework_customer_postal_code_option_text="11530",
         ework_customer_address_field_id="customer-address",
         ework_customer_ktp_field_id="customer-ktp",
         ework_customer_upload_button_id="customer-upload",

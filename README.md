@@ -23,7 +23,7 @@ edot_qa/
 mobile/flows/          Maestro entry flows and reusable runFlow sub-flows
 test_cases/            Manual test case CSV and Excel workbook
 tests/                 Pytest suites for web, mobile, AI, quality gates
-tools/                 Workbook builder, Allure report generator, and triage CLI
+tools/                 Safety checker, workbook builder, Allure report generator, and triage CLI
 ```
 
 ## Prerequisites
@@ -37,7 +37,7 @@ tools/                 Workbook builder, Allure report generator, and triage CLI
 - Android emulator or physical device visible in `adb devices`.
 - eWork SFA installed on that device for live mobile tests.
 
-## Setup
+## Installation
 
 ```powershell
 python -m venv .venv
@@ -47,7 +47,29 @@ npm install
 Copy-Item .env.example .env
 ```
 
-Fill `.env` locally. `.env` is ignored by Git. Do not commit credentials, API keys, storage state, handoff files, Allure results, Maestro output, or generated triage reports.
+Portable form for macOS, Linux, or WSL:
+
+```bash
+python -m venv .venv
+python -m pip install -e .
+python -m playwright install chromium
+npm install
+cp .env.example .env
+```
+
+Fill `.env` locally. `.env` is ignored by Git. Never commit `.env`, credentials, API keys, storage state, handoff files, Allure results, Maestro output, or generated triage reports.
+
+Before packaging or pushing, run:
+
+```bash
+python tools/check_submission_safety.py
+```
+
+Create a safe submission archive from committed files only:
+
+```bash
+git archive --format=zip --output edot-qa-automation-submission.zip HEAD
+```
 
 ## Environment Variables
 
@@ -118,76 +140,41 @@ EWORK_CUSTOMER_SEARCH_FIELD_ID=
 ```
 
 Mobile credentials should come from the web-created company handoff where possible. If handoff data is not available, set valid mobile credentials only in local environment variables.
-For local live mobile verification in this repository, the assignment-provided fallback eWork account was used because no web-created company handoff was available. The fallback values stay only in the ignored local `.env` file and are not committed.
 
-## Running Tests
+## Web Execution
 
 You can use the npm shortcuts below from the project root.
 
 ```powershell
-npm run test:quick
-npm run test:ai
 npm run test:web:quality
 npm run test:web:login
 npm run test:web:company:step1
 npm run test:web:company:full
-npm run test:mobile:foundation
-npm run test:mobile:login
-npm run test:mobile:customer
 ```
 
-The full suite shortcut is:
+`test:web:login` always performs credential input and creates a fresh `PLAYWRIGHT_STORAGE_STATE` after successful login. Authenticated business tests reuse that storage state so they do not repeat login unless the state is missing or stale.
 
-```powershell
-npm test
-```
+Web behavior covered:
 
-The direct Pytest commands are also available when you want to pass extra Pytest options.
+- Login through eDOT Account Center and assert dashboard greeting `Welcome Back,`.
+- Validate Register Company step 1 required fields and location cascade.
+- Register company through the 3-step wizard using AI-generated or fallback dummy data.
+- Verify company detail values field by field as Tier 2 assertions.
+- Delete the created company and assert the company name and captured Company ID are gone from Companies results.
 
-All suites:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest tests
-```
-
-Web suite:
+Direct Pytest form:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\web
 ```
 
-Mobile suite:
+Portable form:
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest tests\mobile
+```bash
+python -m pytest tests/web
 ```
 
-AI/unit suite:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest tests\ai
-```
-
-Quality gates:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest tests\web\test_web_quality_gates.py
-```
-
-Tests that require credentials, storage state, Maestro, a device, or the installed mobile app skip with an explicit reason when prerequisites are missing.
-
-## Web Automation
-
-Web tests use Page Object Model classes under `edot_qa/web/pages`. Test files do not own raw Playwright selectors. Login creates or reuses `PLAYWRIGHT_STORAGE_STATE` so authenticated tests do not log in repeatedly.
-
-Implemented web behaviors:
-
-- Login through eDOT Account Center and assert dashboard greeting `Welcome Back,`.
-- Register company through the 3-step wizard.
-- Verify company detail values field by field as Tier 2 assertions.
-- Attempt cleanup after company creation and assert the company name and captured Company ID are gone from the Companies page.
-
-## Mobile Automation
+## Mobile Execution
 
 Check local runtime first:
 
@@ -198,11 +185,51 @@ adb devices
 
 The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Use Maestro Studio or hierarchy inspection to discover dashboard/customer selectors, then place them in `.env`. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
 
+Run mobile checks:
+
+```powershell
+npm run test:mobile:foundation
+npm run test:mobile:login
+npm run test:mobile:customer
+```
+
+Direct Pytest form:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\mobile -q -rs
+```
+
+Portable form:
+
+```bash
+python -m pytest tests/mobile -q -rs
+```
+
+Tests that require credentials, storage state, Maestro, a device, or the installed mobile app skip with an explicit reason when prerequisites are missing.
+
 Implemented mobile behaviors:
 
 - Login flow launches eWork SFA, runs the shared login sub-flow, and asserts dashboard text.
-- Customer creation flow runs login, creates a customer from AI-generated or fallback data, then asserts the saved name, contact, and address as Tier 2 checks.
+- Customer creation flow runs login, creates a customer from AI-generated or fallback data, then asserts the saved name, contact, and address as Tier 2 checks when required selectors are configured.
 - Maestro stdout, stderr, command details, and supported output artifacts are attached to Allure.
+
+For local live mobile verification in this repository, the assignment-provided fallback eWork account was used because no web-created company handoff was available. The fallback password is not stored in this README and must stay only in ignored local environment configuration.
+
+## Other Test Commands
+
+```powershell
+npm run test:quick
+npm run test:ai
+npm test
+```
+
+Direct Pytest forms:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests
+.\.venv\Scripts\python.exe -m pytest tests\ai
+.\.venv\Scripts\python.exe -m pytest tests\web\test_web_quality_gates.py
+```
 
 ## Web-to-Mobile Handoff
 
@@ -250,6 +277,24 @@ Use optional AI notes when `GEMINI_API_KEY` is set:
 
 Triage verdicts are human-review proposals only. The script never changes tests, weakens assertions, edits expected values, files bugs, or closes bugs.
 
+## Test Data Cleanup
+
+Web company tests create unique company names per run. The full company flow deletes only the company it created, then verifies both the company name and captured Company ID are absent from Companies results. If eSuite still shows the deleted company after confirmation, the cleanup assertion remains failed so the shared-environment data issue is visible.
+
+Mobile customer tests use AI-generated or deterministic fallback customer data. The mandatory customer scenario should be run only after real customer selectors are configured so created data can be tied back to the exact saved record.
+
+## Evidence
+
+Final evidence is generated in the dedicated final execution step. Expected evidence locations are:
+
+```text
+reports/allure-report/
+reports/allure-results/
+reports/triage/triage-report.md
+```
+
+Evidence folders are ignored by Git and must be scanned with `python tools/check_submission_safety.py` before any submission archive is created.
+
 ## Troubleshooting
 
 - Missing `ESUITE_EMAIL` or `ESUITE_PASSWORD`: live web login and authenticated web tests skip unless storage state already exists.
@@ -260,6 +305,9 @@ Triage verdicts are human-review proposals only. The script never changes tests,
 - Missing mobile selectors: discover stable IDs through Maestro and set the `EWORK_*_ID` variables.
 - Missing `GEMINI_API_KEY`: AI test data uses deterministic Faker fallback; triage still produces deterministic verdicts.
 
-## Current Local Verification Notes
+## Known Environment Constraints
 
-Local unit and guardrail tests pass without committed secrets. Live web login and company step-one validation pass with valid eSuite credentials. The full web company flow creates the company and verifies detail values; cleanup still intentionally fails when eSuite continues showing the deleted company in Companies results after confirmation. Live mobile login has been verified on a physical ADB device using the assignment-provided fallback eWork account. Live mobile customer creation still requires post-login customer selectors.
+- Windows mobile execution usually needs Maestro through WSL, while `adb` must still see the target Android device.
+- Live web tests need valid eSuite credentials or a valid storage state.
+- Live mobile tests need eWork SFA installed, an ADB-visible device, valid mobile credentials, and configured dashboard/customer selectors.
+- The full web company flow can fail cleanup when eSuite continues showing a deleted company in Companies results after confirmation. That assertion is intentionally preserved as an application-visible defect, not hidden.

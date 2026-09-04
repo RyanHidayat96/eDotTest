@@ -86,7 +86,7 @@ class LoginPage(BasePage):
         with allure_step(
             "Input eSuite email or username",
             page=self.page,
-            data={"field": "email_or_username", "email": email},
+            input_data={"field": "email_or_username", "email": email},
         ):
             self.email_or_username_input.fill(email)
             self.submit_button.click()
@@ -95,7 +95,7 @@ class LoginPage(BasePage):
         with allure_step(
             "Input eSuite password",
             page=self.page,
-            data={"field": "password", "password": password},
+            input_data={"field": "password", "password": password},
         ):
             self.password_input.fill(password)
             self.submit_button.click()

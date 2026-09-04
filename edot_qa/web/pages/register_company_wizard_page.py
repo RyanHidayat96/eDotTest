@@ -8,7 +8,7 @@ from typing import Any
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, TimeoutError, expect
 
-from edot_qa.reporting.allure_helpers import allure_step
+from edot_qa.reporting.allure_helpers import allure_step, attach_page_evidence
 from edot_qa.web.base_page import BasePage
 from edot_qa.web.company_registration import CompanyRegistrationData
 
@@ -23,6 +23,10 @@ class FieldSpec:
 REGISTER_COMPANY_HEADING = re.compile(r"Register Company", re.I)
 NEXT_ACTION = re.compile(r"^(Next|Lanjut)$", re.I)
 SUBMIT_ACTION = re.compile(r"^(Submit|Register|Finish|Create Company|Save|Simpan)$", re.I)
+SUBMIT_SUCCESS_TEXT = re.compile(
+    r"(success|successfully|created successfully|registered successfully|berhasil|sukses)",
+    re.I,
+)
 
 
 class RegisterCompanyWizardPage(BasePage):
@@ -156,10 +160,12 @@ class RegisterCompanyWizardPage(BasePage):
                 "Submit Register Company wizard",
                 page=self.page,
                 data={"company_name": data.company_name},
-                screenshot=True,
+                screenshot=False,
                 force=True,
             ):
                 self.submit_button.click()
+                self._wait_for_submit_success(data.company_name)
+                attach_page_evidence("Submit success", self.page, screenshot=True)
 
     def expect_created_company_visible(self, company_name: str) -> None:
         with allure_step(
@@ -168,6 +174,45 @@ class RegisterCompanyWizardPage(BasePage):
             data={"company_name": company_name},
         ):
             expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=30_000)
+
+    def _wait_for_submit_success(self, company_name: str) -> None:
+        if self._success_notification_visible(timeout_ms=15_000):
+            return
+        try:
+            self.page.wait_for_url(
+                lambda url: "/companies" in url and "registration-companies" not in url,
+                timeout=10_000,
+            )
+            self.page.wait_for_load_state("domcontentloaded")
+            return
+        except TimeoutError:
+            pass
+        try:
+            expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=10_000)
+        except AssertionError as error:
+            raise AssertionError(
+                f"Company registration submit did not show a success notification or created company {company_name!r}."
+            ) from error
+
+    def _success_notification_visible(self, timeout_ms: int) -> bool:
+        candidates = [
+            self.page.get_by_role("alert").filter(has_text=SUBMIT_SUCCESS_TEXT).first,
+            self.page.get_by_role("status").filter(has_text=SUBMIT_SUCCESS_TEXT).first,
+            self.page.locator(
+                "[data-sonner-toast], [role='alert'], [role='status'], "
+                "[class*='toast' i], [class*='notification' i], [class*='alert' i]"
+            ).filter(has_text=SUBMIT_SUCCESS_TEXT).first,
+            # Text fallback is justified because eSuite success toasts may lack stable roles/classes.
+            self.page.get_by_text(SUBMIT_SUCCESS_TEXT).first,
+        ]
+        timeout_per_candidate = max(1_000, timeout_ms // len(candidates))
+        for locator in candidates:
+            try:
+                expect(locator).to_be_visible(timeout=timeout_per_candidate)
+                return True
+            except (AssertionError, TimeoutError, PlaywrightError):
+                continue
+        return False
 
     def assert_step_can_continue(self, step_name: str) -> None:
         with allure_step(f"Verify {step_name} can continue", page=self.page):
@@ -201,7 +246,11 @@ class RegisterCompanyWizardPage(BasePage):
             expect(self.submit_button).to_be_enabled(timeout=10_000)
 
     def accept_terms(self) -> None:
-        with allure_step("Accept Register Company terms", page=self.page):
+        with allure_step(
+            "Accept Register Company terms",
+            page=self.page,
+            input_data={"field": "Terms and Conditions", "value": "accepted"},
+        ):
             checkbox = self.first_visible(
                 [
                     ("terms checkbox role", self.page.get_by_role("checkbox").first),
@@ -232,7 +281,7 @@ class RegisterCompanyWizardPage(BasePage):
         with allure_step(
             f"Input {spec.label}",
             page=self.page,
-            data={"field": spec.label, "value": value},
+            input_data={"field": spec.label, "value": value},
         ):
             if spec.label == "Street Address":
                 _console_debug("street address: try direct DOM fill")
@@ -254,7 +303,6 @@ class RegisterCompanyWizardPage(BasePage):
         with allure_step(
             f"Choose or input {spec.label}",
             page=self.page,
-            data={"field": spec.label, "value": value},
         ):
             if spec.label == "Postal Code":
                 if self._field_value_is_visible(value):
@@ -275,7 +323,7 @@ class RegisterCompanyWizardPage(BasePage):
         with allure_step(
             f"Choose {spec.label}",
             page=self.page,
-            data={"field": spec.label, "value": value},
+            input_data={"field": spec.label, "value": value},
         ):
             errors: list[str] = []
             for description, control in self._choice_controls(spec):

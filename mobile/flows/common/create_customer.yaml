@@ -1,6 +1,11 @@
 appId: ${EWORK_APP_ID}
 ---
 # Home menu item has repeated generic IDs in hierarchy; text fallback is the captured stable locator.
+- scrollUntilVisible:
+    element:
+      text: ${EWORK_CUSTOMERS_MENU_TEXT}
+    direction: DOWN
+    timeout: 15000
 - tapOn:
     text: ${EWORK_CUSTOMERS_MENU_TEXT}
 - assertVisible: New Customer List
@@ -13,9 +18,11 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     id: ${EWORK_CUSTOMER_CONTACT_FIELD_ID}
 - inputText: ${EWORK_CUSTOMER_CONTACT}
+- hideKeyboard
 - tapOn:
     id: ${EWORK_CUSTOMER_CONTACT_PERSON_FIELD_ID}
 - inputText: ${EWORK_CUSTOMER_CONTACT_PERSON}
+- hideKeyboard
 - tapOn:
     id: ${EWORK_CUSTOMER_CHANNEL_FIELD_ID}
 - tapOn:
@@ -34,8 +41,19 @@ appId: ${EWORK_APP_ID}
 - assertVisible: ${EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT}
 - tapOn:
     id: ${EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID}
+- scrollUntilVisible:
+    element:
+      id: ${EWORK_CUSTOMER_ADDRESS_FIELD_ID}
+    direction: DOWN
+    timeout: 10000
 - assertVisible:
     id: ${EWORK_CUSTOMER_ADDRESS_FIELD_ID}
+- copyTextFrom:
+    id: ${EWORK_CUSTOMER_ADDRESS_FIELD_ID}
+- evalScript: ${output.customerAddress = maestro.copiedText.trim()}
+- assertTrue: ${output.customerAddress.length > 0 && !output.customerAddress.includes('Choose') && !output.customerAddress.includes('Input')}
+# Customer list card truncates long addresses, so validate the visible first address segment.
+- evalScript: ${output.customerCardAddress = output.customerAddress.split(',')[0].trim()}
 - tapOn:
     text: ${EWORK_CUSTOMER_PROVINCE_FIELD_TEXT}
 - tapOn:
@@ -92,12 +110,14 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     id: ${EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID}
 - assertVisible: New Customer List
-- scrollUntilVisible:
-    element:
-      text: ${EWORK_CUSTOMER_NAME}
-    direction: DOWN
-    timeout: 60000
+# New records land at the bottom. The list exposes no search field and cards do not open detail.
+- swipe:
+    start: "50%, 90%"
+    end: "50%, 15%"
+    duration: 50
 # Tier 2: created customer name must appear after save.
 - assertVisible: ${EWORK_CUSTOMER_NAME}
-# Tier 2: created customer address must match submitted data.
-- assertVisible: ${EWORK_CUSTOMER_ADDRESS}
+# Tier 2: created customer address must match current-location address shown on the card.
+- assertVisible: ${output.customerCardAddress}
+# Tier 2: created customer type must match submitted data.
+- assertVisible: ${EWORK_CUSTOMER_TYPE_OPTION_TEXT}

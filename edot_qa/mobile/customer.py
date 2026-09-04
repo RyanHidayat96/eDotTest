@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 from typing import Any
 
 from edot_qa.ai.test_data import GeneratedTestData, generate_test_data
 from edot_qa.reporting.allure_helpers import allure_step, attach_json
+
+
+MOBILE_PHONE_RE = re.compile(r"^\+62\d{8,13}$")
 
 
 @dataclass(frozen=True)
@@ -20,9 +24,10 @@ class MobileCustomerData:
     @classmethod
     def from_generated_test_data(cls, generated: GeneratedTestData) -> "MobileCustomerData":
         customer = generated.data.customer
+        name = _unique_customer_name(customer.name, generated.run_id)
         return cls(
-            name=customer.name,
-            contact=customer.contact,
+            name=name,
+            contact=_mobile_phone_contact(customer.contact, generated.run_id),
             address=customer.address,
             ktp_number=_fake_ktp_number(generated.run_id),
             run_id=generated.run_id,
@@ -32,7 +37,7 @@ class MobileCustomerData:
     def as_maestro_env(self) -> dict[str, str]:
         return {
             "EWORK_CUSTOMER_NAME": self.name,
-            "EWORK_CUSTOMER_CONTACT": self.contact,
+            "EWORK_CUSTOMER_CONTACT": _mobile_phone_input(self.contact),
             "EWORK_CUSTOMER_CONTACT_PERSON": self.name,
             "EWORK_CUSTOMER_ADDRESS": self.address,
             "EWORK_CUSTOMER_KTP_NUMBER": self.ktp_number,
@@ -60,3 +65,25 @@ def _fake_ktp_number(seed: str) -> str:
     digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
     suffix = int(digest[:8], 16) % 10**4
     return f"317507010190{suffix:04d}"
+
+
+def _mobile_phone_contact(contact: str, run_id: str) -> str:
+    if MOBILE_PHONE_RE.match(contact):
+        return contact
+    digest = hashlib.sha256(f"{run_id}:contact".encode("utf-8")).hexdigest()
+    suffix = int(digest[:8], 16) % 10**9
+    return f"+628{suffix:09d}"
+
+
+def _mobile_phone_input(contact: str) -> str:
+    if contact.startswith("+62"):
+        return contact[3:]
+    return contact
+
+
+def _unique_customer_name(name: str, run_id: str) -> str:
+    suffix = hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:8].upper()
+    if suffix in name:
+        return name
+    marker = f" QA {suffix}"
+    return f"{name[:100 - len(marker)].rstrip()}{marker}"

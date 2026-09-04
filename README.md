@@ -116,6 +116,7 @@ Mobile values:
 MAESTRO_CLI=maestro
 ADB_COMMAND=adb
 MOBILE_DEVICE_ID=
+MOBILE_FLOW_TIMEOUT_SECONDS=300
 EDOT_LIVE=false
 EWORK_APP_ID=id.edot.ework
 EWORK_EMAIL=
@@ -123,6 +124,7 @@ EWORK_PASSWORD=
 EWORK_COMPANY_NAME=
 EWORK_COMPANY_CODE=
 EWORK_COMPANY_HANDOFF_PATH=artifacts/handoff/web_company.json
+EWORK_STORAGE_STATE=artifacts/auth/ework_session_state.json
 MAESTRO_FLOW_DIR=mobile/flows
 MAESTRO_OUTPUT_DIR=artifacts/maestro
 EWORK_LOGIN_SCREEN_TEXT=Login
@@ -212,7 +214,7 @@ maestro --version
 adb devices
 ```
 
-The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Dashboard text `Revenue` and the customer path through `New Customer`, `New Customer Registration`, Basic fields, channel/type dropdowns, location dropdowns, KTP document upload, signature, register, confirmation, and success screen were captured from the real app. The New Customer List screen did not expose a search input in hierarchy, so the flow scrolls until the unique generated customer name is visible. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
+The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Dashboard text `Revenue` and the customer path through `New Customer`, `New Customer Registration`, Basic fields, channel/type dropdowns, location dropdowns, KTP document upload, signature, register, confirmation, and success screen were captured from the real app. The New Customer List screen did not expose a search input in hierarchy, and cards do not open a detail page, so the flow jumps to the bottom list area and validates the created card values exposed there. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
 
 Run mobile checks:
 
@@ -221,6 +223,8 @@ npm run test:mobile:foundation
 npm run test:mobile:login
 npm run test:mobile:customer
 ```
+
+`test:mobile:login` clears app data, inputs company code, username, and password, then writes a non-secret `EWORK_STORAGE_STATE` marker. `test:mobile:customer` consumes the existing app session on the device, so it does not clear app data and does not input credentials.
 
 Direct Pytest form:
 
@@ -239,7 +243,7 @@ Ordinary developer mobile runs skip external checks with an explicit reason when
 Implemented mobile behaviors:
 
 - Login flow launches eWork SFA, runs the shared login sub-flow, and asserts dashboard text.
-- Customer creation flow runs login, creates a customer from AI-generated or fallback data, then scrolls the list until the unique saved name is visible and asserts the saved name/address currently exposed by the list.
+- Customer creation flow runs login, creates a customer from AI-generated or fallback data, jumps to the bottom of the customer list, and asserts the saved name, address, and customer type currently exposed by the card.
 - Maestro stdout, stderr, command details, and supported output artifacts are attached to Allure.
 
 For local live mobile verification in this repository, the assignment-provided fallback eWork account was used because no web-created company handoff was available. The fallback password is not stored in this README and must stay only in ignored local environment configuration.

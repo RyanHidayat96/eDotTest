@@ -66,6 +66,21 @@ def clear_app_data(
     return completed.stdout.strip()
 
 
+def force_stop_app(
+    package_name: str,
+    adb_command: str = "adb",
+    *,
+    device_id: str | None = None,
+    timeout_seconds: int = 10,
+) -> str:
+    command = [adb_command]
+    if device_id:
+        command.extend(["-s", device_id])
+    command.extend(["shell", "am", "force-stop", package_name])
+    completed = _run_adb(command, timeout_seconds=timeout_seconds)
+    return completed.stdout.strip()
+
+
 def capture_device_screenshot(
     adb_command: str = "adb",
     *,

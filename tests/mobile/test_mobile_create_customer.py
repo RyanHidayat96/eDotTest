@@ -4,7 +4,8 @@ import pytest
 
 from edot_qa.ai.test_data import GeneratedTestData
 from edot_qa.mobile.customer import MobileCustomerData, generate_mobile_customer_data
-from edot_qa.mobile.device import adb_devices, command_available, package_installed, ready_device
+from edot_qa.mobile.device import adb_devices, command_available, force_stop_app, package_installed, ready_device
+from edot_qa.mobile.session_state import mobile_session_state_exists
 from edot_qa.reporting.allure_helpers import allure_step, attach_json
 
 
@@ -36,18 +37,50 @@ def test_mobile_customer_data_maps_ai_payload():
     )
     customer = MobileCustomerData.from_generated_test_data(generated)
 
-    assert customer.name == "Budi Santoso QA CUSTOMER"
+    assert customer.name.startswith("Budi Santoso QA CUSTOMER QA ")
+    assert customer.name.endswith("2E90892D")
     assert customer.contact == "+6281299900111"
     assert customer.address == "Jl. Melati Raya No. 8, Jakarta Selatan"
     assert customer.ktp_number.isdigit()
     assert len(customer.ktp_number) == 16
     assert customer.as_maestro_env() == {
-        "EWORK_CUSTOMER_NAME": "Budi Santoso QA CUSTOMER",
-        "EWORK_CUSTOMER_CONTACT": "+6281299900111",
-        "EWORK_CUSTOMER_CONTACT_PERSON": "Budi Santoso QA CUSTOMER",
+        "EWORK_CUSTOMER_NAME": customer.name,
+        "EWORK_CUSTOMER_CONTACT": "81299900111",
+        "EWORK_CUSTOMER_CONTACT_PERSON": customer.name,
         "EWORK_CUSTOMER_ADDRESS": "Jl. Melati Raya No. 8, Jakarta Selatan",
         "EWORK_CUSTOMER_KTP_NUMBER": customer.ktp_number,
     }
+
+
+def test_mobile_customer_contact_uses_phone_when_ai_returns_email():
+    generated = GeneratedTestData.model_validate(
+        {
+            "data": {
+                "company": {
+                    "legal_name": "PT Ritel Nusantara",
+                    "email": "qa.company@example.test",
+                    "phone": "+628123456789",
+                    "street_address": "Jl. Sudirman No. 10, Jakarta Selatan",
+                    "industry": "Retail",
+                },
+                "customer": {
+                    "name": "Budi Santoso",
+                    "contact": "budi@example.test",
+                    "address": "Jl. Melati Raya No. 8, Jakarta Selatan",
+                },
+            },
+            "source": "ai_model",
+            "model": "gemini-3.1-flash-lite",
+            "attempts": 1,
+            "run_id": "mobile-email-contact",
+        }
+    )
+
+    customer = MobileCustomerData.from_generated_test_data(generated)
+
+    assert customer.contact.startswith("+62")
+    assert customer.contact[1:].isdigit()
+    assert customer.contact != "budi@example.test"
 
 
 @pytest.mark.requires_credentials
@@ -83,8 +116,30 @@ def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_ma
         ):
             _skip_or_fail_live(mobile_settings, "eWork SFA app not installed or EWORK_APP_ID is incorrect")
 
+    with allure_step(
+        "Validate eWork mobile session state",
+        data={"path": str(mobile_settings.ework_storage_state_path)},
+        screenshot=False,
+    ):
+        if not mobile_session_state_exists(
+            mobile_settings.ework_storage_state_path,
+            app_id=mobile_settings.ework_app_id,
+        ):
+            _skip_or_fail_live(
+                mobile_settings,
+                "Missing eWork mobile storage state. Run npm run test:mobile:login first.",
+            )
+
+    with allure_step("Start eWork from stored mobile session", data={"package": mobile_settings.ework_app_id}, screenshot=False):
+        force_stop_app(
+            mobile_settings.ework_app_id or "",
+            mobile_settings.adb_command,
+            device_id=mobile_settings.mobile_device_id or device.serial,
+            timeout_seconds=10,
+        )
+
     customer = generate_mobile_customer_data()
-    # Tier 2: create-customer flow asserts persisted customer name, contact, and address after save.
+    # Tier 2: create-customer flow asserts card-visible persisted values after save.
     run_maestro_flow("create_customer.yaml", extra_env=customer.as_maestro_env())
 
 

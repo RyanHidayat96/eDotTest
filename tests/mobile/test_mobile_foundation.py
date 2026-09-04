@@ -12,11 +12,13 @@ from edot_qa.mobile.device import (
     capture_device_screenshot,
     clear_app_data,
     command_available,
+    force_stop_app,
     package_installed,
     parse_adb_devices,
     ready_device,
 )
 from edot_qa.mobile.maestro import MaestroResult, MaestroRunner, assert_maestro_passed
+from edot_qa.mobile.session_state import mobile_session_state_exists, write_mobile_session_state
 
 
 pytestmark = pytest.mark.mobile
@@ -88,6 +90,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID"] == "customer-camera-capture"
     assert safe["EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID"] == "customer-document-submit"
     assert safe["EWORK_CUSTOMER_SAVE_BUTTON_ID"] == "customer-register"
+    assert safe["EWORK_STORAGE_STATE"].endswith("artifacts\\auth\\ework_session_state.json")
     assert "secret-value" not in str(safe)
 
 
@@ -143,6 +146,16 @@ def test_clear_app_data_uses_device_scoped_pm_clear(monkeypatch):
     monkeypatch.setattr("edot_qa.mobile.device.subprocess.run", fake_run)
 
     assert clear_app_data("com.example.app", device_id="emulator-5554") == "Success"
+
+
+def test_force_stop_app_uses_device_scoped_am_force_stop(monkeypatch):
+    def fake_run(command, **kwargs):
+        assert command == ["adb", "-s", "emulator-5554", "shell", "am", "force-stop", "com.example.app"]
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("edot_qa.mobile.device.subprocess.run", fake_run)
+
+    assert force_stop_app("com.example.app", device_id="emulator-5554") == ""
 
 
 def test_capture_device_screenshot_uses_exec_out_png(monkeypatch):
@@ -227,6 +240,37 @@ def test_maestro_runner_returns_failed_result_without_swallowing(monkeypatch, tm
     assert result.stderr == "bad selector"
 
 
+def test_maestro_runner_redacts_timeout_without_leaking_command(monkeypatch, tmp_path):
+    settings = _mobile_settings(tmp_path)
+    flow_path = settings.maestro_flow_dir / "login.yaml"
+    flow_path.write_text("appId: ${EWORK_APP_ID}\n---\n- launchApp\n", encoding="utf-8")
+    monkeypatch.setattr("edot_qa.mobile.maestro.command_available", lambda _: True)
+
+    def fake_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, timeout=60, output="user@example.test secret-value")
+
+    redaction_settings = MobileSettings(
+        **{
+            **settings.__dict__,
+            "ework_email": "user@example.test",
+            "ework_password": "secret-value",
+            "ework_company_code": "company-code-secret",
+        }
+    )
+    monkeypatch.setattr("edot_qa.mobile.maestro.subprocess.run", fake_run)
+    monkeypatch.setattr("edot_qa.mobile.maestro.capture_device_screenshot", lambda *args, **kwargs: b"\x89PNG\r\n")
+
+    result = MaestroRunner(redaction_settings).run_flow("login.yaml")
+
+    joined_command = " ".join(result.command)
+    assert result.returncode == 124
+    assert "timed out after 60s" in result.stderr
+    assert "secret-value" not in joined_command
+    assert "secret-value" not in result.stdout
+    assert "user@example.test" not in joined_command
+    assert "user@example.test" not in result.stdout
+
+
 def test_maestro_runner_merges_generated_data_env(monkeypatch, tmp_path):
     settings = _mobile_settings(tmp_path)
     flow_path = settings.maestro_flow_dir / "create_customer.yaml"
@@ -261,6 +305,24 @@ def test_maestro_assertion_helper_fails_pytest_on_failed_flow(tmp_path):
         assert_maestro_passed(result)
 
 
+def test_mobile_session_state_marker_has_no_credentials(tmp_path):
+    state_path = tmp_path / "auth" / "ework_session_state.json"
+
+    payload = write_mobile_session_state(
+        state_path,
+        app_id="id.edot.ework",
+        device_id="emulator-5554",
+        dashboard_text="Revenue",
+    )
+
+    raw_state = state_path.read_text(encoding="utf-8")
+    assert payload["kind"] == "mobile-app-session-marker"
+    assert mobile_session_state_exists(state_path, app_id="id.edot.ework")
+    assert not mobile_session_state_exists(state_path, app_id="other.app")
+    assert "password" not in raw_state.lower()
+    assert "secret" not in raw_state.lower()
+
+
 def test_mobile_login_flow_uses_run_flow_and_environment_values():
     entry_flow = (ROOT_DIR / "mobile" / "flows" / "login.yaml").read_text(encoding="utf-8")
     shared_flow = (ROOT_DIR / "mobile" / "flows" / "common" / "login.yaml").read_text(encoding="utf-8")
@@ -281,13 +343,19 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     shared_flow = (ROOT_DIR / "mobile" / "flows" / "common" / "create_customer.yaml").read_text(encoding="utf-8")
     combined = f"{entry_flow}\n{shared_flow}"
 
-    assert "runFlow: common/login.yaml" in entry_flow
+    assert "runFlow: common/login.yaml" not in entry_flow
     assert "runFlow: common/create_customer.yaml" in entry_flow
+    assert "${EWORK_DASHBOARD_TEXT}" in entry_flow
+    assert "${EWORK_COMPANY_CODE}" not in combined
+    assert "${EWORK_EMAIL}" not in combined
+    assert "${EWORK_PASSWORD}" not in combined
     assert "${EWORK_CUSTOMERS_MENU_TEXT}" in shared_flow
     assert "${EWORK_CUSTOMER_NAME}" in shared_flow
     assert "${EWORK_CUSTOMER_CONTACT}" in shared_flow
     assert "${EWORK_CUSTOMER_CONTACT_PERSON}" in shared_flow
-    assert "${EWORK_CUSTOMER_ADDRESS}" in shared_flow
+    assert "copyTextFrom:" in shared_flow
+    assert "output.customerAddress" in shared_flow
+    assert "output.customerCardAddress" in shared_flow
     assert "${EWORK_CUSTOMER_CHANNEL_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_TYPE_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID}" in shared_flow
@@ -305,9 +373,11 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "${EWORK_CUSTOMER_SIGNATURE_VIEW_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_SUCCESS_TEXT}" in shared_flow
-    assert "scrollUntilVisible:" in shared_flow
+    assert 'start: "50%, 90%"' in shared_flow
+    assert 'end: "50%, 15%"' in shared_flow
     assert "Tier 2: created customer name" in shared_flow
     assert "Tier 2: created customer address" in shared_flow
+    assert "Tier 2: created customer type" in shared_flow
     assert "@edot" not in combined.lower()
 
 
@@ -361,6 +431,7 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         maestro_cli="maestro",
         adb_command="adb",
         mobile_device_id=mobile_device_id,
+        mobile_flow_timeout_seconds=300,
         edot_live=False,
         ework_app_id="id.edot.ework",
         ework_email=None,
@@ -412,6 +483,7 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         maestro_output_dir=tmp_path / "maestro-output",
         allure_results_dir=tmp_path / "allure-results",
         company_handoff_path=tmp_path / "handoff.json",
+        ework_storage_state_path=tmp_path / "auth" / "ework_session_state.json",
     )
 
 

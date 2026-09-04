@@ -1,6 +1,9 @@
 appId: ${EWORK_APP_ID}
 ---
-- assertVisible: ${EWORK_LOGIN_SCREEN_TEXT}
+- extendedWaitUntil:
+    visible:
+      text: ${EWORK_LOGIN_SCREEN_TEXT}
+    timeout: 30000
 - tapOn:
     id: ${EWORK_COMPANY_ID_FIELD_ID}
 - inputText: ${EWORK_COMPANY_CODE}

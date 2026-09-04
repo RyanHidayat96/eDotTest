@@ -16,6 +16,7 @@ except ModuleNotFoundError:
 
 DEFAULT_MAESTRO_FLOW_DIR = ROOT_DIR / "mobile" / "flows"
 DEFAULT_MAESTRO_OUTPUT_DIR = ROOT_DIR / "artifacts" / "maestro"
+DEFAULT_EWORK_STORAGE_STATE = ROOT_DIR / "artifacts" / "auth" / "ework_session_state.json"
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,7 @@ class MobileSettings:
     maestro_cli: str
     adb_command: str
     mobile_device_id: str | None
+    mobile_flow_timeout_seconds: int
     edot_live: bool
     ework_app_id: str | None
     ework_email: str | None = field(repr=False)
@@ -74,6 +76,7 @@ class MobileSettings:
     maestro_output_dir: Path
     allure_results_dir: Path
     company_handoff_path: Path
+    ework_storage_state_path: Path
 
     @property
     def has_ework_credentials(self) -> bool:
@@ -159,6 +162,7 @@ class MobileSettings:
             "MAESTRO_CLI": self.maestro_cli,
             "ADB_COMMAND": self.adb_command,
             "MOBILE_DEVICE_ID": self.mobile_device_id or "<auto>",
+            "MOBILE_FLOW_TIMEOUT_SECONDS": str(self.mobile_flow_timeout_seconds),
             "EDOT_LIVE": str(self.edot_live).lower(),
             "EWORK_APP_ID": self.ework_app_id or "<missing>",
             "EWORK_EMAIL": "<set>" if self.ework_email else "<missing>",
@@ -210,6 +214,7 @@ class MobileSettings:
             "MAESTRO_OUTPUT_DIR": str(self.maestro_output_dir),
             "ALLURE_RESULTS_DIR": str(self.allure_results_dir),
             "EWORK_COMPANY_HANDOFF_PATH": str(self.company_handoff_path),
+            "EWORK_STORAGE_STATE": str(self.ework_storage_state_path),
         }
 
     def maestro_environment(self, extra_values: dict[str, str] | None = None) -> dict[str, str]:
@@ -284,6 +289,7 @@ def load_mobile_settings() -> MobileSettings:
         maestro_cli=os.getenv("MAESTRO_CLI", "maestro"),
         adb_command=os.getenv("ADB_COMMAND", "adb"),
         mobile_device_id=os.getenv("MOBILE_DEVICE_ID") or None,
+        mobile_flow_timeout_seconds=_int_from_env("MOBILE_FLOW_TIMEOUT_SECONDS", 300),
         edot_live=_bool_from_env("EDOT_LIVE"),
         ework_app_id=os.getenv("EWORK_APP_ID") or None,
         ework_email=os.getenv("EWORK_EMAIL") or (handoff.company_email if handoff else None),
@@ -335,6 +341,7 @@ def load_mobile_settings() -> MobileSettings:
         maestro_output_dir=_path_from_env("MAESTRO_OUTPUT_DIR", DEFAULT_MAESTRO_OUTPUT_DIR),
         allure_results_dir=_path_from_env("ALLURE_RESULTS_DIR", DEFAULT_ALLURE_RESULTS),
         company_handoff_path=handoff_path,
+        ework_storage_state_path=_path_from_env("EWORK_STORAGE_STATE", DEFAULT_EWORK_STORAGE_STATE),
     )
 
 
@@ -354,3 +361,10 @@ def _path_from_env(name: str, default: Path) -> Path:
 def _bool_from_env(name: str) -> bool:
     value = os.getenv(name, "").strip().lower()
     return value in {"1", "true", "yes", "y", "on"}
+
+
+def _int_from_env(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return int(value)

@@ -90,21 +90,30 @@ class MaestroRunner:
             attach_json("maestro-command", {"command": redacted_command, "flow": str(flow_path)})
             attach_file("maestro-flow-yaml", flow_path)
 
-            completed = subprocess.run(
-                command,
-                cwd=ROOT_DIR,
-                env=self.settings.maestro_environment(extra_env),
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-            )
-            result = MaestroResult(
-                flow_path=flow_path,
-                command=redacted_command,
-                returncode=completed.returncode,
-                stdout=redact_sensitive_text(completed.stdout, maestro_variables),
-                stderr=redact_sensitive_text(completed.stderr, maestro_variables),
-            )
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=ROOT_DIR,
+                    env=self.settings.maestro_environment(extra_env),
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_seconds,
+                )
+                result = MaestroResult(
+                    flow_path=flow_path,
+                    command=redacted_command,
+                    returncode=completed.returncode,
+                    stdout=redact_sensitive_text(completed.stdout, maestro_variables),
+                    stderr=redact_sensitive_text(completed.stderr, maestro_variables),
+                )
+            except subprocess.TimeoutExpired as error:
+                result = MaestroResult(
+                    flow_path=flow_path,
+                    command=redacted_command,
+                    returncode=124,
+                    stdout=redact_sensitive_text(_timeout_output(error.stdout), maestro_variables),
+                    stderr=f"Maestro flow timed out after {timeout_seconds}s: {flow_path.name}",
+                )
             self.attach_result(result)
             self.attach_device_screenshot()
             return result
@@ -159,3 +168,11 @@ def redact_sensitive_text(text: str, variables: dict[str, str] | None = None) ->
             redacted = redacted.replace(f"{key}={value}", f"{key}=<redacted>")
             redacted = redacted.replace(value, "<redacted>")
     return redacted
+
+
+def _timeout_output(output: str | bytes | None) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        return output.decode("utf-8", errors="replace")
+    return output

@@ -1,74 +1,112 @@
 # AI Usage
 
-This project includes two runtime AI capabilities required by the eDOT QA Automation Take-Home V4 assignment: AI-generated test data and AI-assisted failure triage. Both are optional at runtime when no API key is present, so the suite still runs offline and in CI.
+This project has two runtime AI capabilities required by the eDOT QA Automation Take-Home V4 assignment:
 
-## Model
+1. AI-generated test data for web company and mobile customer flows.
+2. AI-assisted failure triage after Allure results exist.
 
-Default test-data model: `gemini-3.1-flash-lite`.
+Both features are optional at runtime. When no API key is present, deterministic code still runs.
 
-Default triage model: `gemini-3.1-flash-lite`.
+## Models
 
-Why this model:
-
-- The tasks are structured and low-context: create one compact JSON test-data payload or summarize one already-classified failure.
-- Cost control matters more than long-form reasoning.
-- Deterministic code performs validation and classification first, so the model is never trusted as the only control.
-- `gemini-3.1-flash-lite` is used for test-data generation because it is a low-latency Gemini API model suitable for simple structured output.
-
-The model can be changed through environment variables:
+Default test-data model:
 
 ```text
 GEMINI_TEST_DATA_MODEL=gemini-3.1-flash-lite
+```
+
+Default triage model:
+
+```text
 GEMINI_TRIAGE_MODEL=gemini-3.1-flash-lite
 ```
 
-## Where AI Runs
+The model is environment-configured so it can be changed without editing tests. `gemini-3.1-flash-lite` is used because the suite needs compact structured JSON generation, concise failure notes, low token cost, and practical runtime latency. Deterministic validation remains the source of control; model output is never trusted directly.
 
-- While writing tests: AI-assisted development was used to draft and refine code, but no repository script rewrites submitted tests or assertions.
-- During test runs: `edot_qa.ai.test_data.TestDataGenerator` calls the Gemini API when `GEMINI_API_KEY` is set. It generates Indonesian business data before web/mobile tests consume it.
-- After test runs: `tools/triage_allure_failures.py` reads Allure results. Deterministic evidence collection and verdict classification run first. Optional AI notes run only after that evidence exists.
+## Runtime Stages
+
+Test data AI runs before tests consume data. `edot_qa.ai.test_data.TestDataGenerator` calls Gemini only when `GEMINI_API_KEY` exists, then validates the response before returning data to web or mobile tests.
+
+Failure triage AI runs after test execution. `tools/triage_allure_failures.py` reads Allure result JSON files, creates deterministic verdicts and evidence first, then optionally asks Gemini for a short human-review note. Current code does not let AI override the deterministic verdict. Step 8 will strengthen this triage implementation further; this file must be updated in that same step if prompts or schema behavior change.
+
+AI-assisted code authoring may have been used during development, but no project script rewrites submitted assertions or expected values.
 
 ## API Key Handling
 
-Supported API key variables are:
+Supported API key variable:
 
 ```text
 GEMINI_API_KEY=
 ```
 
-It must be set locally in `.env` or the process environment. `.env` is ignored by Git. API keys are never written to reports, handoff files, YAML flows, or tests.
+The key must come from local `.env` or the process environment. `.env` is ignored by Git. API keys are not stored in source, YAML flows, handoff files, test data files, or documentation.
 
 ## Test Data Prompt
 
 Code location: `edot_qa.ai.test_data.build_prompt`.
 
-Exact prompt template:
+Exact current prompt template:
 
 ```text
 Generate coherent realistic Indonesian business test data for eDOT QA automation. Return only JSON matching the provided schema. Use safe dummy domains and phone numbers. Make values unique for run_id {run_id}. Company must include legal_name, email, phone, street_address, industry. Customer must include name, contact, address. Do not include credentials, API keys, real private personal data, or extra fields.
 ```
 
-The prompt is sent with a strict JSON schema from `business_test_data_json_schema()`. Required company fields are legal name, email, phone, street address, and industry. Required customer fields are name, contact, and address.
+## Test Data Schema Validation
 
-Token controls:
+Code location: `edot_qa.ai.test_data`.
+
+Pydantic models:
+
+- `CompanyData`
+- `CustomerData`
+- `BusinessTestData`
+- `GeneratedTestData`
+
+Each model uses `ConfigDict(extra="forbid")`, so unexpected fields are rejected. Company data validates:
+
+- `legal_name` starts with `PT ` or `CV `
+- `email` matches email format
+- `phone` matches Indonesian `+62` format
+- required fields: `legal_name`, `email`, `phone`, `street_address`, `industry`
+
+Customer data validates:
+
+- `contact` is either Indonesian `+62` phone or email
+- required fields: `name`, `contact`, `address`
+
+The Gemini request also sends a JSON response schema derived from `business_test_data_json_schema()`. The returned text is parsed as JSON and then validated with Pydantic before any test uses it.
+
+## Test Data Retry And Fallback
+
+Token and retry controls:
 
 ```text
 AI_TEST_DATA_MAX_ATTEMPTS=2
 AI_TEST_DATA_MAX_OUTPUT_TOKENS=700
 ```
 
-Unavailable or invalid behavior:
+Fallback behavior:
 
-- If `GEMINI_API_KEY` is absent, the generator uses deterministic Faker fallback.
-- If the model returns malformed JSON or schema-invalid data, the generator retries up to `AI_TEST_DATA_MAX_ATTEMPTS`.
-- If all attempts fail, it uses deterministic Faker fallback.
-- The actual data used is attached to Allure as `ai-test-data-used`.
+- Missing `GEMINI_API_KEY`: use deterministic Faker fallback with reason `missing_api_key`.
+- HTTP 404 model error: stop retrying and use fallback with reason `model_not_found`.
+- Other Gemini request failure: stop retrying and use fallback with reason `api_request_failed`.
+- Malformed JSON or schema-invalid output: retry up to `AI_TEST_DATA_MAX_ATTEMPTS`.
+- Still invalid after all attempts: use fallback with reason `invalid_model_output_after_<attempts>_attempts`.
+
+Fallback provider:
+
+- class: `FakerFallbackProvider`
+- locale: `id_ID`
+- seed: first 8 hex chars from `sha256(run_id)`
+- uniqueness: generated values include the run ID suffix
+
+The actual data used, whether AI-generated or fallback, is attached to Allure as `ai-test-data-used`. Generation errors are attached as `ai-test-data-generation-errors`. Secret values are not included.
 
 ## Triage Prompt
 
 Code location: `edot_qa.ai.triage.build_triage_prompt`.
 
-Exact prompt template:
+Exact current prompt template:
 
 ```text
 Review deterministic QA failure triage. Do not change verdict. Do not weaken, skip, or rewrite assertions. Do not swallow failures. Do not change expected values to actual values. Do not auto-file or auto-close bugs. Return at most 3 concise bullets for human review.
@@ -81,7 +119,31 @@ Evidence:
 - {evidence_item_2}
 ```
 
-Only the first eight deterministic evidence items are sent to control tokens.
+Only the first eight deterministic evidence items are sent to keep the prompt bounded.
+
+## Triage Decision Process
+
+Code location: `edot_qa.ai.triage.classify_failure`.
+
+The deterministic classifier checks evidence in the assignment order and stops at the first decisive match:
+
+1. Failure type: exception vs failed assertion.
+2. Locator uniqueness: ambiguous, non-unique, or wrong locator evidence.
+3. Preconditions and prior steps: setup, credentials, auth, device, Maestro, ADB, storage state.
+4. Expected value validity: stale or invalid expected data.
+5. Reproducibility: mixed passed and failed outcomes for the same test.
+
+Allowed verdict strings:
+
+```text
+script/environment defect
+product bug
+flaky
+```
+
+Current AI participation is limited to an optional note after deterministic classification. The note is sanitized and rejected when it suggests forbidden behavior. The report remains a human-review proposal.
+
+## Triage Fallback
 
 Token control:
 
@@ -89,50 +151,34 @@ Token control:
 AI_TRIAGE_MAX_OUTPUT_TOKENS=900
 ```
 
-Unavailable or invalid behavior:
+Fallback behavior:
 
-- If `GEMINI_API_KEY` is absent, triage still writes a Markdown report using deterministic verdicts only.
-- If the Gemini request fails, the report keeps the deterministic verdict and records that the AI note was unavailable.
-- If the AI note suggests a forbidden action, the note is rejected and the deterministic verdict remains unchanged.
+- Missing `GEMINI_API_KEY`: triage writes deterministic Markdown only.
+- Gemini request failure: deterministic verdict remains; evidence records that the AI note was unavailable.
+- Empty or unsafe note: note is rejected; deterministic verdict remains.
 
-## Deterministic Triage Order
+## Guardrails
 
-For each failed or broken Allure result, `edot_qa.ai.triage.classify_failure` walks evidence in the assignment order and stops at the first decisive match:
+AI is forbidden to:
 
-1. Exception or failed assertion.
-2. Locator uniqueness.
-3. Preconditions and prior steps.
-4. Expected value correctness.
-5. Reproducibility.
+- weaken assertions
+- skip failing assertions
+- rewrite expected values
+- change expected values to actual values
+- swallow failures in `try/except`
+- turn a failing test into a passing test
+- file bugs automatically
+- close bugs automatically
+- store or print API keys, passwords, cookies, or bearer tokens
 
-Verdict categories are exactly:
+These restrictions exist because the assignment grades real behavior verification. AI may help generate data and propose triage notes, but it must not hide defects or alter test outcomes.
 
-- `script/environment defect`
-- `product bug`
-- `flaky`
+## Secret Handling
 
-The report always includes evidence for the verdict. A product-bug verdict remains a human-review proposal, not an automatic bug.
+Sensitive runtime values come from environment variables only. Safe reporting helpers redact configured secrets before attaching commands or environment context to Allure. Reports should not expose credentials, API keys, storage state JSON, cookies, or authorization headers.
 
-## AI Guardrails
+Before packaging or sharing evidence, run:
 
-AI is deliberately forbidden to:
-
-- Weaken, skip, or rewrite assertions.
-- Swallow failures in `try/except`.
-- Change expected values to actual values.
-- Make a failing test pass.
-- File bugs automatically.
-- Close bugs automatically.
-- Store or print API keys.
-
-Why: the assignment grades real behavior verification. Letting AI mutate assertions or expected values would hide product defects, create false green builds, and make the evidence untrustworthy.
-
-## Offline and CI Behavior
-
-The suite is designed to run without AI credentials:
-
-- Test data falls back to deterministic Faker output.
-- Triage falls back to deterministic Markdown output.
-- Unit tests use fake providers and do not perform network calls.
-
-This keeps CI stable and prevents network or quota problems from blocking non-AI validation.
+```bash
+python tools/check_submission_safety.py
+```

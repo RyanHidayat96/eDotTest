@@ -16,8 +16,8 @@ DEFAULT_BASE_URL = "https://esuite.edot.id"
 DEFAULT_STORAGE_STATE = ROOT_DIR / "artifacts" / "auth" / "esuite_storage_state.json"
 DEFAULT_ALLURE_RESULTS = ROOT_DIR / "reports" / "allure-results"
 DEFAULT_TRIAGE_REPORT = ROOT_DIR / "reports" / "triage" / "triage-report.md"
-DEFAULT_GEMINI_TEST_DATA_MODEL = "gemini-2.5-flash-lite"
-DEFAULT_GEMINI_TRIAGE_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_GEMINI_TEST_DATA_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_GEMINI_TRIAGE_MODEL = "gemini-3.1-flash-lite"
 
 
 def _load_dotenv() -> None:

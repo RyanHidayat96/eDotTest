@@ -31,7 +31,7 @@ def test_register_company_step_one_requires_valid_data(settings, authenticated_p
         registration = CompanyRegistrationData.from_generated_test_data(generated_data)
         attach_json("company-registration-data", registration.as_allure_payload())
 
-    with allure_step("Validate Register Company step 1 mandatory fields", page=authenticated_page):
+    with allure_step("Validate Register Company step 1 mandatory fields", page=authenticated_page, screenshot=True):
         wizard = CompaniesPage(authenticated_page, settings).open_register_company_wizard()
         wizard.expect_next_disabled_until_step_one_valid(registration)
 
@@ -50,7 +50,7 @@ def test_create_company_three_step_wizard_with_ai_data(settings, authenticated_p
             wizard = CompaniesPage(authenticated_page, settings).open_register_company_wizard()
             wizard.complete_three_step_registration(registration)
 
-        with allure_step("Verify created company in Manage and Detail", page=authenticated_page):
+        with allure_step("Verify created company in Manage and Detail", page=authenticated_page, screenshot=True):
             manage_page = CompaniesPage(authenticated_page, settings).open_manage()
             # Tier 2: created record must display submitted company name in Manage, not only a success toast.
             manage_page.expect_company_present(registration.company_name)
@@ -65,6 +65,7 @@ def test_create_company_three_step_wizard_with_ai_data(settings, authenticated_p
             with allure_step(
                 "Cleanup created company",
                 page=authenticated_page,
+                screenshot=True,
                 data={"company_name": registration.company_name, "company_id": created_company_id},
             ):
                 cleanup_page = CompaniesPage(authenticated_page, settings).open_manage()

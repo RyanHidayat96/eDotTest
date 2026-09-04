@@ -14,11 +14,15 @@ from faker import Faker
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from edot_qa.config import Settings, load_settings
-from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_text
+from edot_qa.reporting.allure_helpers import allure_step, attach_json
 
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 INDONESIAN_PHONE_RE = re.compile(r"^\+62\d{8,13}$")
+
+
+class GeminiModelNotFoundError(RuntimeError):
+    pass
 
 
 class CompanyData(BaseModel):
@@ -113,6 +117,12 @@ class GeminiGenerateContentProvider:
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 body = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                raise GeminiModelNotFoundError(
+                    f"Gemini model not found: {model}. Check GEMINI_TEST_DATA_MODEL/GEMINI_TRIAGE_MODEL."
+                ) from error
+            raise RuntimeError(f"Gemini API request failed for model {model}: HTTP {error.code} {error.reason}") from error
         except (urllib.error.URLError, TimeoutError, OSError) as error:
             raise RuntimeError(f"Gemini API request failed: {error}") from error
         return extract_gemini_text(body)
@@ -189,7 +199,8 @@ class TestDataGenerator:
             if provider is None:
                 return self._fallback(resolved_run_id, attach_to_allure=attach_to_allure, reason="missing_api_key")
 
-            last_error: str | None = None
+            fallback_reason = f"invalid_model_output_after_{self.settings.ai_test_data_max_attempts}_attempts"
+            attempt_errors: list[dict[str, str | int]] = []
             schema = business_test_data_json_schema()
             for attempt in range(1, self.settings.ai_test_data_max_attempts + 1):
                 try:
@@ -209,14 +220,19 @@ class TestDataGenerator:
                     )
                     self._attach(generated, attach_to_allure)
                     return generated
+                except GeminiModelNotFoundError as error:
+                    fallback_reason = "model_not_found"
+                    attempt_errors.append({"attempt": attempt, "error": str(error)})
+                    break
                 except (json.JSONDecodeError, ValidationError, RuntimeError) as error:
-                    last_error = str(error)
-                    attach_text("ai-test-data-invalid-output", last_error)
+                    attempt_errors.append({"attempt": attempt, "error": str(error)})
 
+            if attempt_errors and attach_to_allure:
+                attach_json("ai-test-data-generation-errors", attempt_errors)
             return self._fallback(
                 resolved_run_id,
                 attach_to_allure=attach_to_allure,
-                reason=f"invalid_model_output_after_{self.settings.ai_test_data_max_attempts}_attempts",
+                reason=fallback_reason,
             )
 
     def _default_model_provider(self) -> tuple[ModelProvider, str] | None:

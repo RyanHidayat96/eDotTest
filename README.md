@@ -80,8 +80,8 @@ AI values:
 
 ```text
 GEMINI_API_KEY=
-GEMINI_TEST_DATA_MODEL=gemini-2.5-flash-lite
-GEMINI_TRIAGE_MODEL=gemini-2.5-flash-lite
+GEMINI_TEST_DATA_MODEL=gemini-3.1-flash-lite
+GEMINI_TRIAGE_MODEL=gemini-3.1-flash-lite
 AI_TEST_DATA_MAX_ATTEMPTS=2
 AI_TEST_DATA_MAX_OUTPUT_TOKENS=700
 AI_TRIAGE_MAX_OUTPUT_TOKENS=900
@@ -232,7 +232,7 @@ npm run allure:open:mobile
 
 The Allure binary comes from `allure-commandline` in `devDependencies`, same as a local Node-based automation project. No global Allure PATH is required.
 
-Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Each test result is normalized to include executable steps. UI steps attach page URL/title/viewport and screenshots, input steps attach redacted input payloads, failure hooks attach full-page evidence, and Maestro steps attach redacted commands, flow YAML, stdout/stderr, result JSON, device screenshots, and supported output artifacts.
+Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Reports are intentionally lean: tests show business-level steps, input steps attach redacted payloads, successful UI screenshots are captured only at important milestones, failures attach full-page evidence, and Maestro steps attach redacted commands, flow YAML, stdout/stderr, result JSON, device screenshots, and supported output artifacts.
 
 ## AI Failure Triage
 

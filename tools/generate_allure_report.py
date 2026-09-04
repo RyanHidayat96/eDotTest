@@ -148,32 +148,22 @@ def _postprocess_results(results_dir: Path) -> int:
 
 def _ensure_step_evidence(result: dict[str, Any], results_dir: Path) -> None:
     steps = result.setdefault("steps", [])
+    result["steps"] = _compact_steps(steps, depth=0, results_dir=results_dir)
+    steps = result["steps"]
     if not steps:
-        steps.append(
-            {
-                "name": "Test evidence summary",
-                "status": _status(result.get("status")),
-                "stage": "finished",
-                "start": result.get("start"),
-                "stop": result.get("stop"),
-                "attachments": [],
-            }
-        )
-
-    for step in _iter_steps(steps):
-        _attach_step_runtime_info(result, step, results_dir)
+        summary = {
+            "name": "Test summary",
+            "status": _status(result.get("status")),
+            "stage": "finished",
+            "start": result.get("start"),
+            "stop": result.get("stop"),
+            "attachments": [],
+        }
+        _attach_summary(result, summary, results_dir)
+        steps.append(summary)
 
 
-def _iter_steps(steps: list[dict[str, Any]]):
-    for step in steps:
-        yield step
-        yield from _iter_steps(step.get("steps", []))
-
-
-def _attach_step_runtime_info(result: dict[str, Any], step: dict[str, Any], results_dir: Path) -> None:
-    if any(attachment.get("name") == "step-runtime-info" for attachment in step.get("attachments", [])):
-        return
-
+def _attach_summary(result: dict[str, Any], step: dict[str, Any], results_dir: Path) -> None:
     source = f"{uuid.uuid4()}-attachment.json"
     labels = _labels_by_name(result.get("labels", []))
     payload = {
@@ -181,13 +171,6 @@ def _attach_step_runtime_info(result: dict[str, Any], step: dict[str, Any], resu
             "name": result.get("name"),
             "fullName": result.get("fullName"),
             "status": _status(result.get("status")),
-        },
-        "step": {
-            "name": step.get("name"),
-            "status": _status(step.get("status")),
-            "stage": step.get("stage"),
-            "start": step.get("start"),
-            "stop": step.get("stop"),
         },
         "suite": {
             "parentSuite": labels.get("parentSuite"),
@@ -207,11 +190,86 @@ def _attach_step_runtime_info(result: dict[str, Any], step: dict[str, Any], resu
     (results_dir / source).write_text(json.dumps(redact_payload(payload), indent=2, sort_keys=True), encoding="utf-8")
     step.setdefault("attachments", []).append(
         {
-            "name": "step-runtime-info",
+            "name": "Summary",
             "source": source,
             "type": "application/json",
         }
     )
+
+
+def _compact_steps(steps: list[dict[str, Any]], *, depth: int, results_dir: Path) -> list[dict[str, Any]]:
+    compacted = []
+    for step in steps:
+        step["attachments"] = _clean_attachments(step.get("attachments", []), results_dir)
+        step["steps"] = _compact_steps(step.get("steps", []), depth=depth + 1, results_dir=results_dir)
+        if depth > 0 and _is_empty_passed_step(step):
+            continue
+        compacted.append(step)
+    return compacted
+
+
+def _clean_attachments(attachments: list[dict[str, Any]], results_dir: Path) -> list[dict[str, Any]]:
+    cleaned = []
+    input_records = []
+    for attachment in attachments:
+        name = str(attachment.get("name", ""))
+        if name in {"step-runtime-info", "step-result", "step-evidence-page", "step-evidence-screenshot"}:
+            continue
+        if name in {"step-input", "Input"} or name.startswith("Input - "):
+            input_records.append(
+                {
+                    "step": name.removeprefix("Input - ") if name.startswith("Input - ") else "Input",
+                    "data": _read_json_attachment(results_dir, attachment),
+                }
+            )
+            continue
+        renamed = dict(attachment)
+        renamed["name"] = {
+            "step-error": "Error",
+            "step-failure-evidence-page": "Failure page state",
+            "step-failure-evidence-screenshot": "Failure screenshot",
+            "failure-evidence-call-page": "Final failure page state",
+            "failure-evidence-call-screenshot": "Final failure screenshot",
+        }.get(name, name)
+        cleaned.append(renamed)
+    if input_records:
+        source = f"{uuid.uuid4()}-attachment.json"
+        (results_dir / source).write_text(
+            json.dumps(_combine_input_records(input_records), indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        cleaned.insert(0, {"name": "Inputs", "source": source, "type": "application/json"})
+    return cleaned
+
+
+def _read_json_attachment(results_dir: Path, attachment: dict[str, Any]) -> Any:
+    source = attachment.get("source")
+    if not source:
+        return {}
+    try:
+        return json.loads((results_dir / str(source)).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"source": source}
+
+
+def _combine_input_records(records: list[dict[str, Any]]) -> Any:
+    fields: dict[str, Any] = {}
+    items = []
+    for record in records:
+        data = record.get("data")
+        if isinstance(data, dict) and {"field", "value"}.issubset(data):
+            fields[str(data["field"])] = data["value"]
+            continue
+        items.append(record)
+    if fields:
+        return {"fields": redact_payload(fields)}
+    if len(items) == 1:
+        return redact_payload(items[0].get("data"))
+    return redact_payload({"items": items})
+
+
+def _is_empty_passed_step(step: dict[str, Any]) -> bool:
+    return _status(step.get("status")) == "passed" and not step.get("attachments") and not step.get("steps")
 
 
 def _labels_by_name(labels: list[dict[str, Any]]) -> dict[str, Any]:

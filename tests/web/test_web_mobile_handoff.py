@@ -116,7 +116,7 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
             wizard = CompaniesPage(authenticated_page, settings).open_register_company_wizard()
             wizard.complete_three_step_registration(registration)
 
-        with allure_step("Verify handoff source company on web", page=authenticated_page):
+        with allure_step("Verify handoff source company on web", page=authenticated_page, screenshot=True):
             manage_page = CompaniesPage(authenticated_page, settings).open_manage()
             # Tier 2: handoff source company must exist in Manage before mobile consumes it.
             manage_page.expect_company_present(registration.company_name)
@@ -140,6 +140,7 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
             with allure_step(
                 "Cleanup web company and handoff file",
                 page=authenticated_page,
+                screenshot=True,
                 data={"company_name": registration.company_name, "company_id": created_company_id},
             ):
                 cleanup_page = CompaniesPage(authenticated_page, settings).open_manage()

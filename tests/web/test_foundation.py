@@ -84,12 +84,43 @@ def test_allure_report_generator_adds_step_evidence(tmp_path):
 
     _ensure_step_evidence(result, tmp_path)
 
-    assert result["steps"][0]["name"] == "Test evidence summary"
+    assert result["steps"][0]["name"] == "Test summary"
     attachment = result["steps"][0]["attachments"][0]
-    assert attachment["name"] == "step-runtime-info"
+    assert attachment["name"] == "Summary"
     payload = json.loads((tmp_path / attachment["source"]).read_text(encoding="utf-8"))
     assert payload["test"]["name"] == "test_sample"
     assert payload["suite"]["parentSuite"] == "eSuite Web"
+
+
+def test_allure_report_generator_prunes_noisy_step_attachments(tmp_path):
+    (tmp_path / "input.json").write_text(json.dumps({"field": "Email", "value": "qa@example.test"}), encoding="utf-8")
+    result = {
+        "name": "test_sample",
+        "fullName": "tests.web.test_sample#test_sample",
+        "status": "passed",
+        "steps": [
+            {
+                "name": "Business step",
+                "status": "passed",
+                "attachments": [
+                    {"name": "step-runtime-info", "source": "runtime.json"},
+                    {"name": "step-result", "source": "result.json"},
+                    {"name": "step-evidence-page", "source": "page.json"},
+                    {"name": "step-input", "source": "input.json"},
+                ],
+                "steps": [{"name": "Empty technical step", "status": "passed", "attachments": [], "steps": []}],
+            }
+        ],
+    }
+
+    _ensure_step_evidence(result, tmp_path)
+
+    assert len(result["steps"][0]["attachments"]) == 1
+    attachment = result["steps"][0]["attachments"][0]
+    assert attachment["name"] == "Inputs"
+    payload = json.loads((tmp_path / attachment["source"]).read_text(encoding="utf-8"))
+    assert payload == {"fields": {"Email": "qa@example.test"}}
+    assert result["steps"][0]["steps"] == []
 
 
 def test_company_detail_empty_name_reloads_five_times_before_error(monkeypatch):

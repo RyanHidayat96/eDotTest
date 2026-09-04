@@ -30,11 +30,11 @@ def test_esuite_login_shows_dashboard_greeting(settings, page):
     with allure_step("Login with eSuite credentials", page=page, screenshot=False):
         LoginPage(page, settings).login(settings.esuite_email or "", settings.esuite_password or "")
 
-    with allure_step("Verify dashboard greeting after login", page=page):
+    with allure_step("Verify dashboard greeting after login", page=page, screenshot=True):
         dashboard = DashboardPage(page, settings)
         dashboard.expect_loaded()
 
-    with allure_step("Persist storage state after successful login", page=page, data={"path": settings.storage_state_path}):
+    with allure_step("Persist storage state after successful login", data={"path": settings.storage_state_path}):
         save_storage_state(page.context, settings.storage_state_path)
 
     parsed_url = urlparse(page.url)

@@ -6,6 +6,7 @@ import pytest
 
 from edot_qa.ai.test_data import (
     BusinessTestData,
+    GeminiModelNotFoundError,
     GeneratedTestData,
     TestDataGenerator,
     business_test_data_json_schema,
@@ -32,6 +33,15 @@ class FakeModelProvider:
         assert model
         assert max_output_tokens > 0
         return self.responses.pop(0)
+
+
+class MissingModelProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def generate(self, prompt: str, schema: dict, *, model: str, max_output_tokens: int) -> str:
+        self.calls += 1
+        raise GeminiModelNotFoundError("Gemini model not found: gemini-old")
 
 
 VALID_PAYLOAD = {
@@ -107,13 +117,26 @@ def test_gemini_text_extractor_supports_generate_content_shape():
 
 def test_gemini_key_is_preferred_for_test_data(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
-    monkeypatch.setenv("GEMINI_TEST_DATA_MODEL", "gemini-2.5-flash-lite")
+    monkeypatch.setenv("GEMINI_TEST_DATA_MODEL", "gemini-3.1-flash-lite")
     settings = load_settings()
 
     provider = TestDataGenerator(settings=settings)._default_model_provider()
 
     assert provider is not None
-    assert provider[1] == "gemini-2.5-flash-lite"
+    assert provider[1] == "gemini-3.1-flash-lite"
+
+
+def test_missing_gemini_model_falls_back_without_retry(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
+    provider = MissingModelProvider()
+
+    generated = TestDataGenerator(settings=load_settings(), model_provider=provider).generate(
+        "missing-model-run",
+        attach_to_allure=False,
+    )
+
+    assert provider.calls == 1
+    assert generated.source == "faker_fallback:model_not_found"
 
 
 def test_prompt_keeps_guardrails():
@@ -129,7 +152,7 @@ def test_generated_data_model_forbids_extra_fields():
             {
                 "data": VALID_PAYLOAD,
                 "source": "ai_model",
-                "model": "gemini-2.5-flash-lite",
+                "model": "gemini-3.1-flash-lite",
                 "attempts": 1,
                 "run_id": "abc12345",
                 "extra": "not allowed",

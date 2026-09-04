@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from contextvars import ContextVar
 from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 import json
 from pathlib import Path
-from time import perf_counter
 from typing import Any, Iterator
 
 
@@ -16,6 +16,8 @@ except ModuleNotFoundError:
 
 SENSITIVE_KEY = ("authorization", "cookie", "password", "passwd", "token", "secret", "credential", "session")
 MAX_ARRAY_ITEMS = 25
+_STEP_DEPTH: ContextVar[int] = ContextVar("_STEP_DEPTH", default=0)
+_STEP_INPUTS: ContextVar[list[dict[str, Any]] | None] = ContextVar("_STEP_INPUTS", default=None)
 
 
 def attach_text(name: str, text: str) -> None:
@@ -55,31 +57,53 @@ def allure_step(
     *,
     page: Any | None = None,
     data: Any | None = None,
-    screenshot: bool = True,
+    screenshot: bool = False,
     full_page: bool = False,
+    force: bool = False,
 ) -> Iterator[None]:
     if allure is None:
         yield
         return
 
-    started_at = perf_counter()
-    with allure.step(title):
+    depth = _STEP_DEPTH.get()
+    if depth > 0 and not force:
         if data is not None:
-            attach_json("step-input", data)
+            _record_input(title, data)
         try:
             yield
         except Exception as error:
             attach_json(
-                "step-error",
+                f"Error - {title}",
                 {"error_type": type(error).__name__, "message": str(error)},
             )
             if page is not None:
-                attach_page_evidence("step-failure-evidence", page, screenshot=screenshot, full_page=full_page)
+                attach_page_evidence(f"Failure - {title}", page, screenshot=True, full_page=True)
+            raise
+        return
+
+    with allure.step(title):
+        token = _STEP_DEPTH.set(depth + 1)
+        input_token = _STEP_INPUTS.set([])
+        if data is not None:
+            _record_input(title, data)
+        try:
+            yield
+        except Exception as error:
+            _attach_collected_inputs()
+            attach_json(
+                "Error",
+                {"error_type": type(error).__name__, "message": str(error)},
+            )
+            if page is not None:
+                attach_page_evidence("Failure", page, screenshot=True, full_page=True)
             raise
         else:
-            attach_json("step-result", {"status": "passed", "duration_ms": int((perf_counter() - started_at) * 1000)})
-            if page is not None:
-                attach_page_evidence("step-evidence", page, screenshot=screenshot, full_page=full_page)
+            _attach_collected_inputs()
+            if page is not None and screenshot:
+                attach_page_evidence("Evidence", page, screenshot=True, full_page=full_page)
+        finally:
+            _STEP_INPUTS.reset(input_token)
+            _STEP_DEPTH.reset(token)
 
 
 def attach_page_evidence(
@@ -93,7 +117,7 @@ def attach_page_evidence(
         return
 
     attach_json(
-        f"{name}-page",
+        f"{name} page state",
         {
             "url": _page_url(page),
             "title": _page_title(page),
@@ -103,13 +127,44 @@ def attach_page_evidence(
     if not screenshot:
         return
     try:
-        attach_png(f"{name}-screenshot", page.screenshot(full_page=full_page, timeout=5_000))
+        attach_png(f"{name} screenshot", page.screenshot(full_page=full_page, timeout=5_000))
     except Exception as error:
-        attach_text(f"{name}-screenshot-error", str(error))
+        attach_text(f"{name} screenshot error", str(error))
 
 
 def redact_payload(value: Any) -> Any:
     return _normalize_payload(value)
+
+
+def _record_input(title: str, data: Any) -> None:
+    inputs = _STEP_INPUTS.get()
+    if inputs is None:
+        attach_json("Inputs", data)
+        return
+    inputs.append({"step": title, "data": redact_payload(data)})
+
+
+def _attach_collected_inputs() -> None:
+    inputs = _STEP_INPUTS.get()
+    if not inputs:
+        return
+    attach_json("Inputs", _combined_inputs(inputs))
+
+
+def _combined_inputs(inputs: list[dict[str, Any]]) -> Any:
+    fields: dict[str, Any] = {}
+    records = []
+    for item in inputs:
+        data = item.get("data")
+        if isinstance(data, dict) and {"field", "value"}.issubset(data):
+            fields[str(data["field"])] = data["value"]
+            continue
+        records.append({"step": item.get("step"), "data": data})
+    if fields:
+        return {"fields": fields}
+    if len(records) == 1:
+        return records[0]["data"]
+    return {"items": records}
 
 
 def _normalize_payload(value: Any, *, key: str = "") -> Any:

@@ -15,6 +15,77 @@ DELETE_ACTION = re.compile(r"^(Delete|Hapus|Remove)$", re.I)
 CONFIRM_DELETE_ACTION = re.compile(r"^(Confirm|Delete|Hapus|Yes|Ya|OK)$", re.I)
 DELETE_AGREEMENT = re.compile(r"I understand\s*&\s*agree to delete", re.I)
 DETAIL_EMPTY_REFRESH_TIMEOUT_MS = 2_000
+DETAIL_EMPTY_MAX_RELOADS = 5
+DETAIL_COMPANY_NAME_FIELD_VALUE_SCRIPT = """
+() => {
+  const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim();
+  const visible = (element) => {
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const meaningful = (value) => {
+    const text = normalize(value);
+    return (
+      text.length > 0 &&
+      !/^choose\\b/i.test(text) &&
+      !/^input\\b/i.test(text) &&
+      !/^select\\b/i.test(text)
+    );
+  };
+  const fieldValue = (element) => normalize(
+    element.value ||
+    element.textContent ||
+    element.getAttribute("value") ||
+    element.getAttribute("aria-label") ||
+    element.getAttribute("title")
+  );
+  const controlsFrom = (root) => Array.from(
+    root?.querySelectorAll?.("input, textarea, [role='textbox'], [contenteditable='true']") || []
+  );
+  const directControls = Array.from(
+    document.querySelectorAll(
+      [
+        "input[placeholder*='Company Name' i]",
+        "textarea[placeholder*='Company Name' i]",
+        "input[name*='companyName' i]",
+        "textarea[name*='companyName' i]",
+        "input[name*='company_name' i]",
+        "textarea[name*='company_name' i]",
+        "input[id*='companyName' i]",
+        "textarea[id*='companyName' i]",
+        "input[id*='company_name' i]",
+        "textarea[id*='company_name' i]",
+        "[data-testid*='company-name' i]",
+        "[data-testid*='companyName' i]",
+      ].join(",")
+    )
+  );
+  const labeledControls = [];
+  const labels = Array.from(document.querySelectorAll("label, div, span, p"))
+    .filter((element) => visible(element) && /^Company Name\\*?$/i.test(normalize(element.textContent)));
+  for (const label of labels) {
+    const roots = [
+      label,
+      label.parentElement,
+      label.parentElement?.parentElement,
+      label.closest("label"),
+      label.closest("div"),
+      label.closest("section"),
+      label.nextElementSibling,
+    ].filter(Boolean);
+    for (const root of roots) {
+      labeledControls.push(...controlsFrom(root));
+    }
+  }
+  for (const element of [...directControls, ...labeledControls]) {
+    if (!visible(element)) continue;
+    const value = fieldValue(element);
+    if (meaningful(value)) return value;
+  }
+  return "";
+}
+"""
 DETAIL_COMPANY_NAME_FIELD_SCRIPT = """
 (payload) => {
   const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim();
@@ -73,6 +144,10 @@ class DetailFieldSpec:
     test_ids: tuple[str, ...]
     stable_names: tuple[str, ...]
     placeholders: tuple[str, ...] = ()
+
+
+class CompanyDetailDataNotLoadedError(AssertionError):
+    """Raised when eSuite opens an empty company detail form after Manage."""
 
 
 class CompanyDetailPage(BasePage):
@@ -136,7 +211,7 @@ class CompanyDetailPage(BasePage):
 
     def expect_company_values(self, data: CompanyRegistrationData) -> None:
         expected_values = data.expected_detail_values()
-        self.refresh_once_if_company_name_empty(data.company_name)
+        self.refresh_until_company_name_loaded(data.company_name)
         attach_json("company-detail-expected-values", expected_values)
 
         # Tier 2: detail name is checked first and must match before other fields.
@@ -282,12 +357,63 @@ class CompanyDetailPage(BasePage):
         return ""
 
     def refresh_once_if_company_name_empty(self, company_name: str) -> None:
+        self.refresh_until_company_name_loaded(company_name)
+
+    def refresh_until_company_name_loaded(self, company_name: str, max_reloads: int = DETAIL_EMPTY_MAX_RELOADS) -> None:
         self.expect_detail_shell_loaded()
-        if not self._company_name_field_has_value(timeout_ms=DETAIL_EMPTY_REFRESH_TIMEOUT_MS):
+        for reload_attempt in range(0, max_reloads + 1):
+            if self._company_name_field_ready(
+                company_name,
+                require_expected=True,
+                timeout_ms=DETAIL_EMPTY_REFRESH_TIMEOUT_MS,
+            ):
+                if reload_attempt > 0:
+                    attach_json(
+                        "company-detail-refresh-resolved",
+                        {
+                            "company_name": company_name,
+                            "reload_attempt": reload_attempt,
+                            "max_reloads": max_reloads,
+                        },
+                    )
+                return
+
+            observed_value = self._company_name_field_current_value_now()
+            if observed_value:
+                if _detail_values_match(observed_value, company_name):
+                    attach_json(
+                        "company-detail-refresh-resolved-by-field-read",
+                        {
+                            "company_name": company_name,
+                            "observed_value": observed_value,
+                            "reload_attempt": reload_attempt,
+                            "max_reloads": max_reloads,
+                        },
+                    )
+                    return
+                raise AssertionError(
+                    f"Company Name field loaded {observed_value!r}, expected {company_name!r}"
+                )
+
+            if reload_attempt == max_reloads:
+                attach_json(
+                    "company-detail-refresh-limit-reached",
+                    {
+                        "company_name": company_name,
+                        "max_reloads": max_reloads,
+                        "reason": "company_name field still empty after repeated 2 second waits",
+                    },
+                )
+                raise CompanyDetailDataNotLoadedError(
+                    f"Company Name field stayed empty after {max_reloads} reloads for {company_name!r}"
+                )
+
             attach_json(
                 "company-detail-refresh",
                 {
                     "company_name": company_name,
+                    "reload_attempt": reload_attempt + 1,
+                    "max_reloads": max_reloads,
                     "reason": "company_name field empty for 2 seconds after opening Manage",
                 },
             )
@@ -298,9 +424,24 @@ class CompanyDetailPage(BasePage):
     def _company_name_field_has_value(self, timeout_ms: int) -> bool:
         return self._company_name_field_ready("", require_expected=False, timeout_ms=timeout_ms)
 
+    def _company_name_field_has_value_now(self) -> bool:
+        return bool(self._company_name_field_current_value_now())
+
+    def _company_name_field_current_value_now(self) -> str:
+        try:
+            return str(self.page.evaluate(DETAIL_COMPANY_NAME_FIELD_VALUE_SCRIPT) or "").strip()
+        except PlaywrightError:
+            return ""
+
     def _expect_company_name_field_matches(self, company_name: str, timeout_ms: int) -> None:
-        if not self._company_name_field_ready(company_name, require_expected=True, timeout_ms=timeout_ms):
-            raise AssertionError(f"Company Name field did not match {company_name!r}")
+        if self._company_name_field_ready(company_name, require_expected=True, timeout_ms=timeout_ms):
+            return
+        observed_value = self._company_name_field_current_value_now()
+        if _detail_values_match(observed_value, company_name):
+            return
+        if observed_value:
+            raise AssertionError(f"Company Name field loaded {observed_value!r}, expected {company_name!r}")
+        raise AssertionError(f"Company Name field did not match {company_name!r}")
 
     def _company_name_field_ready(self, company_name: str, require_expected: bool, timeout_ms: int) -> bool:
         try:
@@ -444,3 +585,9 @@ def _delete_confirmation_is_visible(page: Page) -> bool:
 def _is_meaningful_detail_value(value: str) -> bool:
     lowered = value.strip().lower()
     return bool(lowered) and not lowered.startswith(("input ", "choose ", "select "))
+
+
+def _detail_values_match(actual_value: str, expected_value: str) -> bool:
+    actual = " ".join(actual_value.split()).casefold()
+    expected = " ".join(expected_value.split()).casefold()
+    return bool(actual and expected) and (actual == expected or expected in actual)

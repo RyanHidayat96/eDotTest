@@ -7,11 +7,17 @@ from playwright.sync_api import Locator, TimeoutError, expect
 
 from edot_qa.reporting.allure_helpers import attach_json, attach_text
 from edot_qa.web.base_page import BasePage
-from edot_qa.web.pages.company_detail_page import CompanyDetailPage, confirm_delete_if_needed
+from edot_qa.web.pages.company_detail_page import (
+    CompanyDetailDataNotLoadedError,
+    CompanyDetailPage,
+    DETAIL_EMPTY_MAX_RELOADS,
+    confirm_delete_if_needed,
+)
 
 
 DETAIL_ACTION = re.compile(r"^(Manage|Detail|View|Open|Lihat|Kelola)$", re.I)
 DELETE_ACTION = re.compile(r"^(Delete|Hapus|Remove)$", re.I)
+DETAIL_OPEN_ATTEMPTS_AFTER_EMPTY_REFRESH = 2
 
 
 class CompanyManagePage(BasePage):
@@ -81,9 +87,9 @@ class CompanyManagePage(BasePage):
         attach_json("company-cleanup-record-absent", {"company_name": company_name, "company_id": company_id})
 
     def open_company_detail(self, company_name: str) -> CompanyDetailPage:
-        self.search_company(company_name)
         errors: list[str] = []
-        for attempt in range(1, 4):
+        for attempt in range(1, DETAIL_OPEN_ATTEMPTS_AFTER_EMPTY_REFRESH + 1):
+            self.search_company(company_name)
             try:
                 record = self._company_record(company_name)
                 record.scroll_into_view_if_needed(timeout=5_000)
@@ -97,9 +103,25 @@ class CompanyManagePage(BasePage):
 
                 self._wait_after_table_action()
                 detail = CompanyDetailPage(self.page, self.settings)
-                detail.refresh_once_if_company_name_empty(company_name)
+                max_reloads = DETAIL_EMPTY_MAX_RELOADS if attempt == 1 else 0
+                detail.refresh_until_company_name_loaded(company_name, max_reloads=max_reloads)
                 attach_json("company-detail-opened", {"company_name": company_name})
                 return detail
+            except CompanyDetailDataNotLoadedError as error:
+                errors.append(f"attempt {attempt}: {error}")
+                if attempt < DETAIL_OPEN_ATTEMPTS_AFTER_EMPTY_REFRESH:
+                    attach_json(
+                        "company-detail-reopen-after-empty-refresh-limit",
+                        {
+                            "company_name": company_name,
+                            "attempt": attempt,
+                            "reloads_used": DETAIL_EMPTY_MAX_RELOADS,
+                            "next_action": "return to Companies and click Manage again",
+                        },
+                    )
+                    self._reload_companies_page()
+                    continue
+                break
             except (AssertionError, PlaywrightError, TimeoutError) as error:
                 errors.append(f"attempt {attempt}: {error}")
                 if "/profile" in self.page.url:

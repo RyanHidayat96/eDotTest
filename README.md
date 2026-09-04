@@ -183,10 +183,9 @@ Mobile credentials should come from the web-created company handoff only when th
 You can use the npm shortcuts below from the project root.
 
 ```powershell
-npm run test:web:quality
+npm run test:web
 npm run test:web:login
-npm run test:web:company:step1
-npm run test:web:company:full
+npm run test:web:company
 ```
 
 `test:web:login` always performs credential input and creates a fresh `PLAYWRIGHT_STORAGE_STATE` after successful login. Authenticated business tests reuse that storage state so they do not repeat login unless the state is missing or stale.
@@ -225,7 +224,7 @@ The eWork SFA app package is `id.edot.ework`. Current login selectors were confi
 Run mobile checks:
 
 ```powershell
-npm run test:mobile:foundation
+npm run test:mobile
 npm run test:mobile:login
 npm run test:mobile:customer
 ```
@@ -254,12 +253,10 @@ Implemented mobile behaviors:
 
 For local live mobile verification in this repository, the assignment-provided fallback eWork account was used because no web-created company handoff was available. The fallback password is not stored in this README and must stay only in ignored local environment configuration.
 
-## Other Test Commands
+## AI Checks
 
 ```powershell
-npm run test:quick
 npm run test:ai
-npm test
 ```
 
 Direct Pytest forms:
@@ -267,7 +264,6 @@ Direct Pytest forms:
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests
 .\.venv\Scripts\python.exe -m pytest tests\ai
-.\.venv\Scripts\python.exe -m pytest tests\web\test_web_quality_gates.py
 ```
 
 ## Web-to-Mobile Handoff

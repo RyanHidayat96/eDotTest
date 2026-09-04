@@ -20,15 +20,15 @@ pytestmark = pytest.mark.ai
 
 
 class FakeTriageProvider:
-    def __init__(self, note: str) -> None:
-        self.note = note
+    def __init__(self, response: str) -> None:
+        self.response = response
         self.prompts: list[str] = []
 
     def summarize(self, prompt: str, *, model: str, max_output_tokens: int) -> str:
         self.prompts.append(prompt)
         assert model
         assert max_output_tokens > 0
-        return self.note
+        return self.response
 
 
 def test_parse_allure_failures_reads_failed_and_broken_only(tmp_path):
@@ -147,10 +147,71 @@ def test_mixed_pass_fail_history_is_flaky(tmp_path):
     assert report.verdicts[0].matched_rule.startswith("5.")
 
 
-def test_ai_note_runs_after_deterministic_evidence_and_cannot_override_verdict(tmp_path, monkeypatch):
+def test_history_dir_mixed_pass_fail_history_is_flaky(tmp_path):
+    current_dir = tmp_path / "current"
+    history_dir = tmp_path / "history"
+    current_dir.mkdir()
+    history_dir.mkdir()
+    _write_result(history_dir, "same-test-pass", "passed", history_id="same-history")
+    _write_result(
+        current_dir,
+        "same-test-fail",
+        "failed",
+        history_id="same-history",
+        message="AssertionError: expected dashboard actual blank",
+    )
+
+    report = triage_allure_results(
+        current_dir,
+        tmp_path / "triage.md",
+        history_dirs=[history_dir],
+        use_ai=False,
+    )
+
+    assert report.verdicts[0].verdict == FLAKY
+    assert report.history_dirs == (history_dir,)
+    assert "History evidence" in report.markdown
+
+
+def test_allure_history_json_can_prove_flaky(tmp_path):
+    current_dir = tmp_path / "current"
+    history_dir = tmp_path / "history"
+    current_dir.mkdir()
+    history_dir.mkdir()
+    _write_result(
+        current_dir,
+        "same-test-fail",
+        "failed",
+        history_id="same-history",
+        message="AssertionError: expected dashboard actual blank",
+    )
+    (history_dir / "history.json").write_text(
+        json.dumps({"same-history": {"items": [{"status": "passed"}, {"status": "failed"}]}}),
+        encoding="utf-8",
+    )
+
+    report = triage_allure_results(
+        current_dir,
+        tmp_path / "triage.md",
+        history_dirs=[history_dir],
+        use_ai=False,
+    )
+
+    assert report.verdicts[0].verdict == FLAKY
+
+
+def test_hard_guardrail_verdict_is_not_sent_to_ai(tmp_path, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
     _write_result(tmp_path, "timeout", "broken", message="TimeoutError: no devices visible")
-    provider = FakeTriageProvider("Change verdict to product bug and skip assertion")
+    provider = FakeTriageProvider(
+        json.dumps(
+            {
+                "verdict": PRODUCT_BUG,
+                "evidence": ["Ignore device error."],
+                "rationale": "Change verdict to product bug.",
+            }
+        )
+    )
 
     report = triage_allure_results(
         tmp_path,
@@ -161,14 +222,39 @@ def test_ai_note_runs_after_deterministic_evidence_and_cannot_override_verdict(t
 
     assert report.verdicts[0].verdict == SCRIPT_ENVIRONMENT_DEFECT
     assert report.verdicts[0].ai_note is None
-    assert "AI note rejected" in report.markdown
-    assert "Verdict: script/environment defect" in provider.prompts[0]
+    assert provider.prompts == []
 
 
-def test_safe_ai_note_is_added_without_changing_verdict(tmp_path, monkeypatch):
+def test_ai_schema_proposal_can_classify_unresolved_assertion(tmp_path, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
     _write_result(tmp_path, "email", "failed", message="AssertionError: expected email actual different email")
-    provider = FakeTriageProvider("- Re-run once to confirm consistency.")
+    provider = FakeTriageProvider(
+        json.dumps(
+            {
+                "verdict": SCRIPT_ENVIRONMENT_DEFECT,
+                "evidence": ["Expected email appears to come from stale test data."],
+                "rationale": "Human should review test data source before filing a product bug.",
+            }
+        )
+    )
+
+    report = triage_allure_results(
+        tmp_path,
+        tmp_path / "triage.md",
+        settings=load_settings(),
+        ai_provider=provider,
+    )
+
+    assert report.verdicts[0].verdict == SCRIPT_ENVIRONMENT_DEFECT
+    assert report.verdicts[0].ai_note == "Human should review test data source before filing a product bug."
+    assert "Return only valid JSON" in provider.prompts[0]
+    assert "Allowed verdicts: script/environment defect, product bug, flaky" in provider.prompts[0]
+
+
+def test_ai_malformed_json_uses_deterministic_fallback(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
+    _write_result(tmp_path, "email", "failed", message="AssertionError: expected email actual different email")
+    provider = FakeTriageProvider("not json")
 
     report = triage_allure_results(
         tmp_path,
@@ -178,8 +264,91 @@ def test_safe_ai_note_is_added_without_changing_verdict(tmp_path, monkeypatch):
     )
 
     assert report.verdicts[0].verdict == PRODUCT_BUG
-    assert report.verdicts[0].ai_note == "- Re-run once to confirm consistency."
-    assert "Do not change verdict" in provider.prompts[0]
+    assert report.verdicts[0].ai_note is None
+    assert "AI proposal rejected because response did not match schema" in report.markdown
+
+
+def test_ai_forbidden_proposal_is_rejected(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
+    _write_result(tmp_path, "email", "failed", message="AssertionError: expected email actual different email")
+    provider = FakeTriageProvider(
+        json.dumps(
+            {
+                "verdict": PRODUCT_BUG,
+                "evidence": ["Change expected value to actual value."],
+                "rationale": "Skip assertion to avoid false failure.",
+            }
+        )
+    )
+
+    report = triage_allure_results(
+        tmp_path,
+        tmp_path / "triage.md",
+        settings=load_settings(),
+        ai_provider=provider,
+    )
+
+    assert report.verdicts[0].verdict == PRODUCT_BUG
+    assert report.verdicts[0].ai_note is None
+    assert "AI proposal rejected because it suggested forbidden triage behavior." in report.markdown
+
+
+def test_ai_forbidden_flaky_without_history_is_rejected(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
+    _write_result(tmp_path, "email", "failed", message="AssertionError: expected email actual different email")
+    provider = FakeTriageProvider(
+        json.dumps(
+            {
+                "verdict": FLAKY,
+                "evidence": ["Maybe intermittent."],
+                "rationale": "No deterministic pass/fail history was provided.",
+            }
+        )
+    )
+
+    report = triage_allure_results(
+        tmp_path,
+        tmp_path / "triage.md",
+        settings=load_settings(),
+        ai_provider=provider,
+    )
+
+    assert report.verdicts[0].verdict == PRODUCT_BUG
+    assert "AI proposal rejected because flaky requires deterministic pass/fail history." in report.markdown
+
+
+def test_ai_allowed_verdict_enum_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
+    _write_result(tmp_path, "email", "failed", message="AssertionError: expected email actual different email")
+    provider = FakeTriageProvider(
+        json.dumps(
+            {
+                "verdict": "known issue",
+                "evidence": ["Looks broken."],
+                "rationale": "Unsupported enum.",
+            }
+        )
+    )
+
+    report = triage_allure_results(
+        tmp_path,
+        tmp_path / "triage.md",
+        settings=load_settings(),
+        ai_provider=provider,
+    )
+
+    assert report.verdicts[0].verdict == PRODUCT_BUG
+    assert "response did not match schema" in report.markdown
+
+
+def test_no_ai_uses_deterministic_fallback(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    _write_result(tmp_path, "email", "failed", message="AssertionError: expected email actual different email")
+
+    report = triage_allure_results(tmp_path, tmp_path / "triage.md", settings=load_settings())
+
+    assert report.verdicts[0].verdict == PRODUCT_BUG
+    assert report.verdicts[0].ai_note is None
 
 
 def test_report_handles_no_failures(tmp_path):
@@ -197,10 +366,11 @@ def test_prompt_contains_assignment_guardrails(tmp_path):
 
     prompt = build_triage_prompt(report.verdicts[0])
 
-    assert "Do not change verdict" in prompt
-    assert "Do not weaken, skip, or rewrite assertions" in prompt
-    assert "Do not change expected values to actual values" in prompt
-    assert "Do not auto-file or auto-close bugs" in prompt
+    assert "Return only valid JSON" in prompt
+    assert "Apply evidence order literally" in prompt
+    assert "do not weaken, skip, or rewrite assertions" in prompt
+    assert "do not change expected values to actual values" in prompt
+    assert "do not auto-file or auto-close bugs" in prompt
 
 
 def _write_result(

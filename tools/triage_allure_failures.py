@@ -18,6 +18,13 @@ def main() -> int:
     settings = load_settings()
     parser = argparse.ArgumentParser(description="Create an eDOT QA failure triage report from Allure results.")
     parser.add_argument("--results-dir", type=Path, default=settings.allure_results_dir)
+    parser.add_argument(
+        "--history-dir",
+        type=Path,
+        action="append",
+        default=[],
+        help="Optional prior Allure result/history directory used only for safe status history.",
+    )
     parser.add_argument("--output", type=Path, default=settings.triage_report_path)
     parser.add_argument("--no-ai", action="store_true", help="Use deterministic triage only.")
     args = parser.parse_args()
@@ -25,6 +32,7 @@ def main() -> int:
     report = triage_allure_results(
         args.results_dir,
         args.output,
+        history_dirs=args.history_dir,
         settings=settings,
         use_ai=not args.no_ai,
     )

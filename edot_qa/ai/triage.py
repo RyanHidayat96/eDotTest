@@ -9,6 +9,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable, Protocol
 
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+
 from edot_qa.ai.test_data import extract_gemini_text
 from edot_qa.config import Settings, load_settings
 
@@ -16,6 +18,7 @@ from edot_qa.config import Settings, load_settings
 SCRIPT_ENVIRONMENT_DEFECT = "script/environment defect"
 PRODUCT_BUG = "product bug"
 FLAKY = "flaky"
+ALLOWED_TRIAGE_VERDICTS = (SCRIPT_ENVIRONMENT_DEFECT, PRODUCT_BUG, FLAKY)
 
 FAILURE_STATUSES = {"failed", "broken"}
 
@@ -118,6 +121,7 @@ class TriageVerdict:
     matched_rule: str
     evidence: tuple[str, ...]
     ai_note: str | None = None
+    ai_reviewable: bool = False
 
 
 @dataclass(frozen=True)
@@ -126,6 +130,7 @@ class TriageReport:
     output_path: Path
     verdicts: tuple[TriageVerdict, ...]
     markdown: str
+    history_dirs: tuple[Path, ...] = ()
 
     @property
     def summary(self) -> Counter[str]:
@@ -134,7 +139,38 @@ class TriageReport:
 
 class TriageAIProvider(Protocol):
     def summarize(self, prompt: str, *, model: str, max_output_tokens: int) -> str:
-        """Return a concise human-review note."""
+        """Return a schema-constrained triage proposal as JSON."""
+
+
+class AITriageProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    verdict: str
+    evidence: tuple[str, ...] = Field(min_length=1, max_length=3)
+    rationale: str = Field(min_length=1, max_length=500)
+
+    @field_validator("verdict")
+    @classmethod
+    def verdict_must_be_allowed(cls, value: str) -> str:
+        if value not in ALLOWED_TRIAGE_VERDICTS:
+            raise ValueError("verdict is not in the allowed enum")
+        return value
+
+    @field_validator("evidence")
+    @classmethod
+    def clean_evidence(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        cleaned = tuple(_compact_text(value, 220) for value in values if value and value.strip())
+        if not cleaned:
+            raise ValueError("evidence must contain at least one non-empty item")
+        return cleaned
+
+    @field_validator("rationale")
+    @classmethod
+    def clean_rationale(cls, value: str) -> str:
+        compact = _compact_text(value, 500)
+        if not compact:
+            raise ValueError("rationale must not be empty")
+        return compact
 
 
 class GeminiTriageProvider:
@@ -210,6 +246,7 @@ def classify_failure(failure: AllureFailure, previous_outcomes: Iterable[str] = 
         _contains_any(text, EXCEPTION_PATTERNS) and "assertionerror" not in text
     )
 
+    # Ordered triage: each decisive rule returns immediately, so later rules cannot overwrite it.
     if looks_like_exception and not (has_locator_signal or has_precondition_signal or has_expected_value_signal):
         evidence.append(_short_text_evidence(failure))
         return TriageVerdict(
@@ -268,6 +305,7 @@ def classify_failure(failure: AllureFailure, previous_outcomes: Iterable[str] = 
             verdict=PRODUCT_BUG,
             matched_rule="5. reproducibility",
             evidence=tuple(evidence),
+            ai_reviewable=True,
         )
 
     evidence.append("Failure did not expose enough product-state evidence; safest verdict is script/environment.")
@@ -283,12 +321,14 @@ def triage_allure_results(
     results_dir: Path,
     output_path: Path,
     *,
+    history_dirs: Iterable[Path] = (),
     settings: Settings | None = None,
     ai_provider: TriageAIProvider | None = None,
     use_ai: bool = True,
 ) -> TriageReport:
     failures = parse_allure_results(results_dir)
-    outcomes = _outcomes_by_key(results_dir)
+    history_dirs_tuple = tuple(history_dirs)
+    outcomes = _outcomes_by_key(results_dir, history_dirs_tuple)
     verdicts = [
         classify_failure(failure, outcomes.get(failure.key, (failure.status,)))
         for failure in failures
@@ -296,7 +336,7 @@ def triage_allure_results(
     if use_ai:
         verdicts = _add_ai_notes(verdicts, settings or load_settings(), ai_provider)
 
-    markdown = render_markdown(verdicts, results_dir)
+    markdown = render_markdown(verdicts, results_dir, history_dirs_tuple)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(markdown, encoding="utf-8")
     return TriageReport(
@@ -304,11 +344,17 @@ def triage_allure_results(
         output_path=output_path,
         verdicts=tuple(verdicts),
         markdown=markdown,
+        history_dirs=history_dirs_tuple,
     )
 
 
-def render_markdown(verdicts: Iterable[TriageVerdict], results_dir: Path) -> str:
+def render_markdown(
+    verdicts: Iterable[TriageVerdict],
+    results_dir: Path,
+    history_dirs: Iterable[Path] = (),
+) -> str:
     rendered = list(verdicts)
+    history_dirs_tuple = tuple(history_dirs)
     lines = [
         "# eDOT AI Failure Triage Report",
         "",
@@ -319,6 +365,14 @@ def render_markdown(verdicts: Iterable[TriageVerdict], results_dir: Path) -> str
         "Decision order: 1 exception/assertion, 2 locator uniqueness, 3 preconditions, 4 expected value, 5 reproducibility.",
         "",
     ]
+    if history_dirs_tuple:
+        lines.extend(
+            [
+                "History evidence:",
+                *[f"- `{history_dir}`" for history_dir in history_dirs_tuple],
+                "",
+            ]
+        )
     if not rendered:
         lines.extend(["No failed or broken Allure test results found.", ""])
         return "\n".join(lines)
@@ -351,7 +405,7 @@ def render_markdown(verdicts: Iterable[TriageVerdict], results_dir: Path) -> str
         )
         lines.extend(f"  - {item}" for item in verdict.evidence)
         if verdict.ai_note:
-            lines.extend(["- AI note:", *[f"  - {line}" for line in verdict.ai_note.splitlines() if line.strip()]])
+            lines.extend(["- AI proposal:", *[f"  - {line}" for line in verdict.ai_note.splitlines() if line.strip()]])
         lines.append("")
     return "\n".join(lines)
 
@@ -359,13 +413,21 @@ def render_markdown(verdicts: Iterable[TriageVerdict], results_dir: Path) -> str
 def build_triage_prompt(verdict: TriageVerdict) -> str:
     evidence = "\n".join(f"- {item}" for item in verdict.evidence[:8])
     return (
-        "Review deterministic QA failure triage. Do not change verdict. "
-        "Do not weaken, skip, or rewrite assertions. Do not swallow failures. "
-        "Do not change expected values to actual values. Do not auto-file or auto-close bugs. "
-        "Return at most 3 concise bullets for human review.\n"
+        "You are reviewing eDOT QA Automation failure triage evidence. Return only valid JSON matching this schema: "
+        "{\"verdict\":\"script/environment defect|product bug|flaky\",\"evidence\":[\"1-3 concise evidence strings\"],"
+        "\"rationale\":\"one concise human-review rationale\"}\n"
+        "Apply evidence order literally and stop at the first decisive match: "
+        "1 exception vs assertion, 2 locator uniqueness/intended element, 3 preconditions/prior steps, "
+        "4 expected value correctness, 5 reproducibility.\n"
+        "Allowed verdicts: script/environment defect, product bug, flaky.\n"
+        "Guardrails: human-review proposal only; do not weaken, skip, or rewrite assertions; "
+        "do not swallow failures; do not change expected values to actual values; "
+        "do not turn known locator, precondition, exception, driver, device, or environment defects into product bug; "
+        "do not auto-file or auto-close bugs.\n"
+        "Use only bounded evidence below.\n"
         f"Test: {verdict.failure.name}\n"
         f"Status: {verdict.failure.status}\n"
-        f"Verdict: {verdict.verdict}\n"
+        f"Deterministic fallback verdict: {verdict.verdict}\n"
         f"Matched rule: {verdict.matched_rule}\n"
         f"Evidence:\n{evidence}"
     )
@@ -382,8 +444,11 @@ def _add_ai_notes(
 
     updated: list[TriageVerdict] = []
     for verdict in verdicts:
+        if not verdict.ai_reviewable:
+            updated.append(verdict)
+            continue
         try:
-            note = provider.summarize(
+            raw_response = provider.summarize(
                 build_triage_prompt(verdict),
                 model=settings.gemini_triage_model,
                 max_output_tokens=settings.ai_triage_max_output_tokens,
@@ -394,17 +459,47 @@ def _add_ai_notes(
             )
             continue
 
-        safe_note = _sanitize_ai_note(note)
-        if safe_note is None:
+        try:
+            proposal = _parse_ai_triage_proposal(raw_response)
+        except (ValueError, ValidationError) as error:
             updated.append(
                 replace(
                     verdict,
                     evidence=verdict.evidence
-                    + ("AI note rejected because it violated triage guardrails.",),
+                    + (f"AI proposal rejected because response did not match schema: {_compact_text(str(error), 180)}",),
                 )
             )
             continue
-        updated.append(replace(verdict, ai_note=safe_note))
+
+        rejection_reason = _ai_proposal_rejection_reason(proposal)
+        if rejection_reason:
+            updated.append(
+                replace(
+                    verdict,
+                    evidence=verdict.evidence + (f"AI proposal rejected because {rejection_reason}.",),
+                )
+            )
+            continue
+
+        proposal_evidence = tuple(f"AI evidence: {item}" for item in proposal.evidence)
+        updated.append(
+            replace(
+                verdict,
+                verdict=proposal.verdict,
+                matched_rule=f"{verdict.matched_rule} + AI constrained proposal",
+                evidence=tuple(
+                    _dedupe(
+                        (
+                            *verdict.evidence,
+                            f"AI proposal verdict: {proposal.verdict}",
+                            *proposal_evidence,
+                            f"AI rationale: {proposal.rationale}",
+                        )
+                    )
+                ),
+                ai_note=proposal.rationale,
+            )
+        )
     return updated
 
 
@@ -463,19 +558,43 @@ def _step_attachment_names(step: dict) -> list[str]:
     return names
 
 
-def _outcomes_by_key(results_dir: Path) -> dict[str, tuple[str, ...]]:
+def _outcomes_by_key(results_dir: Path, history_dirs: Iterable[Path] = ()) -> dict[str, tuple[str, ...]]:
     outcomes: defaultdict[str, list[str]] = defaultdict(list)
-    if not results_dir.exists():
-        return {}
-    for path in sorted(results_dir.glob("*-result.json")):
-        payload = _read_json(path)
-        if payload is None:
+    for source_dir in (results_dir, *tuple(history_dirs)):
+        if not source_dir.exists():
             continue
-        key = str(payload.get("historyId") or payload.get("testCaseId") or payload.get("fullName") or payload.get("name") or "")
-        status = payload.get("status")
-        if key and status:
-            outcomes[key].append(str(status))
+        for path in sorted(source_dir.rglob("*-result.json")):
+            payload = _read_json(path)
+            if payload is None:
+                continue
+            key = str(
+                payload.get("historyId")
+                or payload.get("testCaseId")
+                or payload.get("fullName")
+                or payload.get("name")
+                or ""
+            )
+            status = payload.get("status")
+            if key and status:
+                outcomes[key].append(str(status))
+        for path in sorted(source_dir.rglob("history.json")):
+            _merge_history_json_outcomes(outcomes, path)
     return {key: tuple(values) for key, values in outcomes.items()}
+
+
+def _merge_history_json_outcomes(outcomes: defaultdict[str, list[str]], path: Path) -> None:
+    payload = _read_json(path)
+    if not isinstance(payload, dict):
+        return
+    for key, value in payload.items():
+        if not isinstance(value, dict):
+            continue
+        items = value.get("items")
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict) and item.get("status"):
+                outcomes[str(key)].append(str(item["status"]))
 
 
 def _combined_failure_text(failure: AllureFailure) -> str:
@@ -535,10 +654,7 @@ def _failed_step_evidence(failure: AllureFailure) -> tuple[str, ...]:
 
 def _short_text_evidence(failure: AllureFailure) -> str:
     text = failure.message or failure.trace or "No Allure status message or trace present."
-    compact = re.sub(r"\s+", " ", text).strip()
-    if len(compact) > 280:
-        compact = f"{compact[:277]}..."
-    return f"Allure detail: {compact}"
+    return f"Allure detail: {_compact_text(text, 280)}"
 
 
 def _sanitize_ai_note(note: str) -> str | None:
@@ -549,6 +665,45 @@ def _sanitize_ai_note(note: str) -> str | None:
     if any(pattern in lowered for pattern in DANGEROUS_AI_NOTE_PATTERNS):
         return None
     return compact[:1200]
+
+
+def _parse_ai_triage_proposal(response_text: str) -> AITriageProposal:
+    json_text = _extract_json_object(response_text)
+    if json_text is None:
+        raise ValueError("missing JSON object")
+    try:
+        payload = json.loads(json_text)
+    except json.JSONDecodeError as error:
+        raise ValueError("malformed JSON") from error
+    return AITriageProposal.model_validate(payload)
+
+
+def _extract_json_object(value: str) -> str | None:
+    stripped = value.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```(?:json)?\s*", "", stripped, flags=re.IGNORECASE)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    return stripped[start : end + 1]
+
+
+def _ai_proposal_rejection_reason(proposal: AITriageProposal) -> str | None:
+    combined = " ".join((proposal.verdict, proposal.rationale, *proposal.evidence)).lower()
+    if any(pattern in combined for pattern in DANGEROUS_AI_NOTE_PATTERNS):
+        return "it suggested forbidden triage behavior"
+    if proposal.verdict == FLAKY:
+        return "flaky requires deterministic pass/fail history"
+    return None
+
+
+def _compact_text(value: str, limit: int) -> str:
+    compact = re.sub(r"\s+", " ", value).strip()
+    if len(compact) > limit:
+        return f"{compact[: limit - 3]}..."
+    return compact
 
 
 def _dedupe(items: Iterable[str]) -> list[str]:

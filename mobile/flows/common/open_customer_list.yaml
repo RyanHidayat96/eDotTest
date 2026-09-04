@@ -1,6 +1,6 @@
 appId: ${EWORK_APP_ID}
 ---
-# Home menu items share generic container IDs; anchored text avoids tapping nearby Store Visit.
+# Home menu items share text-heavy cells; tap the parent cell that contains the exact New Customer label.
 - tapOn:
     text: OK
     optional: true
@@ -9,15 +9,21 @@ appId: ${EWORK_APP_ID}
     optional: true
 - scrollUntilVisible:
     element:
-      text: ${EWORK_CUSTOMERS_MENU_TEXT}
+      id: ${EWORK_CUSTOMERS_MENU_ID}
+      containsDescendants:
+        - text: ${EWORK_CUSTOMERS_MENU_TEXT}
     direction: DOWN
     timeout: 15000
     centerElement: true
     waitToSettleTimeoutMs: 1000
 - assertVisible:
-    text: ${EWORK_CUSTOMERS_MENU_TEXT}
+    id: ${EWORK_CUSTOMERS_MENU_ID}
+    containsDescendants:
+      - text: ${EWORK_CUSTOMERS_MENU_TEXT}
 - tapOn:
-    text: ${EWORK_CUSTOMERS_MENU_TEXT}
+    id: ${EWORK_CUSTOMERS_MENU_ID}
+    containsDescendants:
+      - text: ${EWORK_CUSTOMERS_MENU_TEXT}
     waitToSettleTimeoutMs: 1000
 - tapOn:
     text: OK
@@ -26,7 +32,9 @@ appId: ${EWORK_APP_ID}
     text: Close
     optional: true
 - tapOn:
-    text: ${EWORK_CUSTOMERS_MENU_TEXT}
+    id: ${EWORK_CUSTOMERS_MENU_ID}
+    containsDescendants:
+      - text: ${EWORK_CUSTOMERS_MENU_TEXT}
     optional: true
     waitToSettleTimeoutMs: 1000
 - assertVisible: New Customer List

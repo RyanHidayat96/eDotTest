@@ -27,7 +27,7 @@ The model is environment-configured so it can be changed without editing tests. 
 
 Test data AI runs before tests consume data. `edot_qa.ai.test_data.TestDataGenerator` calls Gemini only when `GEMINI_API_KEY` exists, then validates the response before returning data to web or mobile tests.
 
-Failure triage AI runs after test execution. `tools/triage_allure_failures.py` reads Allure result JSON files, creates deterministic verdicts and evidence first, then optionally asks Gemini for a short human-review note. Current code does not let AI override the deterministic verdict. Step 8 will strengthen this triage implementation further; this file must be updated in that same step if prompts or schema behavior change.
+Failure triage AI runs after test execution. `tools/triage_allure_failures.py` reads Allure result JSON files, applies hard deterministic guardrails first, then optionally asks Gemini for a schema-validated human-review proposal only for unresolved assertion failures. Hard script/environment and flaky decisions are not sent to AI.
 
 AI-assisted code authoring may have been used during development, but no project script rewrites submitted assertions or expected values.
 
@@ -109,10 +109,14 @@ Code location: `edot_qa.ai.triage.build_triage_prompt`.
 Exact current prompt template:
 
 ```text
-Review deterministic QA failure triage. Do not change verdict. Do not weaken, skip, or rewrite assertions. Do not swallow failures. Do not change expected values to actual values. Do not auto-file or auto-close bugs. Return at most 3 concise bullets for human review.
+You are reviewing eDOT QA Automation failure triage evidence. Return only valid JSON matching this schema: {"verdict":"script/environment defect|product bug|flaky","evidence":["1-3 concise evidence strings"],"rationale":"one concise human-review rationale"}
+Apply evidence order literally and stop at the first decisive match: 1 exception vs assertion, 2 locator uniqueness/intended element, 3 preconditions/prior steps, 4 expected value correctness, 5 reproducibility.
+Allowed verdicts: script/environment defect, product bug, flaky.
+Guardrails: human-review proposal only; do not weaken, skip, or rewrite assertions; do not swallow failures; do not change expected values to actual values; do not turn known locator, precondition, exception, driver, device, or environment defects into product bug; do not auto-file or auto-close bugs.
+Use only bounded evidence below.
 Test: {test_name}
 Status: {status}
-Verdict: {verdict}
+Deterministic fallback verdict: {verdict}
 Matched rule: {matched_rule}
 Evidence:
 - {evidence_item_1}
@@ -141,7 +145,9 @@ product bug
 flaky
 ```
 
-Current AI participation is limited to an optional note after deterministic classification. The note is sanitized and rejected when it suggests forbidden behavior. The report remains a human-review proposal.
+Reproducibility can use the current Allure result directory plus optional prior evidence passed with `--history-dir`. The history input reads only safe status identifiers from prior `*-result.json` files or Allure `history.json`; it does not ingest screenshots, cookies, storage state, or credentials.
+
+For unresolved assertion failures, Gemini may return a strict JSON proposal. Pydantic validates `verdict`, `evidence`, and `rationale` with `extra="forbid"`. Unsupported verdicts, malformed JSON, flaky proposals without deterministic pass/fail history, or forbidden suggestions are rejected. The deterministic fallback verdict remains.
 
 ## Triage Fallback
 
@@ -154,8 +160,9 @@ AI_TRIAGE_MAX_OUTPUT_TOKENS=900
 Fallback behavior:
 
 - Missing `GEMINI_API_KEY`: triage writes deterministic Markdown only.
-- Gemini request failure: deterministic verdict remains; evidence records that the AI note was unavailable.
-- Empty or unsafe note: note is rejected; deterministic verdict remains.
+- Gemini request failure: deterministic verdict remains; evidence records that the AI proposal was unavailable.
+- Malformed JSON, unsupported enum, empty fields, extra fields, or unsafe proposal: proposal is rejected and deterministic verdict remains.
+- Hard script/environment and flaky classifications are not sent to AI.
 
 ## Guardrails
 

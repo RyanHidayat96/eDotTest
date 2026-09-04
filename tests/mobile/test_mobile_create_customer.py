@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from edot_qa.ai.test_data import GeneratedTestData
@@ -54,13 +56,15 @@ def test_mobile_customer_data_maps_ai_payload():
     assert customer.name.startswith("Budi Santoso QA CUSTOMER QA ")
     assert customer.name.endswith("2E90892D")
     assert customer.contact == "+6281299900111"
+    assert customer.contact_person != customer.name
+    assert customer.contact_person == "Bima QA PIC 849275"
     assert customer.address == "Jl. Melati Raya No. 8, Jakarta Selatan"
     assert customer.ktp_number.isdigit()
     assert len(customer.ktp_number) == 16
     assert customer.as_maestro_env() == {
         "EWORK_CUSTOMER_NAME": customer.name,
         "EWORK_CUSTOMER_CONTACT": "81299900111",
-        "EWORK_CUSTOMER_CONTACT_PERSON": customer.name,
+        "EWORK_CUSTOMER_CONTACT_PERSON": "Bima QA PIC 849275",
         "EWORK_CUSTOMER_ADDRESS": "Jl. Melati Raya No. 8, Jakarta Selatan",
         "EWORK_CUSTOMER_KTP_NUMBER": customer.ktp_number,
     }
@@ -114,9 +118,44 @@ def test_customer_card_address_marker_ignores_maestro_command_metadata():
     assert _customer_card_address_from_maestro_stdout(stdout) == "Jl. Musyawarah No.3A"
 
 
+def test_customer_card_address_marker_reads_latest_maestro_log(tmp_path):
+    log_path = tmp_path / "2026-09-04_200000" / "create_customer" / "logs" / "maestro.log"
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text(
+        (
+            "Run ${console.log('__EWORK_CUSTOMER_CARD_ADDRESS__=' + output.customerAddress)} COMPLETED\n"
+            "JsConsole: __EWORK_CUSTOMER_CARD_ADDRESS__=Jl. Musyawarah No.3A\n"
+        ),
+        encoding="utf-8",
+    )
+
+    assert _customer_card_address_from_maestro_logs(tmp_path) == "Jl. Musyawarah No.3A"
+
+
 def test_customer_card_address_marker_missing_fails_clearly():
     with pytest.raises(AssertionError, match="address marker not found"):
         _customer_card_address_from_maestro_stdout("noise only")
+
+
+def test_customer_card_visibility_requires_name_address_and_type():
+    locator_texts = {
+        CUSTOMER_CARD_NAME_ID: ["Budi QA"],
+        CUSTOMER_CARD_ADDRESS_ID: ["Jl. Musyawarah No.3A, Jakarta"],
+        CUSTOMER_CARD_TYPE_ID: ["Semi Grosir"],
+    }
+
+    assert _customer_card_values_visible(
+        locator_texts,
+        customer_name="Budi QA",
+        customer_address="Jl. Musyawarah No.3A",
+        customer_type="Semi Grosir",
+    )
+    assert not _customer_card_values_visible(
+        {**locator_texts, CUSTOMER_CARD_ADDRESS_ID: []},
+        customer_name="Budi QA",
+        customer_address="Jl. Musyawarah No.3A",
+        customer_type="Semi Grosir",
+    )
 
 
 @pytest.mark.requires_credentials
@@ -182,7 +221,7 @@ def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_ma
     customer = generate_mobile_customer_data()
     customer_env = customer.as_maestro_env()
     create_result = run_maestro_flow("create_customer.yaml", extra_env=customer_env)
-    customer_card_address = _customer_card_address_from_maestro_stdout(create_result.stdout)
+    customer_card_address = _customer_card_address_from_maestro_result(create_result)
 
     with allure_step(
         "Find created customer card from list bottom",
@@ -197,6 +236,11 @@ def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_ma
         },
         screenshot=False,
     ):
+        expected_card_texts = [
+            customer.name,
+            customer_card_address,
+            mobile_settings.ework_customer_type_option_text or "",
+        ]
         card_locators = [
             CUSTOMER_CARD_NAME_ID,
             CUSTOMER_CARD_ADDRESS_ID,
@@ -209,7 +253,12 @@ def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_ma
             timeout_seconds=10,
         )
         attach_json("customer-card-locators-before-scroll", pre_scroll_locator_texts)
-        if customer.name in pre_scroll_locator_texts[CUSTOMER_CARD_NAME_ID]:
+        if _customer_card_values_visible(
+            pre_scroll_locator_texts,
+            customer_name=customer.name,
+            customer_address=customer_card_address,
+            customer_type=mobile_settings.ework_customer_type_option_text or "",
+        ):
             scroll_result = {
                 "reached_end": False,
                 "down_swipes": 0,
@@ -219,7 +268,7 @@ def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_ma
             }
         else:
             result = scroll_list_to_end_and_find_texts(
-                [customer.name],
+                expected_card_texts,
                 mobile_settings.adb_command,
                 device_id=mobile_settings.mobile_device_id or device.serial,
                 bottom_timeout_seconds=40,
@@ -253,11 +302,49 @@ def _skip_or_fail_live(mobile_settings, message: str) -> None:
     pytest.skip(message)
 
 
+def _customer_card_address_from_maestro_result(result, log_root: Path | None = None) -> str:
+    value = _customer_card_address_from_maestro_text(f"{result.stdout}\n{result.stderr}")
+    if value:
+        return value
+
+    value = _customer_card_address_from_maestro_logs(log_root or Path.home() / ".maestro" / "tests")
+    if value:
+        return value
+
+    raise AssertionError("Created customer card address marker not found in Maestro output")
+
+
 def _customer_card_address_from_maestro_stdout(stdout: str) -> str:
+    value = _customer_card_address_from_maestro_text(stdout)
+    if value:
+        return value
+    raise AssertionError("Created customer card address marker not found in Maestro output")
+
+
+def _customer_card_address_from_maestro_logs(log_root: Path) -> str | None:
+    if not log_root.is_dir():
+        return None
+    log_paths = sorted(log_root.rglob("maestro.log"), key=lambda path: path.stat().st_mtime, reverse=True)
+    for log_path in log_paths[:20]:
+        if "create_customer" not in str(log_path):
+            continue
+        value = _customer_card_address_from_maestro_text(log_path.read_text(encoding="utf-8", errors="replace"))
+        if value:
+            return value
+    return None
+
+
+def _customer_card_address_from_maestro_text(stdout: str) -> str | None:
     for line in stdout.splitlines():
         if CUSTOMER_CARD_ADDRESS_MARKER not in line:
             continue
         stripped_line = line.strip()
+        log_message_index = stripped_line.find("logMessages=[")
+        marker_index = stripped_line.find(CUSTOMER_CARD_ADDRESS_MARKER, log_message_index)
+        if log_message_index >= 0 and marker_index >= 0:
+            value = stripped_line[marker_index + len(CUSTOMER_CARD_ADDRESS_MARKER) :].split("], insight=", 1)[0].strip()
+            if value:
+                return value
         if "console.log(" in stripped_line or "output.customerAddress" in stripped_line:
             continue
         if not (stripped_line.startswith(CUSTOMER_CARD_ADDRESS_MARKER) or "JsConsole:" in stripped_line):
@@ -265,4 +352,33 @@ def _customer_card_address_from_maestro_stdout(stdout: str) -> str:
         value = line.split(CUSTOMER_CARD_ADDRESS_MARKER, 1)[1].strip()
         if value and "COMPLETED" not in value:
             return value
-    raise AssertionError("Created customer card address marker not found in Maestro output")
+    return None
+
+
+def _customer_card_values_visible(
+    locator_texts: dict[str, list[str]],
+    *,
+    customer_name: str,
+    customer_address: str,
+    customer_type: str,
+) -> bool:
+    expectations = {
+        CUSTOMER_CARD_NAME_ID: customer_name,
+        CUSTOMER_CARD_ADDRESS_ID: customer_address,
+        CUSTOMER_CARD_TYPE_ID: customer_type,
+    }
+    return all(
+        _text_in_values(expected_text, locator_texts.get(locator_id, []))
+        for locator_id, expected_text in expectations.items()
+    )
+
+
+def _text_in_values(expected_text: str, values: list[str]) -> bool:
+    normalized_expected = _normalize_text(expected_text)
+    if not normalized_expected:
+        return False
+    return any(normalized_expected in _normalize_text(value) for value in values)
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join(value.split())

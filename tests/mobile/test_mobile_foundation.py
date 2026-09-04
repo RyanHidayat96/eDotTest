@@ -89,6 +89,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_COMPANY_CODE"] == "<set>"
     assert safe["EWORK_COMPANY_ID_FIELD_ID"] == "company-id"
     assert safe["EWORK_DASHBOARD_TEXT"] == "Dashboard"
+    assert safe["EWORK_CUSTOMERS_MENU_ID"] == "customers-menu"
     assert safe["EWORK_CUSTOMERS_MENU_TEXT"] == "New Customer"
     assert safe["EWORK_CUSTOMER_NAME_FIELD_ID"] == "customer-name"
     assert safe["EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID"] == "customer-address-type"
@@ -120,7 +121,8 @@ def test_mobile_settings_reports_missing_login_requirements(tmp_path):
     assert "EWORK_PASSWORD" in settings.missing_login_requirements()
     assert "EWORK_EMAIL" in settings.missing_customer_requirements()
     assert "EWORK_CUSTOMER_NAME_FIELD_ID" not in settings.missing_customer_requirements()
-    assert "EWORK_CUSTOMERS_MENU_ID or EWORK_CUSTOMERS_MENU_TEXT" not in settings.missing_customer_requirements()
+    assert "EWORK_CUSTOMERS_MENU_ID" not in settings.missing_customer_requirements()
+    assert "EWORK_CUSTOMERS_MENU_TEXT" not in settings.missing_customer_requirements()
 
 
 def test_adb_devices_parser_detects_ready_device():
@@ -548,7 +550,9 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "${EWORK_COMPANY_CODE}" not in combined
     assert "${EWORK_EMAIL}" not in combined
     assert "${EWORK_PASSWORD}" not in combined
+    assert "${EWORK_CUSTOMERS_MENU_ID}" in open_flow
     assert "${EWORK_CUSTOMERS_MENU_TEXT}" in open_flow
+    assert "containsDescendants:" in open_flow
     assert "centerElement: true" in open_flow
     assert "waitToSettleTimeoutMs: 1000" in open_flow
     assert "text: OK" in open_flow

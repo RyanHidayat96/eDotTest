@@ -116,6 +116,8 @@ class MobileSettings:
 
     def missing_customer_requirements(self) -> list[str]:
         requirements = {
+            "EWORK_CUSTOMERS_MENU_ID": self.ework_customers_menu_id,
+            "EWORK_CUSTOMERS_MENU_TEXT": self.ework_customers_menu_text,
             "EWORK_ADD_CUSTOMER_BUTTON_ID": self.ework_add_customer_button_id,
             "EWORK_CUSTOMER_NAME_FIELD_ID": self.ework_customer_name_field_id,
             "EWORK_CUSTOMER_CONTACT_FIELD_ID": self.ework_customer_contact_field_id,
@@ -151,8 +153,6 @@ class MobileSettings:
             "EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID": self.ework_customer_success_continue_button_id,
         }
         missing = self.missing_login_requirements()
-        if not (self.ework_customers_menu_id or self.ework_customers_menu_text):
-            missing.append("EWORK_CUSTOMERS_MENU_ID or EWORK_CUSTOMERS_MENU_TEXT")
         missing.extend(key for key, value in requirements.items() if not value)
         return missing
 

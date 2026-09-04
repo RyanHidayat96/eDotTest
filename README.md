@@ -10,7 +10,7 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 - Web automation: eSuite at `https://esuite.edot.id` using Playwright, Pytest, Page Object Model, and Allure.
 - Mobile automation: eWork SFA using Maestro YAML flows wrapped by Pytest so web and mobile share Allure output.
 - AI test data: optional Gemini model call with deterministic Faker fallback.
-- AI failure triage: deterministic Allure parser first, optional Gemini note second, Markdown output.
+- AI failure triage: deterministic Allure parser first, optional schema-constrained Gemini proposal second, Markdown output.
 
 ## Project Structure
 
@@ -133,7 +133,7 @@ EWORK_USERNAME_FIELD_ID=id.edot.ework:id/tv_username
 EWORK_PASSWORD_FIELD_ID=id.edot.ework:id/tv_password
 EWORK_LOGIN_BUTTON_ID=id.edot.ework:id/btn_signin
 EWORK_DASHBOARD_TEXT=Revenue
-EWORK_CUSTOMERS_MENU_ID=
+EWORK_CUSTOMERS_MENU_ID=id.edot.ework:id/home_container_menu
 EWORK_CUSTOMERS_MENU_TEXT=^New Customer$
 EWORK_ADD_CUSTOMER_BUTTON_ID=id.edot.ework:id/noo_label_add_new_cust
 EWORK_CUSTOMER_NAME_FIELD_ID=id.edot.ework:id/noo_registration_input_outlet_name
@@ -215,7 +215,7 @@ maestro --version
 adb devices
 ```
 
-The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Dashboard text `Revenue` and the customer path through `New Customer`, `New Customer Registration`, Basic fields, channel/type dropdowns, location dropdowns, KTP document upload, signature, register, confirmation, and success screen were captured from the real app. The New Customer List screen did not expose a search input in hierarchy, and cards do not open a detail page, so the flow jumps to the bottom list area and validates the created card values exposed there. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
+The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Dashboard text `Revenue` and the customer path through `New Customer`, `New Customer Registration`, Basic fields, channel/type dropdowns, location dropdowns, KTP document upload, signature, register, confirmation, and success screen were captured from the real app. The Home menu uses shared menu containers, so `New Customer` is opened through parent id `home_container_menu` plus exact child text to avoid tapping nearby menu items. The New Customer List screen did not expose a search input in hierarchy, and cards do not open a detail page, so the flow checks the current list view first, then fast-scrolls to the bottom, then searches upward at most four slow swipes while validating the saved name, address, and customer type exposed by the card. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
 
 Run mobile checks:
 
@@ -307,6 +307,12 @@ Use optional AI notes when `GEMINI_API_KEY` is set:
 
 ```powershell
 .\.venv\Scripts\python.exe tools\triage_allure_failures.py --results-dir reports\allure-results --output reports\triage\triage-report.md
+```
+
+Pass prior safe result history when checking flaky evidence across cleaned runs:
+
+```powershell
+.\.venv\Scripts\python.exe tools\triage_allure_failures.py --results-dir reports\allure-results --history-dir reports\allure-history --output reports\triage\triage-report.md
 ```
 
 Triage verdicts are human-review proposals only. The script never changes tests, weakens assertions, edits expected values, files bugs, or closes bugs.

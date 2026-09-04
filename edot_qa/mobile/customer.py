@@ -16,6 +16,7 @@ MOBILE_PHONE_RE = re.compile(r"^\+62\d{8,13}$")
 class MobileCustomerData:
     name: str
     contact: str
+    contact_person: str
     address: str
     ktp_number: str
     run_id: str
@@ -28,6 +29,7 @@ class MobileCustomerData:
         return cls(
             name=name,
             contact=_mobile_phone_contact(customer.contact, generated.run_id),
+            contact_person=_unique_contact_person_name(generated.run_id),
             address=customer.address,
             ktp_number=_fake_ktp_number(generated.run_id),
             run_id=generated.run_id,
@@ -38,7 +40,7 @@ class MobileCustomerData:
         return {
             "EWORK_CUSTOMER_NAME": self.name,
             "EWORK_CUSTOMER_CONTACT": _mobile_phone_input(self.contact),
-            "EWORK_CUSTOMER_CONTACT_PERSON": self.name,
+            "EWORK_CUSTOMER_CONTACT_PERSON": self.contact_person,
             "EWORK_CUSTOMER_ADDRESS": self.address,
             "EWORK_CUSTOMER_KTP_NUMBER": self.ktp_number,
         }
@@ -47,6 +49,7 @@ class MobileCustomerData:
         return {
             "name": self.name,
             "contact": self.contact,
+            "contact_person": self.contact_person,
             "address": self.address,
             "ktp_number": self.ktp_number,
             "run_id": self.run_id,
@@ -87,3 +90,11 @@ def _unique_customer_name(name: str, run_id: str) -> str:
         return name
     marker = f" QA {suffix}"
     return f"{name[:100 - len(marker)].rstrip()}{marker}"
+
+
+def _unique_contact_person_name(run_id: str) -> str:
+    digest = hashlib.sha256(f"{run_id}:contact-person".encode("utf-8")).hexdigest()
+    names = ("Raka", "Dina", "Arif", "Sinta", "Bima", "Nadia")
+    name = names[int(digest[:2], 16) % len(names)]
+    suffix = digest[2:8].upper()
+    return f"{name} QA PIC {suffix}"

@@ -7,7 +7,11 @@ import pytest
 from edot_qa.config import DEFAULT_BASE_URL, load_settings
 from edot_qa.reporting.allure_helpers import redact_payload
 from edot_qa.reporting.allure_metadata import metadata_for_node
-from edot_qa.web.pages.company_detail_page import CompanyDetailDataNotLoadedError, CompanyDetailPage
+from edot_qa.web.pages.company_detail_page import (
+    CompanyDetailDataNotLoadedError,
+    CompanyDetailPage,
+    _detail_values_match,
+)
 from tools.generate_allure_report import _ensure_step_evidence
 
 
@@ -187,6 +191,31 @@ def test_company_detail_wrong_visible_name_fails_without_reload(monkeypatch):
         detail.refresh_until_company_name_loaded("PT Expected QA")
 
     assert page.reload_count == 0
+
+
+@pytest.mark.parametrize(
+    ("label", "expected", "actual"),
+    [
+        ("email", "qa.company@example.test", "qa.company@example.test WRONG"),
+        ("phone", "+6281234567890", "+628123456789"),
+        ("name", "PT Correct Company", "PT Correct Company Other"),
+    ],
+)
+def test_company_detail_tier_two_matcher_rejects_wrong_suffix_or_digits(label, expected, actual):
+    assert _detail_values_match(label, actual, expected) is False
+
+
+@pytest.mark.parametrize(
+    ("label", "expected", "actual"),
+    [
+        ("name", " PT Correct Company ", "pt correct company"),
+        ("phone", "+6281234567890", "0812 3456 7890"),
+        ("address", "Jalan Sudirman No 10", "Jalan Sudirman No. 10"),
+        ("postal code", "12190", "12190"),
+    ],
+)
+def test_company_detail_tier_two_matcher_allows_safe_normalization(label, expected, actual):
+    assert _detail_values_match(label, actual, expected) is True
 
 
 class _ReloadOnlyPage:

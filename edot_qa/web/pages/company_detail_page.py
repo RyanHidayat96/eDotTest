@@ -131,7 +131,7 @@ DETAIL_COMPANY_NAME_FIELD_SCRIPT = """
       element.getAttribute("title");
     const value = normalize(rawValue);
     if (payload.requireExpected) {
-      return expected.length > 0 && (value === expected || value.includes(expected));
+      return expected.length > 0 && value === expected;
     }
     return meaningful(value);
   });
@@ -305,7 +305,7 @@ class CompanyDetailPage(BasePage):
             self.expect_detail_value(self.industry_type, data.industry_type)
             # Tier 2: detail company type must match submitted Company Type.
             self.expect_detail_value(self.company_type, data.company_type)
-            # Tier 2: detail address must include submitted Street Address.
+            # Tier 2: detail address must match submitted Street Address after documented normalization.
             self.expect_detail_value(self.address, data.street_address)
             # Tier 2: detail postal code must match submitted Postal Code.
             self.expect_detail_value(self.postal_code, data.location.postal_code)
@@ -322,13 +322,13 @@ class CompanyDetailPage(BasePage):
         ):
             observed_values = self._detail_field_observed_values(spec)
             for observed_value in observed_values:
-                if _detail_values_match(observed_value, expected_value):
+                if _detail_values_match(spec.label, observed_value, expected_value):
                     return
 
             errors: list[str] = []
             for description, locator in self._detail_value_candidates(spec, expected_value):
                 try:
-                    self._expect_locator_has_value(locator, expected_value)
+                    self._expect_locator_matches(locator, spec.label, expected_value)
                     return
                 except (AssertionError, PlaywrightError, TimeoutError) as error:
                     errors.append(f"{description}: {error}")
@@ -382,27 +382,20 @@ class CompanyDetailPage(BasePage):
         label = re.compile(re.escape(spec.label), re.I)
         exact_value = re.compile(rf"^\s*{re.escape(expected_value)}\s*$", re.I)
         candidates = [
-            (f"placeholder {placeholder}", self.page.get_by_placeholder(placeholder).first)
-            for placeholder in spec.placeholders
+            (f"data-testid {test_id}", self.page.get_by_test_id(test_id).first)
+            for test_id in spec.test_ids
         ]
         candidates.extend(
             [
+                ("textbox labelled field", self.page.get_by_label(label).first),
+                ("textbox role named field", self.page.get_by_role("textbox", name=label).first),
+                ("combobox role named field", self.page.get_by_role("combobox", name=label).first),
                 ("combobox with exact value", self.page.get_by_role("combobox").filter(has_text=exact_value).first),
-                # Text fallback is justified because eSuite profile renders select values as visible read-only text.
-                ("exact visible detail text", self.page.get_by_text(expected_value, exact=True).first),
-                # Text fallback is justified because long address fields may be rendered with surrounding location text.
-                ("contained visible detail text", self.page.get_by_text(expected_value, exact=False).first),
-            ]
-        )
-        candidates.extend((f"data-testid {test_id}", self.page.get_by_test_id(test_id).first) for test_id in spec.test_ids)
-        candidates.extend(
-            [
+                ("cell with exact value", self.page.get_by_role("cell", name=exact_value).first),
                 (
                     f"row containing {spec.label}",
-                    self.page.get_by_role("row").filter(has_text=label).filter(has_text=expected_value).first,
+                    self.page.get_by_role("row").filter(has_text=label).filter(has_text=exact_value).first,
                 ),
-                ("cell with exact value", self.page.get_by_role("cell", name=exact_value).first),
-                ("textbox labelled field", self.page.get_by_label(label).first),
             ]
         )
         candidates.extend(
@@ -411,6 +404,14 @@ class CompanyDetailPage(BasePage):
                 for stable_name in spec.stable_names
             ]
         )
+        candidates.extend(
+            [
+                (f"placeholder {placeholder}", self.page.get_by_placeholder(placeholder).first)
+                for placeholder in spec.placeholders
+            ]
+        )
+        # Text fallback is justified because eSuite profile sometimes renders saved select values as read-only text.
+        candidates.append(("exact visible detail text", self.page.get_by_text(expected_value, exact=True).first))
         return candidates
 
     def _detail_field_current_value(self, spec: DetailFieldSpec) -> str:
@@ -429,12 +430,21 @@ class CompanyDetailPage(BasePage):
     def _detail_field_candidates(self, spec: DetailFieldSpec) -> list[tuple[str, Locator]]:
         label = re.compile(re.escape(spec.label), re.I)
         candidates = [
+            (f"data-testid {test_id}", self.page.get_by_test_id(test_id).first)
+            for test_id in spec.test_ids
+        ]
+        candidates.extend(
+            [
+                ("textbox labelled field", self.page.get_by_label(label).first),
+                ("textbox role named field", self.page.get_by_role("textbox", name=label).first),
+                ("combobox role named field", self.page.get_by_role("combobox", name=label).first),
+            ]
+        )
+        candidates.extend((f"stable name/id {stable_name}", self.page.locator(stable_detail_selector(stable_name)).first) for stable_name in spec.stable_names)
+        candidates.extend(
             (f"placeholder {placeholder}", self.page.get_by_placeholder(placeholder).first)
             for placeholder in spec.placeholders
-        ]
-        candidates.extend((f"data-testid {test_id}", self.page.get_by_test_id(test_id).first) for test_id in spec.test_ids)
-        candidates.extend((f"stable name/id {stable_name}", self.page.locator(stable_detail_selector(stable_name)).first) for stable_name in spec.stable_names)
-        candidates.append(("textbox labelled field", self.page.get_by_label(label).first))
+        )
         return candidates
 
     def _detail_field_observed_values(self, spec: DetailFieldSpec) -> list[str]:
@@ -453,14 +463,12 @@ class CompanyDetailPage(BasePage):
         return [str(value) for value in values if str(value).strip()]
 
     @staticmethod
-    def _expect_locator_has_value(locator: Locator, expected_value: str) -> None:
+    def _expect_locator_matches(locator: Locator, label: str, expected_value: str) -> None:
         expect(locator).to_be_visible(timeout=1_000)
-        try:
-            expect(locator).to_have_value(expected_value, timeout=1_000)
+        actual_value = CompanyDetailPage._locator_current_value(locator)
+        if _detail_values_match(label, actual_value, expected_value):
             return
-        except (AssertionError, PlaywrightError):
-            pass
-        expect(locator).to_contain_text(expected_value, timeout=1_000)
+        raise AssertionError(f"Company detail {label!r} actual {actual_value!r} did not equal expected {expected_value!r}")
 
     @staticmethod
     def _locator_current_value(locator: Locator) -> str:
@@ -503,7 +511,7 @@ class CompanyDetailPage(BasePage):
 
                 observed_value = self._company_name_field_current_value_now()
                 if observed_value:
-                    if _detail_values_match(observed_value, company_name):
+                    if _detail_values_match("name", observed_value, company_name):
                         attach_json(
                             "company-detail-refresh-resolved-by-field-read",
                             {
@@ -569,7 +577,7 @@ class CompanyDetailPage(BasePage):
         if self._company_name_field_ready(company_name, require_expected=True, timeout_ms=timeout_ms):
             return
         observed_value = self._company_name_field_current_value_now()
-        if _detail_values_match(observed_value, company_name):
+        if _detail_values_match("name", observed_value, company_name):
             return
         if observed_value:
             raise AssertionError(f"Company Name field loaded {observed_value!r}, expected {company_name!r}")
@@ -635,6 +643,11 @@ def _accept_delete_agreement_if_present(page: Page) -> None:
         data={"agreement": "I understand & agree to delete"},
     ):
         candidates = [
+            ("delete agreement checkbox role", page.get_by_role("checkbox", name=DELETE_AGREEMENT).first),
+            ("delete agreement checkbox by label", page.get_by_label(DELETE_AGREEMENT).first),
+            ("delete agreement stable checkbox", page.locator("button[role='checkbox']#select-all").last),
+            ("visible role checkbox", page.get_by_role("checkbox").last),
+            ("visible delete checkbox", page.locator("input[type='checkbox']").last),
             (
                 "delete agreement row checkbox",
                 page.locator("div.align-center.flex.flex-row")
@@ -642,11 +655,6 @@ def _accept_delete_agreement_if_present(page: Page) -> None:
                 .locator("button[role='checkbox']")
                 .first,
             ),
-            ("delete agreement stable checkbox", page.locator("button[role='checkbox']#select-all").last),
-            ("delete agreement checkbox by label", page.get_by_label(DELETE_AGREEMENT).first),
-            ("delete agreement checkbox role", page.get_by_role("checkbox", name=DELETE_AGREEMENT).first),
-            ("visible role checkbox", page.get_by_role("checkbox").last),
-            ("visible delete checkbox", page.locator("input[type='checkbox']").last),
         ]
         for _, locator in candidates:
             try:
@@ -655,6 +663,7 @@ def _accept_delete_agreement_if_present(page: Page) -> None:
                 return
             except (AssertionError, PlaywrightError, TimeoutError):
                 continue
+        # Coordinate click is absolute last resort because the Radix checkbox can expose no usable label.
         _click_delete_agreement_box_by_text_position(page)
 
 
@@ -726,14 +735,27 @@ def _is_meaningful_detail_value(value: str) -> bool:
     return bool(lowered) and not lowered.startswith(("input ", "choose ", "select "))
 
 
-def _detail_values_match(actual_value: str, expected_value: str) -> bool:
-    actual = " ".join(actual_value.split()).casefold()
-    expected = " ".join(expected_value.split()).casefold()
-    if not actual or not expected:
-        return False
-    if actual == expected or expected in actual:
-        return True
-    if actual.endswith(("...", "…")):
-        prefix = actual.rstrip(".…").strip()
-        return bool(prefix) and expected.startswith(prefix)
-    return False
+def _detail_values_match(label: str, actual_value: str, expected_value: str) -> bool:
+    actual = _normalise_detail_value(label, actual_value)
+    expected = _normalise_detail_value(label, expected_value)
+    return bool(actual and expected and actual == expected)
+
+
+def _normalise_detail_value(label: str, value: str) -> str:
+    normalized = " ".join(str(value or "").split()).strip()
+    if not normalized:
+        return ""
+
+    lowered_label = label.casefold()
+    if lowered_label == "phone":
+        digits = re.sub(r"\D+", "", normalized)
+        if digits.startswith("62"):
+            digits = digits[2:]
+        if digits.startswith("0"):
+            digits = digits[1:]
+        return digits
+
+    if lowered_label == "address":
+        return re.sub(r"[^a-z0-9]+", " ", normalized.casefold()).strip()
+
+    return normalized.casefold()

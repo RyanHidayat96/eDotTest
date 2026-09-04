@@ -169,6 +169,9 @@ class CompanyManagePage(BasePage):
     def _company_record_candidates(self, company_name: str) -> list[tuple[str, Locator]]:
         company_name_pattern = re.compile(re.escape(company_name), re.I)
         return [
+            ("row containing company name", self.page.get_by_role("row", name=company_name_pattern).first),
+            ("link named company", self.page.get_by_role("link", name=company_name_pattern).first),
+            ("button named company", self.page.get_by_role("button", name=company_name_pattern).first),
             (
                 "company card containing company name and Manage action",
                 # Text fallback is justified because company cards expose persisted company names as visible card text.
@@ -177,9 +180,6 @@ class CompanyManagePage(BasePage):
                 .filter(has=self.page.get_by_role("button", name=DETAIL_ACTION))
                 .first,
             ),
-            ("row containing company name", self.page.get_by_role("row", name=company_name_pattern).first),
-            ("link named company", self.page.get_by_role("link", name=company_name_pattern).first),
-            ("button named company", self.page.get_by_role("button", name=company_name_pattern).first),
             # Text fallback is justified because created company name is the exact persisted value under test.
             ("exact company-name text", self.page.get_by_text(company_name, exact=True).first),
         ]
@@ -187,11 +187,13 @@ class CompanyManagePage(BasePage):
     def _company_identifier_candidates(self, identifier: str) -> list[tuple[str, Locator]]:
         pattern = re.compile(re.escape(identifier), re.I)
         return [
-            ("company card containing identifier", self.page.locator("div.rounded-lg.border").filter(has_text=pattern).first),
             ("row containing identifier", self.page.get_by_role("row", name=pattern).first),
             ("cell containing identifier", self.page.get_by_role("cell", name=pattern).first),
             ("link named identifier", self.page.get_by_role("link", name=pattern).first),
             ("button named identifier", self.page.get_by_role("button", name=pattern).first),
+            # Text fallback is justified because company cards expose captured company identifiers as visible text.
+            ("company card containing identifier", self.page.locator("div.rounded-lg.border").filter(has_text=pattern).first),
+            # Text fallback is justified because cleanup verifies exact captured company identifier is absent.
             ("exact identifier text", self.page.get_by_text(identifier, exact=True).first),
         ]
 

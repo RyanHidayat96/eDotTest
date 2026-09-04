@@ -342,10 +342,26 @@ class RegisterCompanyWizardPage(BasePage):
             raise AssertionError(f"Could not choose {value!r} for {spec.label}; tried {len(errors)} controls")
 
     def _text_control(self, spec: FieldSpec) -> Locator:
+        label_regex = re.compile(re.escape(spec.label), re.I)
         if spec.label == "Street Address":
-            return self.first_visible(
+            candidates = [
+                (f"data-testid {test_id}", self.page.get_by_test_id(test_id).first)
+                for test_id in spec.test_ids
+            ]
+            candidates.extend(
                 [
-                    ("street address label-adjacent input", self._input_after_label("Street Address")),
+                    (f"textbox named {spec.label}", self.page.get_by_role("textbox", name=label_regex).first),
+                    (f"label {spec.label}", self.page.get_by_label(label_regex).first),
+                ]
+            )
+            candidates.extend(
+                [
+                    (f"stable name/id {stable_name}", self.page.locator(stable_text_selector(stable_name)).first)
+                    for stable_name in spec.stable_names
+                ]
+            )
+            candidates.extend(
+                [
                     (
                         "street address visible placeholder",
                         self.page.locator(
@@ -353,12 +369,16 @@ class RegisterCompanyWizardPage(BasePage):
                             "input[placeholder*='Address']:visible, textarea[placeholder*='Address']:visible"
                         ).first,
                     ),
-                ],
+                    # XPath fallback is justified because current eSuite labels are not consistently bound to inputs.
+                    ("street address label-adjacent input", self._input_after_label("Street Address")),
+                ]
+            )
+            return self.first_visible(
+                candidates,
                 f"{spec.label} input",
                 timeout_ms=1_000,
             )
 
-        label_regex = re.compile(re.escape(spec.label), re.I)
         candidates = existing_locator_candidates(
             [
                 (f"data-testid {test_id}", self.page.get_by_test_id(test_id).first)
@@ -367,9 +387,7 @@ class RegisterCompanyWizardPage(BasePage):
         )
         candidates.extend(
             [
-                (f"placeholder Input {spec.label.removeprefix('Street ')}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label.removeprefix('Street '))}", re.I)).first),
-                (f"placeholder {spec.label}", self.page.get_by_placeholder(label_regex).first),
-                (f"placeholder Input {spec.label}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label)}", re.I)).first),
+                (f"textbox named {spec.label}", self.page.get_by_role("textbox", name=label_regex).first),
                 (f"label {spec.label}", self.page.get_by_label(label_regex).first),
             ]
         )
@@ -381,7 +399,13 @@ class RegisterCompanyWizardPage(BasePage):
                 ]
             )
         )
-        candidates.append((f"textbox named {spec.label}", self.page.get_by_role("textbox", name=label_regex).first))
+        candidates.extend(
+            [
+                (f"placeholder Input {spec.label.removeprefix('Street ')}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label.removeprefix('Street '))}", re.I)).first),
+                (f"placeholder {spec.label}", self.page.get_by_placeholder(label_regex).first),
+                (f"placeholder Input {spec.label}", self.page.get_by_placeholder(re.compile(rf"Input\s+{re.escape(spec.label)}", re.I)).first),
+            ]
+        )
         return self.first_visible(candidates, f"{spec.label} input", timeout_ms=1_500)
 
     def _input_after_label(self, label: str) -> Locator:
@@ -405,8 +429,6 @@ class RegisterCompanyWizardPage(BasePage):
         candidates.extend(
             existing_locator_candidates(
                 [
-                (f"combobox containing Choose {spec.label}", self.page.get_by_role("combobox").filter(has_text=f"Choose {spec.label}").first),
-                (f"button containing Choose {spec.label}", self.page.get_by_role("button").filter(has_text=f"Choose {spec.label}").first),
                 (f"combobox named {spec.label}", self.page.get_by_role("combobox", name=label_regex).first),
                 (f"button named {spec.label}", self.page.get_by_role("button", name=label_regex).first),
                 (f"label {spec.label}", self.page.get_by_label(label_regex).first),
@@ -421,6 +443,14 @@ class RegisterCompanyWizardPage(BasePage):
                 ]
             )
         )
+        candidates.extend(
+            existing_locator_candidates(
+                [
+                (f"combobox containing Choose {spec.label}", self.page.get_by_role("combobox").filter(has_text=f"Choose {spec.label}").first),
+                (f"button containing Choose {spec.label}", self.page.get_by_role("button").filter(has_text=f"Choose {spec.label}").first),
+                ]
+            )
+        )
         # Text fallback is justified because current eSuite dropdown buttons expose visible text but no stable name/id.
         candidates.append((f"assignment dropdown Choose {spec.label}", self.page.get_by_text(f"Choose {spec.label}", exact=True).first))
         return candidates
@@ -428,10 +458,10 @@ class RegisterCompanyWizardPage(BasePage):
     def _choice_control_by_visible_text(self, spec: FieldSpec, text: str) -> Locator:
         return self.first_visible(
             [
-                # Text fallback is justified because eSuite cascade controls expose selected placeholder text.
-                (f"visible {spec.label} placeholder", self.page.get_by_text(text, exact=True).first),
                 ("button containing visible choice text", self.page.get_by_role("button").filter(has_text=text).first),
                 ("combobox containing visible choice text", self.page.get_by_role("combobox").filter(has_text=text).first),
+                # Text fallback is justified because eSuite cascade controls expose selected placeholder text.
+                (f"visible {spec.label} placeholder", self.page.get_by_text(text, exact=True).first),
             ],
             f"{spec.label} disabled cascade control",
             timeout_ms=1_000,
@@ -465,9 +495,9 @@ class RegisterCompanyWizardPage(BasePage):
     def _try_filter_and_click_option(self, value: str) -> bool:
         search_regex = re.compile(r"^Search$", re.I)
         search_controls = [
-            ("dropdown search input", self.page.locator("input[placeholder='Search']").last),
             ("dropdown searchbox", self.page.get_by_role("searchbox").last),
             ("dropdown search placeholder", self.page.get_by_placeholder(search_regex).last),
+            ("dropdown search input", self.page.locator("input[placeholder='Search']").last),
         ]
         for _, search_control in search_controls:
             try:

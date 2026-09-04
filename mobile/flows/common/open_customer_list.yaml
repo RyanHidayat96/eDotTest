@@ -1,0 +1,11 @@
+appId: ${EWORK_APP_ID}
+---
+# Home menu item has repeated generic IDs in hierarchy; text fallback is the captured stable locator.
+- scrollUntilVisible:
+    element:
+      text: ${EWORK_CUSTOMERS_MENU_TEXT}
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    text: ${EWORK_CUSTOMERS_MENU_TEXT}
+- assertVisible: New Customer List

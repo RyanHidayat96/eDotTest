@@ -4,12 +4,26 @@ import pytest
 
 from edot_qa.ai.test_data import GeneratedTestData
 from edot_qa.mobile.customer import MobileCustomerData, generate_mobile_customer_data
-from edot_qa.mobile.device import adb_devices, command_available, force_stop_app, package_installed, ready_device, wake_device
+from edot_qa.mobile.device import (
+    adb_devices,
+    command_available,
+    force_stop_app,
+    package_installed,
+    ready_device,
+    scroll_list_to_end_and_find_texts,
+    visible_texts_by_resource_id,
+    wake_device,
+)
 from edot_qa.mobile.session_state import mobile_session_state_exists
 from edot_qa.reporting.allure_helpers import allure_step, attach_json
 
 
 pytestmark = pytest.mark.mobile
+
+CUSTOMER_CARD_ADDRESS_MARKER = "__EWORK_CUSTOMER_CARD_ADDRESS__="
+CUSTOMER_CARD_NAME_ID = "id.edot.ework:id/tv_name"
+CUSTOMER_CARD_ADDRESS_ID = "id.edot.ework:id/tv_address"
+CUSTOMER_CARD_TYPE_ID = "id.edot.ework:id/tv_first_customer_group"
 
 
 def test_mobile_customer_data_maps_ai_payload():
@@ -83,6 +97,17 @@ def test_mobile_customer_contact_uses_phone_when_ai_returns_email():
     assert customer.contact != "budi@example.test"
 
 
+def test_customer_card_address_marker_is_read_from_maestro_stdout():
+    stdout = "noise\n__EWORK_CUSTOMER_CARD_ADDRESS__=Jl. Musyawarah\nmore noise"
+
+    assert _customer_card_address_from_maestro_stdout(stdout) == "Jl. Musyawarah"
+
+
+def test_customer_card_address_marker_missing_fails_clearly():
+    with pytest.raises(AssertionError, match="address marker not found"):
+        _customer_card_address_from_maestro_stdout("noise only")
+
+
 @pytest.mark.requires_credentials
 @pytest.mark.requires_device
 @pytest.mark.requires_maestro
@@ -144,11 +169,84 @@ def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_ma
         )
 
     customer = generate_mobile_customer_data()
-    # Tier 2: create-customer flow asserts card-visible persisted values after save.
-    run_maestro_flow("create_customer.yaml", extra_env=customer.as_maestro_env())
+    customer_env = customer.as_maestro_env()
+    create_result = run_maestro_flow("create_customer.yaml", extra_env=customer_env)
+    customer_card_address = _customer_card_address_from_maestro_stdout(create_result.stdout)
+
+    with allure_step(
+        "Find created customer card from list bottom",
+        data={
+            "customer_name": customer.name,
+            "customer_card_address": customer_card_address,
+            "customer_type": mobile_settings.ework_customer_type_option_text,
+            "bottom_timeout_seconds": 40,
+            "search_timeout_seconds": 40,
+            "max_up_swipes": 4,
+            "search_identity": "customer_name",
+        },
+        screenshot=False,
+    ):
+        card_locators = [
+            CUSTOMER_CARD_NAME_ID,
+            CUSTOMER_CARD_ADDRESS_ID,
+            CUSTOMER_CARD_TYPE_ID,
+        ]
+        pre_scroll_locator_texts = visible_texts_by_resource_id(
+            card_locators,
+            mobile_settings.adb_command,
+            device_id=mobile_settings.mobile_device_id or device.serial,
+            timeout_seconds=10,
+        )
+        attach_json("customer-card-locators-before-scroll", pre_scroll_locator_texts)
+        if customer.name in pre_scroll_locator_texts[CUSTOMER_CARD_NAME_ID]:
+            scroll_result = {
+                "reached_end": False,
+                "down_swipes": 0,
+                "up_swipes": 0,
+                "visible_texts": pre_scroll_locator_texts,
+                "skipped_scroll": True,
+            }
+        else:
+            result = scroll_list_to_end_and_find_texts(
+                [customer.name],
+                mobile_settings.adb_command,
+                device_id=mobile_settings.mobile_device_id or device.serial,
+                bottom_timeout_seconds=40,
+                search_timeout_seconds=40,
+                max_up_swipes=4,
+            )
+            scroll_result = {
+                "reached_end": result.reached_end,
+                "down_swipes": result.down_swipes,
+                "up_swipes": result.up_swipes,
+                "visible_texts": result.visible_texts,
+                "skipped_scroll": False,
+            }
+        attach_json(
+            "customer-list-scroll-search",
+            scroll_result,
+        )
+
+    run_maestro_flow(
+        "validate_customer_list_card.yaml",
+        extra_env={
+            **customer_env,
+            "EWORK_CUSTOMER_CARD_ADDRESS": customer_card_address,
+        },
+    )
 
 
 def _skip_or_fail_live(mobile_settings, message: str) -> None:
     if mobile_settings.edot_live:
         pytest.fail(message)
     pytest.skip(message)
+
+
+def _customer_card_address_from_maestro_stdout(stdout: str) -> str:
+    for line in stdout.splitlines():
+        if CUSTOMER_CARD_ADDRESS_MARKER not in line:
+            continue
+        value = line.split(CUSTOMER_CARD_ADDRESS_MARKER, 1)[1].strip()
+        if value:
+            return value
+    raise AssertionError("Created customer card address marker not found in Maestro output")

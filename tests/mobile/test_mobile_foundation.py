@@ -16,6 +16,8 @@ from edot_qa.mobile.device import (
     package_installed,
     parse_adb_devices,
     ready_device,
+    scroll_list_to_end_and_find_texts,
+    visible_texts_by_resource_id,
     wake_device,
 )
 from edot_qa.mobile.maestro import MaestroResult, MaestroRunner, assert_maestro_passed
@@ -173,6 +175,154 @@ def test_wake_device_wakes_and_dismisses_keyguard(monkeypatch):
         ["adb", "-s", "emulator-5554", "shell", "input", "keyevent", "KEYCODE_WAKEUP"],
         ["adb", "-s", "emulator-5554", "shell", "wm", "dismiss-keyguard"],
     ]
+
+
+def test_scroll_list_to_end_then_searches_up_for_target(monkeypatch):
+    signatures = [
+        ["New Customer List", "CUST-001"],
+        ["New Customer List", "CUST-100"],
+        ["New Customer List", "CUST-999"],
+        ["New Customer List", "CUST-999"],
+        ["New Customer List", "CUST-999"],
+        ["New Customer List", "Budi QA", "Jl. Test", "Grosir"],
+    ]
+    swipes = []
+
+    def fake_visible_text_signature(*args, **kwargs):
+        return signatures.pop(0)
+
+    def fake_swipe(*args, **kwargs):
+        swipes.append(kwargs)
+
+    monkeypatch.setattr("edot_qa.mobile.device._screen_size", lambda *args, **kwargs: (1200, 2670))
+    monkeypatch.setattr("edot_qa.mobile.device._visible_text_signature", fake_visible_text_signature)
+    monkeypatch.setattr("edot_qa.mobile.device._adb_swipe", fake_swipe)
+    monkeypatch.setattr("edot_qa.mobile.device._adb_swipe_batch", fake_swipe)
+    monkeypatch.setattr("edot_qa.mobile.device.time.sleep", lambda _: None)
+
+    result = scroll_list_to_end_and_find_texts(
+        ["Budi QA", "Jl. Test", "Grosir"],
+        device_id="emulator-5554",
+        bottom_timeout_seconds=30,
+        search_timeout_seconds=30,
+        down_swipe_batch_size=1,
+    )
+
+    assert result.reached_end is True
+    assert result.down_swipes == 4
+    assert result.up_swipes == 1
+    assert swipes[0]["start_y_ratio"] == 0.88
+    assert swipes[0]["end_y_ratio"] == 0.3
+    assert swipes[-1]["start_y_ratio"] == 0.45
+    assert swipes[-1]["end_y_ratio"] == 0.75
+
+
+def test_scroll_list_stops_when_target_already_visible(monkeypatch):
+    swipes = []
+
+    monkeypatch.setattr("edot_qa.mobile.device._screen_size", lambda *args, **kwargs: (1200, 2670))
+    monkeypatch.setattr(
+        "edot_qa.mobile.device._visible_text_signature",
+        lambda *args, **kwargs: ["New Customer List", "Toko QA12345", "Jalan Test No. 1"],
+    )
+    monkeypatch.setattr("edot_qa.mobile.device._adb_swipe", lambda *args, **kwargs: swipes.append(kwargs))
+    monkeypatch.setattr("edot_qa.mobile.device._adb_swipe_batch", lambda *args, **kwargs: swipes.append(kwargs))
+
+    result = scroll_list_to_end_and_find_texts(["Toko QA12345"], device_id="emulator-5554")
+
+    assert result.down_swipes == 0
+    assert result.up_swipes == 0
+    assert swipes == []
+
+
+def test_scroll_list_stops_when_target_appears_while_scrolling_down(monkeypatch):
+    signatures = [
+        ["New Customer List", "CUST-001"],
+        ["New Customer List", "Toko QA12345", "Jalan Test\nNo. 1"],
+    ]
+    swipes = []
+
+    def fake_visible_text_signature(*args, **kwargs):
+        return signatures.pop(0)
+
+    def fake_swipe(*args, **kwargs):
+        swipes.append(kwargs)
+
+    monkeypatch.setattr("edot_qa.mobile.device._screen_size", lambda *args, **kwargs: (1200, 2670))
+    monkeypatch.setattr("edot_qa.mobile.device._visible_text_signature", fake_visible_text_signature)
+    monkeypatch.setattr("edot_qa.mobile.device._adb_swipe", fake_swipe)
+    monkeypatch.setattr("edot_qa.mobile.device._adb_swipe_batch", fake_swipe)
+    monkeypatch.setattr("edot_qa.mobile.device.time.sleep", lambda _: None)
+
+    result = scroll_list_to_end_and_find_texts(
+        ["Jalan Test No. 1"],
+        device_id="emulator-5554",
+        down_swipe_batch_size=1,
+    )
+
+    assert result.down_swipes == 1
+    assert result.up_swipes == 0
+    assert len(swipes) == 1
+
+
+def test_scroll_list_fails_after_four_slow_up_swipes(monkeypatch):
+    signatures = [
+        ["New Customer List", "CUST-001"],
+        ["New Customer List", "CUST-100"],
+        ["New Customer List", "CUST-999"],
+        ["New Customer List", "CUST-999"],
+        ["New Customer List", "CUST-999"],
+        ["New Customer List", "CUST-998"],
+        ["New Customer List", "CUST-997"],
+        ["New Customer List", "CUST-996"],
+        ["New Customer List", "CUST-995"],
+    ]
+    swipes = []
+
+    def fake_visible_text_signature(*args, **kwargs):
+        return signatures.pop(0)
+
+    def fake_swipe(*args, **kwargs):
+        swipes.append(kwargs)
+
+    monkeypatch.setattr("edot_qa.mobile.device._screen_size", lambda *args, **kwargs: (1200, 2670))
+    monkeypatch.setattr("edot_qa.mobile.device._visible_text_signature", fake_visible_text_signature)
+    monkeypatch.setattr("edot_qa.mobile.device._adb_swipe", fake_swipe)
+    monkeypatch.setattr("edot_qa.mobile.device._adb_swipe_batch", fake_swipe)
+    monkeypatch.setattr("edot_qa.mobile.device.time.sleep", lambda _: None)
+
+    with pytest.raises(AssertionError, match="Missing: Toko QA404"):
+        scroll_list_to_end_and_find_texts(
+            ["Toko QA404"],
+            device_id="emulator-5554",
+            down_swipe_batch_size=1,
+        )
+
+    up_swipes = [swipe for swipe in swipes if swipe["start_y_ratio"] == 0.45]
+    assert len(up_swipes) == 4
+    assert all(swipe["end_y_ratio"] == 0.75 for swipe in up_swipes)
+
+
+def test_visible_texts_by_resource_id_reads_locator_values(monkeypatch):
+    xml_text = """<?xml version="1.0" encoding="UTF-8"?>
+<hierarchy>
+  <node resource-id="id.edot.ework:id/tv_name" text="Toko QA12345" content-desc="" />
+  <node resource-id="id.edot.ework:id/tv_address" text="Jalan Test&#10;No. 1" content-desc="" />
+  <node resource-id="id.edot.ework:id/tv_first_customer_group" text="Grosir" content-desc="" />
+</hierarchy>"""
+    resource_ids = [
+        "id.edot.ework:id/tv_name",
+        "id.edot.ework:id/tv_address",
+        "id.edot.ework:id/tv_first_customer_group",
+    ]
+
+    monkeypatch.setattr("edot_qa.mobile.device._dump_window_xml", lambda *args, **kwargs: xml_text)
+
+    assert visible_texts_by_resource_id(resource_ids, device_id="emulator-5554") == {
+        "id.edot.ework:id/tv_name": ["Toko QA12345"],
+        "id.edot.ework:id/tv_address": ["Jalan Test No. 1"],
+        "id.edot.ework:id/tv_first_customer_group": ["Grosir"],
+    }
 
 
 def test_capture_device_screenshot_uses_exec_out_png(monkeypatch):
@@ -359,7 +509,9 @@ def test_mobile_login_flow_uses_run_flow_and_environment_values():
 def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     entry_flow = (ROOT_DIR / "mobile" / "flows" / "create_customer.yaml").read_text(encoding="utf-8")
     shared_flow = (ROOT_DIR / "mobile" / "flows" / "common" / "create_customer.yaml").read_text(encoding="utf-8")
-    combined = f"{entry_flow}\n{shared_flow}"
+    open_flow = (ROOT_DIR / "mobile" / "flows" / "common" / "open_customer_list.yaml").read_text(encoding="utf-8")
+    validation_flow = (ROOT_DIR / "mobile" / "flows" / "validate_customer_list_card.yaml").read_text(encoding="utf-8")
+    combined = f"{entry_flow}\n{shared_flow}\n{open_flow}\n{validation_flow}"
 
     assert "runFlow: common/login.yaml" not in entry_flow
     assert "runFlow: common/create_customer.yaml" in entry_flow
@@ -368,13 +520,16 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "${EWORK_COMPANY_CODE}" not in combined
     assert "${EWORK_EMAIL}" not in combined
     assert "${EWORK_PASSWORD}" not in combined
-    assert "${EWORK_CUSTOMERS_MENU_TEXT}" in shared_flow
+    assert "${EWORK_CUSTOMERS_MENU_TEXT}" in open_flow
     assert "${EWORK_CUSTOMER_NAME}" in shared_flow
+    assert "runFlow: open_customer_list.yaml" in shared_flow
+    assert "runFlow: go_to_customer_list_bottom.yaml" not in shared_flow
     assert "${EWORK_CUSTOMER_CONTACT}" in shared_flow
     assert "${EWORK_CUSTOMER_CONTACT_PERSON}" in shared_flow
     assert "copyTextFrom:" in shared_flow
     assert "output.customerAddress" in shared_flow
-    assert "output.customerCardAddress" in shared_flow
+    assert "output.customerCardAddress" not in shared_flow
+    assert "__EWORK_CUSTOMER_CARD_ADDRESS__=" in shared_flow
     assert "${EWORK_CUSTOMER_CHANNEL_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_TYPE_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID}" in shared_flow
@@ -391,11 +546,22 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "${EWORK_CUSTOMER_SIGNATURE_VIEW_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_SUCCESS_TEXT}" in shared_flow
-    assert 'start: "50%, 90%"' in shared_flow
-    assert 'end: "50%, 15%"' in shared_flow
-    assert "Tier 2: created customer name" in shared_flow
-    assert "Tier 2: created customer address" in shared_flow
-    assert "Tier 2: created customer type" in shared_flow
+    bottom_flow = (ROOT_DIR / "mobile" / "flows" / "common" / "go_to_customer_list_bottom.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "scrollUntilVisible" not in bottom_flow
+    assert "repeat:" in bottom_flow
+    assert 'start: "50%, 88%"' in bottom_flow
+    assert 'end: "50%, 30%"' in bottom_flow
+    assert "${EWORK_CUSTOMER_CARD_ADDRESS}" in validation_flow
+    assert "id.edot.ework:id/tv_name" in validation_flow
+    assert "id.edot.ework:id/tv_address" in validation_flow
+    assert "id.edot.ework:id/tv_first_customer_group" in validation_flow
+    assert "scrollUntilVisible" not in validation_flow
+    assert "swipe:" not in validation_flow
+    assert "Tier 2: created customer name" in validation_flow
+    assert "Tier 2: created customer address" in validation_flow
+    assert "Tier 2: created customer type" in validation_flow
     assert "@edot" not in combined.lower()
 
 

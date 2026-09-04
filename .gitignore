@@ -41,6 +41,10 @@ reports/allure-results*/
 reports/allure-report*/
 reports/triage/
 reports/
+evidence/web-allure/
+evidence/deliberate-allure/
+evidence/triage/
+evidence/*.zip
 artifacts/
 maestro-output/
 .maestro/

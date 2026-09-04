@@ -24,6 +24,9 @@ def write_baseline(root: Path) -> None:
                 "reports/",
                 "allure-results/",
                 "allure-report/",
+                "evidence/web-allure/",
+                "evidence/deliberate-allure/",
+                "evidence/triage/",
                 "*.key",
                 "*.pem",
             ]

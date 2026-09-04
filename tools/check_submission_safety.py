@@ -17,6 +17,9 @@ REQUIRED_GITIGNORE_LINES = {
     "reports/",
     "allure-results/",
     "allure-report/",
+    "evidence/web-allure/",
+    "evidence/deliberate-allure/",
+    "evidence/triage/",
     "*.key",
     "*.pem",
 }
@@ -199,6 +202,8 @@ def _check_forbidden_path(rel_path: str) -> Finding | None:
         return Finding(normalised, "runtime environment file must not be submitted")
     if any(part in RUNTIME_DIR_PARTS for part in parts):
         return Finding(normalised, "runtime artifact/report path must not be submitted")
+    if lowered.startswith(("evidence/web-allure/", "evidence/deliberate-allure/", "evidence/triage/")):
+        return Finding(normalised, "generated evidence artifact must not be submitted")
     if suffix in SECRET_SUFFIXES or name in SECRET_FILE_NAMES:
         return Finding(normalised, "secret key/certificate file must not be submitted")
     if suffix == ".log":

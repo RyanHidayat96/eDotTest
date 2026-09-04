@@ -318,6 +318,38 @@ Pass prior safe result history when checking flaky evidence across cleaned runs:
 
 Triage verdicts are human-review proposals only. The script never changes tests, weakens assertions, edits expected values, files bugs, or closes bugs.
 
+## Evidence Commands
+
+Dry-run evidence commands first:
+
+```powershell
+npm run evidence:web:dry-run
+npm run evidence:deliberate:dry-run
+npm run evidence:validate
+```
+
+Final web evidence command:
+
+```powershell
+npm run evidence:web
+```
+
+This cleans `reports/allure-results` and `evidence/web-allure`, runs the required web login/company scenarios, generates the preserved Allure HTML report in `evidence/web-allure`, then scans preserved evidence for secrets.
+
+Deliberate-failure evidence command:
+
+```powershell
+npm run evidence:deliberate
+```
+
+This runs only the isolated wrong-locator evidence test with `EDOT_DELIBERATE_FAILURE=wrong_locator`, expects that test to fail, writes triage to `evidence/triage/triage-report.md`, generates `evidence/deliberate-allure`, then scans preserved evidence for secrets. Normal suites do not enable this flag.
+
+Manual evidence safety scan:
+
+```powershell
+npm run evidence:scan
+```
+
 ## Test Data Cleanup
 
 Web company tests create unique company names per run. The full company flow deletes only the company it created, then verifies both the company name and captured Company ID are absent from Companies results. If eSuite still shows the deleted company after confirmation, the cleanup assertion remains failed so the shared-environment data issue is visible.
@@ -329,12 +361,15 @@ Mobile customer tests use AI-generated or deterministic fallback customer data. 
 Final evidence is generated in the dedicated final execution step. Expected evidence locations are:
 
 ```text
-reports/allure-report/
+evidence/README.md
+evidence/web-allure/
+evidence/deliberate-allure/
+evidence/triage/triage-report.md
 reports/allure-results/
-reports/triage/triage-report.md
+reports/allure-results-deliberate/
 ```
 
-Evidence folders are ignored by Git and must be scanned with `python tools/check_submission_safety.py` before any submission archive is created.
+Generated evidence folders are ignored by Git and must be scanned with `npm run evidence:scan` plus `python tools/check_submission_safety.py` before any submission archive is created.
 
 ## Troubleshooting
 

@@ -40,7 +40,7 @@ class CompanyRegistrationData(BaseModel):
     company_name: str = Field(min_length=5, max_length=140)
     email: str = Field(min_length=6, max_length=120)
     phone: str = Field(min_length=10, max_length=16)
-    industry_type: str = Field(min_length=3, max_length=60)
+    industry_type: str = Field(default="Retail", min_length=3, max_length=60)
     company_type: str = Field(default="Retailer", min_length=2, max_length=60)
     language: str = Field(default="English", min_length=2, max_length=60)
     street_address: str = Field(min_length=10, max_length=180)
@@ -58,7 +58,7 @@ class CompanyRegistrationData(BaseModel):
             company_name=company_name,
             email=normalize_email_for_web(company.email, suffix),
             phone=normalize_phone_for_web(company.phone),
-            industry_type=normalize_industry_for_web(company.industry),
+            industry_type=os.getenv("ESUITE_COMPANY_INDUSTRY_TYPE", cls.model_fields["industry_type"].default),
             company_type=os.getenv("ESUITE_COMPANY_TYPE", cls.model_fields["company_type"].default),
             language=os.getenv("ESUITE_COMPANY_LANGUAGE", cls.model_fields["language"].default),
             street_address=normalize_street_address_for_web(company.street_address),
@@ -133,15 +133,3 @@ def normalize_street_address_for_web(address: str) -> str:
         normalized = f"{normalized} Jakarta".strip()
     return normalized[:80]
 
-
-def normalize_industry_for_web(industry: str) -> str:
-    lowered = industry.strip().lower()
-    if "food" in lowered or "beverage" in lowered:
-        return "Food & Beverage"
-    if "manufact" in lowered:
-        return "Manufacturing"
-    if "transport" in lowered or "logistic" in lowered or "distribut" in lowered:
-        return "Transportation and Logistics"
-    if "tech" in lowered:
-        return "Technology"
-    return "Retail"

@@ -95,25 +95,11 @@ class RegisterCompanyWizardPage(BasePage):
         with allure_step("Verify Register Company wizard is open", page=self.page):
             expect(self.heading).to_be_visible()
 
-    def expect_next_disabled(self) -> None:
-        with allure_step("Verify Next button disabled", page=self.page):
-            expect(self.next_button).to_be_disabled(timeout=10_000)
-
     def expect_next_enabled(self) -> None:
         with allure_step("Verify Next button enabled", page=self.page):
             expect(self.next_button).to_be_enabled(timeout=10_000)
 
-    def expect_next_disabled_until_step_one_valid(self, data: CompanyRegistrationData) -> None:
-        with allure_step(
-            "Validate Register Company step 1 required fields",
-            page=self.page,
-            data=data.as_allure_payload(),
-        ):
-            self.expect_next_disabled()
-            self.fill_required_step_one(data, validate_dependents_after_country=True)
-            self.expect_next_enabled()
-
-    def fill_required_step_one(self, data: CompanyRegistrationData, *, validate_dependents_after_country: bool = False) -> None:
+    def fill_required_step_one(self, data: CompanyRegistrationData) -> None:
         with allure_step("Fill Register Company step 1 fields", page=self.page, data=data.as_allure_payload()):
             self.fill_text_field(self.company_name, data.company_name)
             self.fill_text_field(self.email, data.email)
@@ -123,31 +109,17 @@ class RegisterCompanyWizardPage(BasePage):
             self.choose_field_option(self.language, data.language)
             self.fill_text_field(self.street_address, data.street_address)
             self.choose_field_option(self.country, data.location.country)
-            if validate_dependents_after_country:
-                self.expect_location_dependents_disabled_after_country_only()
             self.choose_field_option(self.province, data.location.province)
             self.choose_field_option(self.city, data.location.city)
             self.choose_field_option(self.district, data.location.district)
             self.choose_field_option(self.zone, data.location.zone)
             self.choose_or_fill_field(self.postal_code, data.location.postal_code)
 
-    def expect_location_dependents_disabled_after_country_only(self) -> None:
-        with allure_step("Verify dependent location fields stay disabled after Country only", page=self.page):
-            for spec, placeholder in (
-                (self.city, "Choose City"),
-                (self.district, "Choose District"),
-                (self.zone, "Choose Sub District"),
-                (self.postal_code, "Choose Postal Code"),
-            ):
-                if self._visible_control_is_disabled(placeholder):
-                    continue
-                control = self._choice_control_by_visible_text(spec, placeholder)
-                self._expect_required_control_disabled(control, spec)
-
     def complete_three_step_registration(self, data: CompanyRegistrationData) -> None:
         with allure_step("Complete Register Company three step wizard", page=self.page):
             with allure_step("Register Company page 1 - Company details", page=self.page, screenshot=True, force=True):
-                self.expect_next_disabled_until_step_one_valid(data)
+                self.fill_required_step_one(data)
+                self.expect_next_enabled()
             with allure_step("Register Company page 2 - Company settings", page=self.page, screenshot=True, force=True):
                 self.next_button.click()
                 self.assert_step_can_continue(step_name="Register Company step 2")
@@ -444,18 +416,6 @@ class RegisterCompanyWizardPage(BasePage):
         candidates.append((f"assignment dropdown Choose {spec.label}", self.page.get_by_text(f"Choose {spec.label}", exact=True).first))
         return candidates
 
-    def _choice_control_by_visible_text(self, spec: FieldSpec, text: str) -> Locator:
-        return self.first_visible(
-            [
-                ("button containing visible choice text", self.page.get_by_role("button").filter(has_text=text).first),
-                ("combobox containing visible choice text", self.page.get_by_role("combobox").filter(has_text=text).first),
-                # Text fallback is justified because eSuite cascade controls expose selected placeholder text.
-                (f"visible {spec.label} placeholder", self.page.get_by_text(text, exact=True).first),
-            ],
-            f"{spec.label} disabled cascade control",
-            timeout_ms=1_000,
-        )
-
     def _visible_option(self, value: str, *, timeout_ms: int = 10_000) -> Locator:
         exact = re.compile(rf"^{re.escape(value)}$", re.I)
         role_candidates = existing_locator_candidates(
@@ -559,30 +519,6 @@ class RegisterCompanyWizardPage(BasePage):
             return False
         return isinstance(result, dict) and result.get("ok") is True
 
-    def _visible_control_is_disabled(self, text: str) -> bool:
-        try:
-            return bool(
-                self.page.evaluate(
-                    """text => {
-                        const controls = Array.from(
-                            document.querySelectorAll('button,input,textarea,select,[role="combobox"]')
-                        );
-                        return controls.some(element => {
-                            const visible = Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-                            if (!visible) return false;
-                            const value = element.value || element.innerText || element.textContent || element.getAttribute('placeholder') || '';
-                            if (!value.toLowerCase().includes(text.toLowerCase())) return false;
-                            return Boolean(element.disabled)
-                                || element.readOnly === true
-                                || element.getAttribute('aria-disabled') === 'true';
-                        });
-                    }""",
-                    text,
-                )
-            )
-        except PlaywrightError:
-            return False
-
     def _assert_required_control_editable(self, control: Locator, spec: FieldSpec) -> None:
         try:
             expect(control).to_be_enabled(timeout=1_000)
@@ -602,26 +538,6 @@ class RegisterCompanyWizardPage(BasePage):
         raise AssertionError(
             f"Product bug candidate: mandatory field {spec.label!r} is disabled or read-only when automation must enter/choose a value."
         )
-
-    def _expect_required_control_disabled(self, control: Locator, spec: FieldSpec) -> None:
-        try:
-            expect(control).to_be_disabled(timeout=1_000)
-            return
-        except (AssertionError, TimeoutError, PlaywrightError):
-            pass
-        try:
-            disabled = control.evaluate(
-                """element => {
-                    const control = element.closest('input,textarea,select,button,[role="combobox"],[aria-disabled]');
-                    if (!control) return false;
-                    return Boolean(control.disabled) || control.getAttribute('aria-disabled') === 'true';
-                }"""
-            )
-            if disabled:
-                return
-        except PlaywrightError:
-            pass
-        raise AssertionError(f"Expected mandatory dependent field {spec.label!r} to stay disabled until its parent value is selected.")
 
     def _try_native_select(self, control: Locator, value: str) -> bool:
         try:

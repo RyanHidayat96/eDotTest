@@ -33,21 +33,6 @@ class CompaniesPage(BasePage):
             timeout_ms=15_000,
         )
 
-    @property
-    def manage_navigation(self) -> Locator:
-        return self.first_visible(
-            [
-                ("button named View All Company", self.page.get_by_role("button", name=re.compile(r"^View All Company$", re.I)).first),
-                ("tab named Manage", self.page.get_by_role("tab", name=re.compile(r"^Manage$", re.I)).first),
-                ("link named Manage", self.page.get_by_role("link", name=re.compile(r"^Manage$", re.I)).first),
-                ("button named Manage", self.page.get_by_role("button", name=re.compile(r"^Manage$", re.I)).first),
-                # Text fallback is justified because the assignment names this exact Companies sub-page.
-                ("assignment-required Manage text", self.page.get_by_text("Manage", exact=True).first),
-            ],
-            "Companies Manage navigation",
-            timeout_ms=3_000,
-        )
-
     def open(self) -> None:
         with allure_step("Open eSuite Companies page", page=self.page):
             if not self.page.url.rstrip("/").endswith("/companies"):
@@ -66,18 +51,9 @@ class CompaniesPage(BasePage):
 
     def open_manage(self) -> CompanyManagePage:
         with allure_step("Open Companies Manage page", page=self.page):
-            if "/profile" in self.page.url:
-                self._try_back_to_company_list()
             self.open()
-            manage_page = CompanyManagePage(self.page, self.settings)
-            if "/manage-companies" not in self.page.url:
-                before_url = self.page.url
-                self.manage_navigation.click(timeout=5_000)
-                try:
-                    self.page.wait_for_url(lambda url: "/manage-companies" in url or url != before_url, timeout=5_000)
-                except TimeoutError:
-                    pass
             self.page.wait_for_load_state("domcontentloaded")
+            manage_page = CompanyManagePage(self.page, self.settings)
             manage_page.expect_loaded()
             return manage_page
 

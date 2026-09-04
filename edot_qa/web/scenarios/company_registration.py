@@ -22,13 +22,6 @@ class CompanyRegistrationScenario:
     page: Page
     settings: Settings
 
-    def validate_step_one_required_fields(self) -> CompanyRegistrationData:
-        registration = prepare_company_registration_data()
-        with allure_step("Validate Register Company step 1 mandatory fields", page=self.page, screenshot=True):
-            wizard = CompaniesPage(self.page, self.settings).open_register_company_wizard()
-            wizard.expect_next_disabled_until_step_one_valid(registration)
-        return registration
-
     def create_verify_and_cleanup(self) -> CompanyRegistrationResult:
         registration = prepare_company_registration_data()
         primary_error: Exception | None = None

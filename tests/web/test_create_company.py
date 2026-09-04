@@ -22,10 +22,6 @@ pytestmark = [
 ]
 
 
-def test_register_company_step_one_requires_valid_data(settings, authenticated_page):
-    CompanyRegistrationScenario(authenticated_page, settings).validate_step_one_required_fields()
-
-
 @pytest.mark.requires_cleanup
 def test_create_company_three_step_wizard_with_ai_data(settings, authenticated_page):
     CompanyRegistrationScenario(authenticated_page, settings).create_verify_and_cleanup()

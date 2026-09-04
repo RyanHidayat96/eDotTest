@@ -89,7 +89,6 @@ def test_manual_xlsx_matches_csv_headers_row_count_and_metadata() -> None:
 def test_automated_requirement_flows_are_traceable_to_manual_ids() -> None:
     cases = {
         "tests/web/test_login.py::test_esuite_login_shows_dashboard_greeting": "WEB-TC-001",
-        "tests/web/test_create_company.py::test_register_company_step_one_requires_valid_data": "WEB-TC-002",
         "tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data": "WEB-TC-003",
         "tests/mobile/test_mobile_login.py::test_ework_login_displays_dashboard": "MOB-TC-001",
         "tests/mobile/test_mobile_create_customer.py::test_ework_create_customer_appears_with_correct_data": "MOB-TC-002",

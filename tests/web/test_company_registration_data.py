@@ -55,6 +55,7 @@ def test_company_registration_maps_ai_data_and_defaults():
 
 
 def test_company_registration_allows_env_overrides(monkeypatch):
+    monkeypatch.setenv("ESUITE_COMPANY_INDUSTRY_TYPE", "Manufacturing")
     monkeypatch.setenv("ESUITE_COMPANY_TYPE", "Distributor")
     monkeypatch.setenv("ESUITE_COMPANY_LANGUAGE", "Indonesia")
     monkeypatch.setenv("ESUITE_COMPANY_CITY", "Jakarta Pusat")
@@ -85,7 +86,7 @@ def test_company_registration_allows_env_overrides(monkeypatch):
     registration = CompanyRegistrationData.from_generated_test_data(generated)
 
     assert registration.company_name == "PT Data QA ABC12345"
-    assert registration.industry_type == "Transportation and Logistics"
+    assert registration.industry_type == "Manufacturing"
     assert registration.company_type == "Distributor"
     assert registration.language == "Indonesia"
     assert registration.location.city == "Jakarta Pusat"

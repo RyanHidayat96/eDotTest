@@ -2,7 +2,7 @@
   "name": "edot-qa-automation",
   "version": "0.1.0",
   "private": true,
-  "description": "Local Allure commandline tooling for the eDOT QA automation take-home project.",
+  "description": "Convenience scripts for the eDOT QA automation take-home project.",
   "scripts": {
     "test:web": ".venv\\Scripts\\python.exe -m pytest tests/web -q",
     "test:web:login": ".venv\\Scripts\\python.exe -m pytest tests/web/test_login.py -q",
@@ -11,6 +11,8 @@
     "test:mobile:login": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_login.py -q -rs",
     "test:mobile:customer": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_create_customer.py -q -rs",
     "test:ai": ".venv\\Scripts\\python.exe -m pytest tests/ai -q",
+    "test:parallel": ".venv\\Scripts\\python.exe -m pytest tests -q -n auto -m \"not requires_credentials and not requires_device and not requires_maestro and not requires_mobile_app and not requires_storage_state and not requires_cleanup and not deliberate_failure\"",
+    "test:e2e:handoff": ".venv\\Scripts\\python.exe -m pytest tests/web/test_web_mobile_handoff.py::test_web_created_company_handoff_drives_mobile_login -q -rs",
     "triage": ".venv\\Scripts\\python.exe tools/triage_allure_failures.py --results-dir reports/allure-results --output reports/triage/triage-report.md",
     "evidence:web": ".venv\\Scripts\\python.exe tools/evidence_workflow.py full-web",
     "evidence:deliberate": ".venv\\Scripts\\python.exe tools/evidence_workflow.py deliberate-failure",

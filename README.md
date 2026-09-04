@@ -100,6 +100,7 @@ ESUITE_COMPANY_CITY=Jakarta Selatan
 ESUITE_COMPANY_DISTRICT=Kebayoran Baru
 ESUITE_COMPANY_ZONE=Senayan
 ESUITE_COMPANY_POSTAL_CODE=12190
+ESUITE_COMPANY_INDUSTRY_TYPE=Retail
 ```
 
 AI values:
@@ -193,7 +194,6 @@ npm run test:web:company
 Web behavior covered:
 
 - Login through eDOT Account Center and assert dashboard greeting `Welcome Back,`.
-- Validate Register Company step 1 required fields and location cascade.
 - Register company through the 3-step wizard using AI-generated or fallback dummy data.
 - Verify company detail values field by field as Tier 2 assertions.
 - Delete the created company and assert the company name and captured Company ID are gone from Companies results.
@@ -269,6 +269,25 @@ Direct Pytest forms:
 ## Web-to-Mobile Handoff
 
 When a web company is created, `edot_qa.handoff` can write non-secret runtime company data to `artifacts/handoff/web_company.json`, including company name, company email, and captured Company ID/code. Mobile config normally reads this only when explicit mobile environment values are absent. In the dedicated handoff proof, `EWORK_PREFER_HANDOFF=true` makes handoff company identity override fallback identity. Passwords are never written to handoff files, and company email is not assumed to be a valid mobile username unless the live mobile login succeeds with it.
+
+Run the dedicated live handoff proof:
+
+```powershell
+npm run test:e2e:handoff
+```
+
+## Bonus Features
+
+Implemented bonus scope:
+
+- Parallel execution: `npm run test:parallel` runs safe non-live Pytest checks with `pytest-xdist -n auto`. Live web/mobile/device flows stay outside that script because they share external accounts, storage state, browser state, and a single Android device.
+- Genuine web-to-mobile handoff: `npm run test:e2e:handoff` creates a company through eSuite web, verifies Tier 2 web detail, writes only non-secret handoff data, then attempts eWork login using that created company identity. Treat this bonus as proven only when the live run passes.
+
+Run safe parallel checks locally:
+
+```powershell
+npm run test:parallel
+```
 
 ## Allure Reporting
 

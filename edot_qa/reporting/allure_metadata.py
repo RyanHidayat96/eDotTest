@@ -26,7 +26,6 @@ IGNORED_MARKERS = {"parametrize", "skipif", "usefixtures", "filterwarnings"}
 
 EXPLICIT_TEST_CASE_IDS = {
     "tests/web/test_login.py::test_esuite_login_shows_dashboard_greeting": "WEB-TC-001",
-    "tests/web/test_create_company.py::test_register_company_step_one_requires_valid_data": "WEB-TC-002",
     "tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data": "WEB-TC-003",
     "tests/web/test_web_mobile_handoff.py::test_web_created_company_handoff_drives_mobile_login": "E2E-WEB-MOBILE-001",
     "tests/mobile/test_mobile_login.py::test_ework_login_displays_dashboard": "MOB-TC-001",
@@ -206,14 +205,13 @@ def _web_metadata(file_name: str, test_name: str) -> AllureMetadata:
             tags={"web", "login"},
         )
     if file_name == "test_create_company.py":
-        story = "Step 1 Validation" if "step_one" in test_name else "Three Step Company Registration"
         return _metadata(
             parent_suite="eSuite Web",
             suite="Web",
             sub_suite="Company Registration",
             epic="eSuite Web",
             feature="Company Management",
-            story=story,
+            story="Three Step Company Registration",
             severity="critical" if "three_step" in test_name else "normal",
             tags={"web", "company-registration"},
         )

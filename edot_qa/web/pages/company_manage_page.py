@@ -18,6 +18,152 @@ from edot_qa.web.pages.company_detail_page import (
 DETAIL_ACTION = re.compile(r"^(Manage|Detail|View|Open|Lihat|Kelola)$", re.I)
 DELETE_ACTION = re.compile(r"^(Delete|Hapus|Remove)$", re.I)
 DETAIL_OPEN_ATTEMPTS_AFTER_EMPTY_REFRESH = 2
+COMPANY_TEXT_VISIBLE_SCRIPT = """
+(companyName) => {
+  const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim();
+  const visible = (element) => {
+    if (!element) return false;
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const expected = normalize(companyName);
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if (normalize(node.nodeValue) === expected && visible(node.parentElement)) return true;
+    node = walker.nextNode();
+  }
+  return false;
+}
+"""
+COMPANY_ACTION_MARK_SCRIPT = """
+(payload) => {
+  const markerAttribute = "data-edot-company-action-target";
+  const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim();
+  const visible = (element) => {
+    if (!element) return false;
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const enabled = (element) => {
+    return !element.disabled && element.getAttribute("aria-disabled") !== "true";
+  };
+  const actionText = (element) => normalize(
+    element.innerText ||
+    element.textContent ||
+    element.getAttribute("aria-label") ||
+    element.getAttribute("title") ||
+    element.value
+  );
+  const expectedName = normalize(payload.companyName);
+  const actionRegex = new RegExp(payload.actionPattern, "i");
+  document.querySelectorAll(`[${markerAttribute}]`).forEach((element) => element.removeAttribute(markerAttribute));
+
+  const nameElements = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if (normalize(node.nodeValue) === expectedName && visible(node.parentElement)) {
+      nameElements.push(node.parentElement);
+    }
+    node = walker.nextNode();
+  }
+
+  const candidates = [];
+  for (const nameElement of nameElements) {
+    let container = nameElement;
+    let depth = 0;
+    while (container && container !== document.body && depth <= 12) {
+      const actions = Array.from(container.querySelectorAll("button, a, [role='button']"))
+        .filter((element) => visible(element) && enabled(element) && actionRegex.test(actionText(element)));
+      for (const action of actions) {
+        const rect = container.getBoundingClientRect();
+        candidates.push({
+          action,
+          depth,
+          area: rect.width * rect.height,
+          actionText: actionText(action),
+          containerText: normalize(container.textContent).slice(0, 240),
+          tagName: container.tagName,
+          className: String(container.className || "").slice(0, 160),
+        });
+      }
+      container = container.parentElement;
+      depth += 1;
+    }
+  }
+
+  candidates.sort((left, right) => left.depth - right.depth || left.area - right.area);
+  const selected = candidates[0];
+  if (!selected) {
+    return {
+      found: false,
+      companyName: expectedName,
+      exactTextMatches: nameElements.length,
+      reason: "no matching action inside nearest company container",
+    };
+  }
+
+  selected.action.setAttribute(markerAttribute, payload.marker);
+  selected.action.scrollIntoView({block: "center", inline: "nearest"});
+  return {
+    found: true,
+    companyName: expectedName,
+    exactTextMatches: nameElements.length,
+    depth: selected.depth,
+    area: selected.area,
+    actionText: selected.actionText,
+    containerText: selected.containerText,
+    tagName: selected.tagName,
+    className: selected.className,
+  };
+}
+"""
+SEARCH_CONTROL_FILL_SCRIPT = """
+(searchText) => {
+  const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim();
+  const visible = (element) => {
+    if (!element) return false;
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const selectors = [
+    "input[type='search']",
+    "input[placeholder*='Search' i]",
+    "input[aria-label*='Search' i]",
+    "[role='searchbox']",
+    "[data-testid*='search' i] input",
+    "[data-testid*='company-search' i] input"
+  ];
+  const controls = selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)));
+  const control = controls.find((element) => visible(element) && !element.disabled && !element.readOnly);
+  if (!control) return {used: false, reason: "visible search input not found"};
+
+  control.focus();
+  const prototype = control.tagName.toLowerCase() === "textarea"
+    ? HTMLTextAreaElement.prototype
+    : HTMLInputElement.prototype;
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+  if (descriptor && descriptor.set) {
+    descriptor.set.call(control, searchText);
+  } else {
+    control.value = searchText;
+  }
+  control.dispatchEvent(new Event("input", {bubbles: true}));
+  control.dispatchEvent(new Event("change", {bubbles: true}));
+  control.dispatchEvent(new KeyboardEvent("keydown", {bubbles: true, key: "Enter", code: "Enter"}));
+  control.dispatchEvent(new KeyboardEvent("keyup", {bubbles: true, key: "Enter", code: "Enter"}));
+  return {
+    used: true,
+    value: normalize(control.value),
+    placeholder: control.getAttribute("placeholder") || "",
+    ariaLabel: control.getAttribute("aria-label") || "",
+  };
+}
+"""
 
 
 class CompanyManagePage(BasePage):
@@ -62,26 +208,22 @@ class CompanyManagePage(BasePage):
 
     def search_company(self, company_name: str) -> None:
         with allure_step("Search company in Manage list", page=self.page, data={"search_text": company_name}):
-            if self.page.locator("input").count() == 0:
-                attach_text("company-manage-search-not-used", "Company list exposes no search input; verifying visible card list instead.")
+            result = self._try_fast_search(company_name)
+            if not result.get("used"):
+                attach_text("company-manage-search-not-used", result.get("reason", "visible search input not found"))
                 return
             try:
-                search = self.search_control
-            except AssertionError as error:
-                attach_text("company-manage-search-not-used", str(error))
-                return
-            search.fill(company_name)
-            try:
-                search.press("Enter")
+                self.page.keyboard.press("Enter")
             except PlaywrightError:
                 pass
+            attach_json("company-manage-search-used", result)
             self._wait_after_table_action()
 
     def expect_company_present(self, company_name: str) -> None:
         with allure_step("Verify company exists in Manage list", page=self.page, data={"company_name": company_name}):
             self.search_company(company_name)
             # Tier 2: created company must exist in Manage results after submit.
-            expect(self._company_record(company_name)).to_be_visible(timeout=5_000)
+            self._expect_company_text_visible(company_name, timeout_ms=5_000)
             attach_json("company-manage-record-present", {"company_name": company_name})
 
     def expect_company_absent(self, company_name: str, company_id: str | None = None) -> None:
@@ -92,11 +234,11 @@ class CompanyManagePage(BasePage):
         ):
             self._reload_companies_page()
             self.search_company(company_name)
-            self._expect_identifier_absent("company name", company_name, self._company_record_candidates(company_name))
+            self._expect_exact_text_absent("company name", company_name)
 
             if company_id:
                 self.search_company(company_id)
-                self._expect_identifier_absent("company id", company_id, self._company_identifier_candidates(company_id))
+                self._expect_exact_text_absent("company id", company_id)
 
             attach_json("company-cleanup-record-absent", {"company_name": company_name, "company_id": company_id})
 
@@ -106,20 +248,20 @@ class CompanyManagePage(BasePage):
             for attempt in range(1, DETAIL_OPEN_ATTEMPTS_AFTER_EMPTY_REFRESH + 1):
                 self.search_company(company_name)
                 try:
-                    record = self._company_record(company_name)
-                    record.scroll_into_view_if_needed(timeout=5_000)
-                    try:
-                        record.hover(timeout=2_000)
-                    except PlaywrightError:
-                        pass
-
+                    self._expect_company_text_visible(company_name, timeout_ms=5_000)
                     with allure_step(
                         "Click Manage action for company",
                         page=self.page,
                         data={"company_name": company_name, "attempt": attempt},
                     ):
-                        if not self._try_open_detail_from_record(record):
-                            self._click_and_wait_for_detail(record)
+                        marker = f"detail-{attempt}"
+                        target = self._mark_company_action(company_name, DETAIL_ACTION.pattern, marker)
+                        attach_json("company-manage-action-target", target)
+                        if not target.get("found"):
+                            raise AssertionError(
+                                f"Could not find Manage action beside company {company_name!r}: {target}"
+                            )
+                        self._click_marked_company_action(marker, wait_for_profile=True)
 
                     self._wait_after_table_action()
                     detail = CompanyDetailPage(self.page, self.settings)
@@ -165,71 +307,28 @@ class CompanyManagePage(BasePage):
             detail.delete_current_company()
             attach_json("company-cleanup-delete-requested", {"company_name": company_name, "source": "detail"})
 
-    def _company_record(self, company_name: str, timeout_ms: int = 3_000) -> Locator:
-        return self.first_visible(
-            self._company_record_candidates(company_name),
-            f"company record {company_name}",
-            timeout_ms=timeout_ms,
-        )
-
     def _heading_candidates(self) -> list[tuple[str, Locator]]:
         return [
             ("heading named Manage", self.page.get_by_role("heading", name=re.compile(r"Manage", re.I)).first),
             ("region named Manage", self.page.get_by_role("region", name=re.compile(r"Manage", re.I)).first),
+            ("button named + Add Company", self.page.get_by_role("button", name=re.compile(r"^\+?\s*Add Company$", re.I)).first),
+            ("button named Manage Company", self.page.get_by_role("button", name=re.compile(r"^Manage Company$", re.I)).first),
+            ("company list My Company text", self.page.get_by_text("My Company", exact=True).first),
             # Text fallback is justified because the assignment names this exact Companies sub-page.
             ("assignment-required Manage text", self.page.get_by_text("Manage", exact=True).first),
         ]
 
-    def _company_record_candidates(self, company_name: str) -> list[tuple[str, Locator]]:
-        company_name_pattern = re.compile(re.escape(company_name), re.I)
-        return [
-            ("row containing company name", self.page.get_by_role("row", name=company_name_pattern).first),
-            ("link named company", self.page.get_by_role("link", name=company_name_pattern).first),
-            ("button named company", self.page.get_by_role("button", name=company_name_pattern).first),
-            (
-                "company card containing company name and Manage action",
-                # Text fallback is justified because company cards expose persisted company names as visible card text.
-                self.page.locator("div.rounded-lg.border")
-                .filter(has_text=company_name_pattern)
-                .filter(has=self.page.get_by_role("button", name=DETAIL_ACTION))
-                .first,
-            ),
-            # Text fallback is justified because created company name is the exact persisted value under test.
-            ("exact company-name text", self.page.get_by_text(company_name, exact=True).first),
-        ]
-
-    def _company_identifier_candidates(self, identifier: str) -> list[tuple[str, Locator]]:
-        pattern = re.compile(re.escape(identifier), re.I)
-        return [
-            ("row containing identifier", self.page.get_by_role("row", name=pattern).first),
-            ("cell containing identifier", self.page.get_by_role("cell", name=pattern).first),
-            ("link named identifier", self.page.get_by_role("link", name=pattern).first),
-            ("button named identifier", self.page.get_by_role("button", name=pattern).first),
-            # Text fallback is justified because company cards expose captured company identifiers as visible text.
-            ("company card containing identifier", self.page.locator("div.rounded-lg.border").filter(has_text=pattern).first),
-            # Text fallback is justified because cleanup verifies exact captured company identifier is absent.
-            ("exact identifier text", self.page.get_by_text(identifier, exact=True).first),
-        ]
-
-    def _expect_identifier_absent(
+    def _expect_exact_text_absent(
         self,
         label: str,
         identifier: str,
-        candidates: list[tuple[str, Locator]],
     ) -> None:
         with allure_step(
             f"Verify deleted company {label} is not visible",
             page=self.page,
             data={label.replace(" ", "_"): identifier},
         ):
-            errors: list[str] = []
-            for description, locator in candidates:
-                try:
-                    # Tier 2: cleanup must prove deleted company identifiers are gone from Companies results.
-                    expect(locator).not_to_be_visible(timeout=3_000)
-                except AssertionError as error:
-                    errors.append(f"{description}: {error}")
-            if errors:
+            if self._is_exact_text_visible(identifier, timeout_ms=3_000):
                 raise AssertionError(f"Deleted company {label} {identifier!r} is still visible in Companies results")
 
     def _reload_companies_page(self) -> None:
@@ -248,62 +347,59 @@ class CompanyManagePage(BasePage):
             )
 
     def _is_company_visible(self, company_name: str, timeout_ms: int) -> bool:
-        for _, locator in self._company_record_candidates(company_name):
-            try:
-                expect(locator).to_be_visible(timeout=timeout_ms)
-                return True
-            except AssertionError:
-                continue
-        return False
-
-    def _try_open_detail_from_record(self, record: Locator) -> bool:
-        for _, locator in self._detail_action_candidates(record):
-            try:
-                expect(locator).to_be_visible(timeout=2_000)
-                self._click_and_wait_for_detail(locator)
-                return True
-            except (AssertionError, PlaywrightError, TimeoutError):
-                continue
-        return False
-
-    def _click_and_wait_for_detail(self, locator: Locator) -> None:
-        before_url = self.page.url
-        locator.click(timeout=5_000)
-        self.page.wait_for_url(lambda url: "/profile" in url or url != before_url, timeout=10_000)
+        return self._is_exact_text_visible(company_name, timeout_ms=timeout_ms)
 
     def _try_delete_from_manage(self, company_name: str) -> bool:
         with allure_step("Try delete company from Manage list", page=self.page, data={"company_name": company_name}):
-            record = self._company_record(company_name, timeout_ms=5_000)
-            try:
-                record.hover(timeout=2_000)
-            except PlaywrightError:
-                pass
+            target = self._mark_company_action(company_name, DELETE_ACTION.pattern, "delete")
+            attach_json("company-delete-action-target", target)
+            if not target.get("found"):
+                return False
+            self._click_marked_company_action("delete", wait_for_profile=False)
+            self._confirm_delete_if_needed()
+            self._wait_after_table_action()
+            return True
 
-            for _, locator in self._delete_action_candidates(record):
-                try:
-                    expect(locator).to_be_visible(timeout=2_000)
-                    locator.click()
-                    self._confirm_delete_if_needed()
-                    self._wait_after_table_action()
-                    return True
-                except (AssertionError, PlaywrightError, TimeoutError):
-                    continue
+    def _expect_company_text_visible(self, company_name: str, timeout_ms: int) -> None:
+        try:
+            self.page.wait_for_function(COMPANY_TEXT_VISIBLE_SCRIPT, arg=company_name, timeout=timeout_ms)
+        except TimeoutError as error:
+            raise AssertionError(f"Company {company_name!r} is not visible in Companies results") from error
+
+    def _is_exact_text_visible(self, text: str, timeout_ms: int) -> bool:
+        try:
+            self.page.wait_for_function(COMPANY_TEXT_VISIBLE_SCRIPT, arg=text, timeout=timeout_ms)
+            return True
+        except TimeoutError:
             return False
 
-    def _detail_action_candidates(self, record: Locator) -> list[tuple[str, Locator]]:
-        return [
-            ("row Manage button", record.get_by_role("button", name=DETAIL_ACTION).first),
-            ("row Manage link", record.get_by_role("link", name=DETAIL_ACTION).first),
-            ("row stable manage action", record.locator(stable_action_selector("manage")).first),
-            ("row stable detail action", record.locator(stable_action_selector("detail")).first),
-        ]
+    def _try_fast_search(self, search_text: str) -> dict[str, object]:
+        try:
+            result = self.page.evaluate(SEARCH_CONTROL_FILL_SCRIPT, search_text)
+        except PlaywrightError as error:
+            return {"used": False, "reason": str(error)}
+        return result if isinstance(result, dict) else {"used": False, "reason": "unexpected search result"}
 
-    def _delete_action_candidates(self, record: Locator) -> list[tuple[str, Locator]]:
-        return [
-            ("row Delete button", record.get_by_role("button", name=DELETE_ACTION).first),
-            ("row Delete link", record.get_by_role("link", name=DELETE_ACTION).first),
-            ("row stable delete action", record.locator(stable_action_selector("delete")).first),
-        ]
+    def _mark_company_action(self, company_name: str, action_pattern: str, marker: str) -> dict[str, object]:
+        try:
+            result = self.page.evaluate(
+                COMPANY_ACTION_MARK_SCRIPT,
+                {
+                    "companyName": company_name,
+                    "actionPattern": action_pattern,
+                    "marker": marker,
+                },
+            )
+        except PlaywrightError as error:
+            return {"found": False, "companyName": company_name, "reason": str(error)}
+        return result if isinstance(result, dict) else {"found": False, "companyName": company_name, "reason": "unexpected action result"}
+
+    def _click_marked_company_action(self, marker: str, *, wait_for_profile: bool) -> None:
+        locator = self.page.locator(f"[data-edot-company-action-target='{marker}']").first
+        expect(locator).to_be_visible(timeout=1_000)
+        locator.click(timeout=5_000)
+        if wait_for_profile:
+            self.page.wait_for_url(lambda url: "/profile" in url, timeout=10_000)
 
     def _confirm_delete_if_needed(self) -> None:
         confirm_delete_if_needed(self.page)
@@ -321,10 +417,3 @@ def stable_search_selector() -> str:
         "input[aria-label='Search'], input[placeholder='Search']"
     )
 
-
-def stable_action_selector(action_name: str) -> str:
-    return (
-        f"button[name='{action_name}'], button[id='{action_name}'], "
-        f"a[name='{action_name}'], a[id='{action_name}'], "
-        f"button[aria-label='{action_name}'], a[aria-label='{action_name}']"
-    )

@@ -10,6 +10,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -18,6 +19,7 @@ from zoneinfo import ZoneInfo
 from edot_qa.config import ROOT_DIR, load_settings
 from edot_qa.mobile.config import load_mobile_settings
 from edot_qa.reporting.allure_metadata import apply_metadata_to_result
+from edot_qa.reporting.allure_helpers import redact_payload
 
 
 DEFAULT_CATEGORIES = ROOT_DIR / "edot_qa" / "reporting" / "allure_categories.json"
@@ -135,11 +137,95 @@ def _postprocess_results(results_dir: Path) -> int:
     for result_path in sorted(results_dir.glob("*-result.json")):
         try:
             payload = json.loads(result_path.read_text(encoding="utf-8"))
-            result_path.write_text(json.dumps(apply_metadata_to_result(payload), indent=2), encoding="utf-8")
+            payload = apply_metadata_to_result(payload)
+            _ensure_step_evidence(payload, results_dir)
+            result_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             count += 1
         except (OSError, json.JSONDecodeError) as error:
             print(f"[Allure Generate] Skipped {result_path.name}: {error}")
     return count
+
+
+def _ensure_step_evidence(result: dict[str, Any], results_dir: Path) -> None:
+    steps = result.setdefault("steps", [])
+    if not steps:
+        steps.append(
+            {
+                "name": "Test evidence summary",
+                "status": _status(result.get("status")),
+                "stage": "finished",
+                "start": result.get("start"),
+                "stop": result.get("stop"),
+                "attachments": [],
+            }
+        )
+
+    for step in _iter_steps(steps):
+        _attach_step_runtime_info(result, step, results_dir)
+
+
+def _iter_steps(steps: list[dict[str, Any]]):
+    for step in steps:
+        yield step
+        yield from _iter_steps(step.get("steps", []))
+
+
+def _attach_step_runtime_info(result: dict[str, Any], step: dict[str, Any], results_dir: Path) -> None:
+    if any(attachment.get("name") == "step-runtime-info" for attachment in step.get("attachments", [])):
+        return
+
+    source = f"{uuid.uuid4()}-attachment.json"
+    labels = _labels_by_name(result.get("labels", []))
+    payload = {
+        "test": {
+            "name": result.get("name"),
+            "fullName": result.get("fullName"),
+            "status": _status(result.get("status")),
+        },
+        "step": {
+            "name": step.get("name"),
+            "status": _status(step.get("status")),
+            "stage": step.get("stage"),
+            "start": step.get("start"),
+            "stop": step.get("stop"),
+        },
+        "suite": {
+            "parentSuite": labels.get("parentSuite"),
+            "suite": labels.get("suite"),
+            "subSuite": labels.get("subSuite"),
+        },
+        "behavior": {
+            "epic": labels.get("epic"),
+            "feature": labels.get("feature"),
+            "story": labels.get("story"),
+            "severity": labels.get("severity"),
+            "owner": labels.get("owner"),
+        },
+        "tags": labels.get("tag", []),
+        "parameters": result.get("parameters", []),
+    }
+    (results_dir / source).write_text(json.dumps(redact_payload(payload), indent=2, sort_keys=True), encoding="utf-8")
+    step.setdefault("attachments", []).append(
+        {
+            "name": "step-runtime-info",
+            "source": source,
+            "type": "application/json",
+        }
+    )
+
+
+def _labels_by_name(labels: list[dict[str, Any]]) -> dict[str, Any]:
+    grouped: dict[str, Any] = {}
+    for label in labels:
+        name = label.get("name")
+        value = label.get("value")
+        if not name or value is None:
+            continue
+        if name == "tag":
+            grouped.setdefault(name, []).append(value)
+        else:
+            grouped.setdefault(name, value)
+    return grouped
 
 
 def _allure_command(root: Path) -> list[str]:

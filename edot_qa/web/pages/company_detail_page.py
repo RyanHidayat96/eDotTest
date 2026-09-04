@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, Page, TimeoutError, expect
 
-from edot_qa.reporting.allure_helpers import attach_json
+from edot_qa.reporting.allure_helpers import allure_step, attach_json
 from edot_qa.web.base_page import BasePage
 from edot_qa.web.company_registration import CompanyRegistrationData
 
@@ -194,62 +194,72 @@ class CompanyDetailPage(BasePage):
     )
 
     def expect_loaded_for(self, company_name: str) -> None:
-        self.expect_detail_shell_loaded()
-        self._expect_company_name_field_matches(company_name, timeout_ms=5_000)
+        with allure_step("Verify company detail loaded for company", page=self.page, data={"company_name": company_name}):
+            self.expect_detail_shell_loaded()
+            self._expect_company_name_field_matches(company_name, timeout_ms=5_000)
 
     def expect_detail_shell_loaded(self) -> None:
-        self.first_visible(
-            [
-                ("Company Details heading", self.page.get_by_role("heading", name=re.compile(r"Company Details", re.I)).first),
-                # Text fallback is justified because this is the assignment-required profile page title.
-                ("Company Details text", self.page.get_by_text("Company Details", exact=True).first),
-                ("Profile Account tab", self.page.get_by_text("Profile Account", exact=True).first),
-            ],
-            "company detail shell",
-            timeout_ms=10_000,
-        )
+        with allure_step("Verify company detail shell loaded", page=self.page):
+            self.first_visible(
+                [
+                    ("Company Details heading", self.page.get_by_role("heading", name=re.compile(r"Company Details", re.I)).first),
+                    # Text fallback is justified because this is the assignment-required profile page title.
+                    ("Company Details text", self.page.get_by_text("Company Details", exact=True).first),
+                    ("Profile Account tab", self.page.get_by_text("Profile Account", exact=True).first),
+                ],
+                "company detail shell",
+                timeout_ms=10_000,
+            )
 
     def expect_company_values(self, data: CompanyRegistrationData) -> None:
-        expected_values = data.expected_detail_values()
-        self.refresh_until_company_name_loaded(data.company_name)
-        attach_json("company-detail-expected-values", expected_values)
+        with allure_step("Verify company detail values", page=self.page, data=data.expected_detail_values()):
+            expected_values = data.expected_detail_values()
+            self.refresh_until_company_name_loaded(data.company_name)
+            attach_json("company-detail-expected-values", expected_values)
 
-        # Tier 2: detail name is checked first and must match before other fields.
-        self._expect_company_name_field_matches(data.company_name, timeout_ms=5_000)
-        # Tier 2: detail industry type must match submitted Industry Type.
-        self.expect_detail_value(self.industry_type, data.industry_type)
-        # Tier 2: detail company type must match submitted Company Type.
-        self.expect_detail_value(self.company_type, data.company_type)
-        # Tier 2: detail address must include submitted Street Address.
-        self.expect_detail_value(self.address, data.street_address)
-        # Tier 2: detail postal code must match submitted Postal Code.
-        self.expect_detail_value(self.postal_code, data.location.postal_code)
-        # Tier 2: detail email must match submitted Email.
-        self.expect_detail_value(self.email, data.email)
-        # Tier 2: detail phone must match submitted Phone.
-        self.expect_detail_value(self.phone, data.phone)
+            # Tier 2: detail name is checked first and must match before other fields.
+            self._expect_company_name_field_matches(data.company_name, timeout_ms=5_000)
+            # Tier 2: detail industry type must match submitted Industry Type.
+            self.expect_detail_value(self.industry_type, data.industry_type)
+            # Tier 2: detail company type must match submitted Company Type.
+            self.expect_detail_value(self.company_type, data.company_type)
+            # Tier 2: detail address must include submitted Street Address.
+            self.expect_detail_value(self.address, data.street_address)
+            # Tier 2: detail postal code must match submitted Postal Code.
+            self.expect_detail_value(self.postal_code, data.location.postal_code)
+            # Tier 2: detail email must match submitted Email.
+            self.expect_detail_value(self.email, data.email)
+            # Tier 2: detail phone must match submitted Phone.
+            self.expect_detail_value(self.phone, data.phone)
 
     def expect_detail_value(self, spec: DetailFieldSpec, expected_value: str) -> None:
-        errors: list[str] = []
-        for description, locator in self._detail_value_candidates(spec, expected_value):
-            try:
-                self._expect_locator_has_value(locator, expected_value)
-                return
-            except (AssertionError, PlaywrightError, TimeoutError) as error:
-                errors.append(f"{description}: {error}")
-        raise AssertionError(
-            f"Could not verify company detail {spec.label!r} value {expected_value!r}; tried {len(errors)} locators"
-        )
+        with allure_step(
+            f"Verify company detail {spec.label}",
+            page=self.page,
+            data={"field": spec.label, "expected_value": expected_value},
+        ):
+            errors: list[str] = []
+            for description, locator in self._detail_value_candidates(spec, expected_value):
+                try:
+                    self._expect_locator_has_value(locator, expected_value)
+                    return
+                except (AssertionError, PlaywrightError, TimeoutError) as error:
+                    errors.append(f"{description}: {error}")
+            raise AssertionError(
+                f"Could not verify company detail {spec.label!r} value {expected_value!r}; tried {len(errors)} locators"
+            )
 
     def company_id_value(self) -> str:
-        value = self._detail_field_current_value(self.company_id)
-        attach_json("company-detail-id", {"company_id": value})
-        return value
+        with allure_step("Read generated Company ID", page=self.page):
+            value = self._detail_field_current_value(self.company_id)
+            attach_json("company-detail-id", {"company_id": value})
+            return value
 
     def delete_current_company(self) -> None:
-        self._delete_action().click()
-        self._confirm_delete_if_needed()
-        self._wait_after_delete()
+        with allure_step("Delete current company from detail page", page=self.page):
+            self._delete_action().click()
+            self._confirm_delete_if_needed()
+            self._wait_after_delete()
 
     def _delete_action(self) -> Locator:
         return self.first_visible(
@@ -267,7 +277,8 @@ class CompanyDetailPage(BasePage):
         )
 
     def _confirm_delete_if_needed(self) -> None:
-        confirm_delete_if_needed(self.page)
+        with allure_step("Confirm delete company dialog", page=self.page):
+            confirm_delete_if_needed(self.page)
 
     def _wait_after_delete(self) -> None:
         try:
@@ -360,66 +371,80 @@ class CompanyDetailPage(BasePage):
         self.refresh_until_company_name_loaded(company_name)
 
     def refresh_until_company_name_loaded(self, company_name: str, max_reloads: int = DETAIL_EMPTY_MAX_RELOADS) -> None:
-        self.expect_detail_shell_loaded()
-        for reload_attempt in range(0, max_reloads + 1):
-            if self._company_name_field_ready(
-                company_name,
-                require_expected=True,
-                timeout_ms=DETAIL_EMPTY_REFRESH_TIMEOUT_MS,
-            ):
-                if reload_attempt > 0:
-                    attach_json(
-                        "company-detail-refresh-resolved",
-                        {
-                            "company_name": company_name,
-                            "reload_attempt": reload_attempt,
-                            "max_reloads": max_reloads,
-                        },
-                    )
-                return
-
-            observed_value = self._company_name_field_current_value_now()
-            if observed_value:
-                if _detail_values_match(observed_value, company_name):
-                    attach_json(
-                        "company-detail-refresh-resolved-by-field-read",
-                        {
-                            "company_name": company_name,
-                            "observed_value": observed_value,
-                            "reload_attempt": reload_attempt,
-                            "max_reloads": max_reloads,
-                        },
-                    )
-                    return
-                raise AssertionError(
-                    f"Company Name field loaded {observed_value!r}, expected {company_name!r}"
-                )
-
-            if reload_attempt == max_reloads:
-                attach_json(
-                    "company-detail-refresh-limit-reached",
-                    {
-                        "company_name": company_name,
-                        "max_reloads": max_reloads,
-                        "reason": "company_name field still empty after repeated 2 second waits",
-                    },
-                )
-                raise CompanyDetailDataNotLoadedError(
-                    f"Company Name field stayed empty after {max_reloads} reloads for {company_name!r}"
-                )
-
-            attach_json(
-                "company-detail-refresh",
-                {
-                    "company_name": company_name,
-                    "reload_attempt": reload_attempt + 1,
-                    "max_reloads": max_reloads,
-                    "reason": "company_name field empty for 2 seconds after opening Manage",
-                },
-            )
-            self.page.reload(wait_until="domcontentloaded")
+        with allure_step(
+            "Wait for Company Name field to load",
+            page=self.page,
+            data={"company_name": company_name, "max_reloads": max_reloads, "wait_per_attempt_ms": DETAIL_EMPTY_REFRESH_TIMEOUT_MS},
+        ):
             self.expect_detail_shell_loaded()
-        self._expect_company_name_field_matches(company_name, timeout_ms=5_000)
+            for reload_attempt in range(0, max_reloads + 1):
+                if self._company_name_field_ready(
+                    company_name,
+                    require_expected=True,
+                    timeout_ms=DETAIL_EMPTY_REFRESH_TIMEOUT_MS,
+                ):
+                    if reload_attempt > 0:
+                        attach_json(
+                            "company-detail-refresh-resolved",
+                            {
+                                "company_name": company_name,
+                                "reload_attempt": reload_attempt,
+                                "max_reloads": max_reloads,
+                            },
+                        )
+                    return
+
+                observed_value = self._company_name_field_current_value_now()
+                if observed_value:
+                    if _detail_values_match(observed_value, company_name):
+                        attach_json(
+                            "company-detail-refresh-resolved-by-field-read",
+                            {
+                                "company_name": company_name,
+                                "observed_value": observed_value,
+                                "reload_attempt": reload_attempt,
+                                "max_reloads": max_reloads,
+                            },
+                        )
+                        return
+                    raise AssertionError(
+                        f"Company Name field loaded {observed_value!r}, expected {company_name!r}"
+                    )
+
+                if reload_attempt == max_reloads:
+                    attach_json(
+                        "company-detail-refresh-limit-reached",
+                        {
+                            "company_name": company_name,
+                            "max_reloads": max_reloads,
+                            "reason": "company_name field still empty after repeated 2 second waits",
+                        },
+                    )
+                    raise CompanyDetailDataNotLoadedError(
+                        f"Company Name field stayed empty after {max_reloads} reloads for {company_name!r}"
+                    )
+
+                with allure_step(
+                    "Reload company detail because Company Name is empty",
+                    page=self.page,
+                    data={
+                        "company_name": company_name,
+                        "reload_attempt": reload_attempt + 1,
+                        "max_reloads": max_reloads,
+                    },
+                ):
+                    attach_json(
+                        "company-detail-refresh",
+                        {
+                            "company_name": company_name,
+                            "reload_attempt": reload_attempt + 1,
+                            "max_reloads": max_reloads,
+                            "reason": "company_name field empty for 2 seconds after opening Manage",
+                        },
+                    )
+                    self.page.reload(wait_until="domcontentloaded")
+                    self.expect_detail_shell_loaded()
+            self._expect_company_name_field_matches(company_name, timeout_ms=5_000)
 
     def _company_name_field_has_value(self, timeout_ms: int) -> bool:
         return self._company_name_field_ready("", require_expected=False, timeout_ms=timeout_ms)
@@ -472,51 +497,58 @@ def stable_action_selector(action_name: str) -> str:
 
 
 def confirm_delete_if_needed(page: Page) -> None:
-    _accept_delete_agreement_if_present(page)
-    candidates = [
-        ("confirmation Confirm button", page.get_by_role("button", name=re.compile(r"^Confirm$", re.I)).first),
-        ("confirmation button", page.get_by_role("button", name=CONFIRM_DELETE_ACTION).first),
-        # Text fallback is justified because confirmation dialogs often lack stable roles.
-        ("confirmation Delete text", page.get_by_text("Delete", exact=True).last),
-        # Text fallback is justified because eSuite may localize confirmation text.
-        ("confirmation Hapus text", page.get_by_text("Hapus", exact=True).last),
-    ]
-    for _, locator in candidates:
-        try:
-            expect(locator).to_be_visible(timeout=3_000)
-            expect(locator).to_be_enabled(timeout=3_000)
-            locator.click()
-            _expect_delete_confirmation_closed(page)
-            return
-        except (AssertionError, PlaywrightError, TimeoutError):
-            continue
-    if _delete_confirmation_is_visible(page):
-        raise AssertionError("Could not confirm company deletion; confirmation dialog is still visible")
+    with allure_step("Handle delete confirmation dialog", page=page):
+        _accept_delete_agreement_if_present(page)
+        candidates = [
+            ("confirmation Confirm button", page.get_by_role("button", name=re.compile(r"^Confirm$", re.I)).first),
+            ("confirmation button", page.get_by_role("button", name=CONFIRM_DELETE_ACTION).first),
+            # Text fallback is justified because confirmation dialogs often lack stable roles.
+            ("confirmation Delete text", page.get_by_text("Delete", exact=True).last),
+            # Text fallback is justified because eSuite may localize confirmation text.
+            ("confirmation Hapus text", page.get_by_text("Hapus", exact=True).last),
+        ]
+        for _, locator in candidates:
+            try:
+                expect(locator).to_be_visible(timeout=3_000)
+                expect(locator).to_be_enabled(timeout=3_000)
+                with allure_step("Click delete confirmation Confirm", page=page):
+                    locator.click()
+                _expect_delete_confirmation_closed(page)
+                return
+            except (AssertionError, PlaywrightError, TimeoutError):
+                continue
+        if _delete_confirmation_is_visible(page):
+            raise AssertionError("Could not confirm company deletion; confirmation dialog is still visible")
 
 
 def _accept_delete_agreement_if_present(page: Page) -> None:
-    candidates = [
-        (
-            "delete agreement row checkbox",
-            page.locator("div.align-center.flex.flex-row")
-            .filter(has_text=DELETE_AGREEMENT)
-            .locator("button[role='checkbox']")
-            .first,
-        ),
-        ("delete agreement stable checkbox", page.locator("button[role='checkbox']#select-all").last),
-        ("delete agreement checkbox by label", page.get_by_label(DELETE_AGREEMENT).first),
-        ("delete agreement checkbox role", page.get_by_role("checkbox", name=DELETE_AGREEMENT).first),
-        ("visible role checkbox", page.get_by_role("checkbox").last),
-        ("visible delete checkbox", page.locator("input[type='checkbox']").last),
-    ]
-    for _, locator in candidates:
-        try:
-            expect(locator).to_be_visible(timeout=1_000)
-            _check_or_click(locator)
-            return
-        except (AssertionError, PlaywrightError, TimeoutError):
-            continue
-    _click_delete_agreement_box_by_text_position(page)
+    with allure_step(
+        "Accept delete agreement checkbox",
+        page=page,
+        data={"agreement": "I understand & agree to delete"},
+    ):
+        candidates = [
+            (
+                "delete agreement row checkbox",
+                page.locator("div.align-center.flex.flex-row")
+                .filter(has_text=DELETE_AGREEMENT)
+                .locator("button[role='checkbox']")
+                .first,
+            ),
+            ("delete agreement stable checkbox", page.locator("button[role='checkbox']#select-all").last),
+            ("delete agreement checkbox by label", page.get_by_label(DELETE_AGREEMENT).first),
+            ("delete agreement checkbox role", page.get_by_role("checkbox", name=DELETE_AGREEMENT).first),
+            ("visible role checkbox", page.get_by_role("checkbox").last),
+            ("visible delete checkbox", page.locator("input[type='checkbox']").last),
+        ]
+        for _, locator in candidates:
+            try:
+                expect(locator).to_be_visible(timeout=1_000)
+                _check_or_click(locator)
+                return
+            except (AssertionError, PlaywrightError, TimeoutError):
+                continue
+        _click_delete_agreement_box_by_text_position(page)
 
 
 def _check_or_click(locator: Locator) -> None:

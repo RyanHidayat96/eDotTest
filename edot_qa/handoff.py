@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -8,7 +9,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from edot_qa.config import ROOT_DIR
-from edot_qa.reporting.allure_helpers import attach_json
+from edot_qa.reporting.allure_helpers import allure_step, attach_json
 from edot_qa.web.company_registration import CompanyRegistrationData
 
 
@@ -64,12 +65,22 @@ def write_company_handoff(
     *,
     attach_to_allure: bool = True,
 ) -> Path:
-    resolved_path = Path(path)
-    resolved_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_path.write_text(json.dumps(handoff.model_dump(), indent=2, sort_keys=True), encoding="utf-8")
-    if attach_to_allure:
-        attach_json("web-mobile-company-handoff", handoff.as_safe_payload())
-    return resolved_path
+    context = (
+        allure_step(
+            "Write web-to-mobile company handoff",
+            data=handoff.as_safe_payload(),
+            screenshot=False,
+        )
+        if attach_to_allure
+        else nullcontext()
+    )
+    with context:
+        resolved_path = Path(path)
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        resolved_path.write_text(json.dumps(handoff.model_dump(), indent=2, sort_keys=True), encoding="utf-8")
+        if attach_to_allure:
+            attach_json("web-mobile-company-handoff", handoff.as_safe_payload())
+        return resolved_path
 
 
 def read_company_handoff(path: str | Path = DEFAULT_COMPANY_HANDOFF_PATH) -> CompanyHandoff | None:
@@ -83,4 +94,3 @@ def delete_company_handoff(path: str | Path = DEFAULT_COMPANY_HANDOFF_PATH) -> N
     resolved_path = Path(path)
     if resolved_path.is_file():
         resolved_path.unlink()
-

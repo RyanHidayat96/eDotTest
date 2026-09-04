@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, TimeoutError, expect
 
+from edot_qa.reporting.allure_helpers import allure_step
 from edot_qa.web.base_page import BasePage
 from edot_qa.web.company_registration import CompanyRegistrationData
 
@@ -86,152 +87,195 @@ class RegisterCompanyWizardPage(BasePage):
         )
 
     def expect_open(self) -> None:
-        expect(self.heading).to_be_visible()
+        with allure_step("Verify Register Company wizard is open", page=self.page):
+            expect(self.heading).to_be_visible()
 
     def expect_next_disabled(self) -> None:
-        expect(self.next_button).to_be_disabled(timeout=10_000)
+        with allure_step("Verify Next button disabled", page=self.page):
+            expect(self.next_button).to_be_disabled(timeout=10_000)
 
     def expect_next_enabled(self) -> None:
-        expect(self.next_button).to_be_enabled(timeout=10_000)
+        with allure_step("Verify Next button enabled", page=self.page):
+            expect(self.next_button).to_be_enabled(timeout=10_000)
 
     def expect_next_disabled_until_step_one_valid(self, data: CompanyRegistrationData) -> None:
-        self.expect_next_disabled()
-        self.fill_required_step_one(data, validate_dependents_after_country=True)
-        self.expect_next_enabled()
+        with allure_step(
+            "Validate Register Company step 1 required fields",
+            page=self.page,
+            data=data.as_allure_payload(),
+        ):
+            self.expect_next_disabled()
+            self.fill_required_step_one(data, validate_dependents_after_country=True)
+            self.expect_next_enabled()
 
     def fill_required_step_one(self, data: CompanyRegistrationData, *, validate_dependents_after_country: bool = False) -> None:
-        self.fill_text_field(self.company_name, data.company_name)
-        self.fill_text_field(self.email, data.email)
-        self.fill_text_field(self.phone, data.phone)
-        self.choose_field_option(self.industry_type, data.industry_type)
-        self.choose_field_option(self.company_type, data.company_type)
-        self.choose_field_option(self.language, data.language)
-        self.fill_text_field(self.street_address, data.street_address)
-        self.choose_field_option(self.country, data.location.country)
-        if validate_dependents_after_country:
-            self.expect_location_dependents_disabled_after_country_only()
-        self.choose_field_option(self.province, data.location.province)
-        self.choose_field_option(self.city, data.location.city)
-        self.choose_field_option(self.district, data.location.district)
-        self.choose_field_option(self.zone, data.location.zone)
-        self.choose_or_fill_field(self.postal_code, data.location.postal_code)
-
-    def expect_location_dependents_disabled_after_country_only(self) -> None:
-        for spec, placeholder in (
-            (self.city, "Choose City"),
-            (self.district, "Choose District"),
-            (self.zone, "Choose Sub District"),
-            (self.postal_code, "Choose Postal Code"),
-        ):
-            if self._visible_control_is_disabled(placeholder):
-                continue
-            control = self._choice_control_by_visible_text(spec, placeholder)
-            self._expect_required_control_disabled(control, spec)
-
-    def complete_three_step_registration(self, data: CompanyRegistrationData) -> None:
-        self.expect_next_disabled_until_step_one_valid(data)
-        self.next_button.click()
-        self.assert_step_can_continue(step_name="Register Company step 2")
-        self.next_button.click()
-        self.fill_required_step_three(data)
-        self.expect_submit_enabled()
-        self.submit_button.click()
-
-    def expect_created_company_visible(self, company_name: str) -> None:
-        expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=30_000)
-
-    def assert_step_can_continue(self, step_name: str) -> None:
-        try:
-            expect(self.next_button).to_be_enabled(timeout=10_000)
-            return
-        except AssertionError as error:
-            raise AssertionError(
-                f"{step_name} has disabled Next. Product-required fields must be discovered and filled before submission."
-            ) from error
-
-    def fill_required_step_three(self, data: CompanyRegistrationData) -> None:
-        self.fill_text_field(self.branch_name, data.branch_name)
-        if not self._try_fill_branch_from_company_records():
+        with allure_step("Fill Register Company step 1 fields", page=self.page, data=data.as_allure_payload()):
+            self.fill_text_field(self.company_name, data.company_name)
+            self.fill_text_field(self.email, data.email)
+            self.fill_text_field(self.phone, data.phone)
+            self.choose_field_option(self.industry_type, data.industry_type)
+            self.choose_field_option(self.company_type, data.company_type)
+            self.choose_field_option(self.language, data.language)
             self.fill_text_field(self.street_address, data.street_address)
             self.choose_field_option(self.country, data.location.country)
+            if validate_dependents_after_country:
+                self.expect_location_dependents_disabled_after_country_only()
             self.choose_field_option(self.province, data.location.province)
             self.choose_field_option(self.city, data.location.city)
             self.choose_field_option(self.district, data.location.district)
             self.choose_field_option(self.zone, data.location.zone)
             self.choose_or_fill_field(self.postal_code, data.location.postal_code)
-        self.accept_terms()
+
+    def expect_location_dependents_disabled_after_country_only(self) -> None:
+        with allure_step("Verify dependent location fields stay disabled after Country only", page=self.page):
+            for spec, placeholder in (
+                (self.city, "Choose City"),
+                (self.district, "Choose District"),
+                (self.zone, "Choose Sub District"),
+                (self.postal_code, "Choose Postal Code"),
+            ):
+                if self._visible_control_is_disabled(placeholder):
+                    continue
+                control = self._choice_control_by_visible_text(spec, placeholder)
+                self._expect_required_control_disabled(control, spec)
+
+    def complete_three_step_registration(self, data: CompanyRegistrationData) -> None:
+        with allure_step("Complete Register Company three step wizard", page=self.page, data=data.as_allure_payload()):
+            self.expect_next_disabled_until_step_one_valid(data)
+            with allure_step("Continue from Register Company step 1 to step 2", page=self.page):
+                self.next_button.click()
+            self.assert_step_can_continue(step_name="Register Company step 2")
+            with allure_step("Continue from Register Company step 2 to step 3", page=self.page):
+                self.next_button.click()
+            self.fill_required_step_three(data)
+            self.expect_submit_enabled()
+            with allure_step("Submit Register Company wizard", page=self.page, data={"company_name": data.company_name}):
+                self.submit_button.click()
+
+    def expect_created_company_visible(self, company_name: str) -> None:
+        with allure_step(
+            "Verify created company is visible after submit",
+            page=self.page,
+            data={"company_name": company_name},
+        ):
+            expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=30_000)
+
+    def assert_step_can_continue(self, step_name: str) -> None:
+        with allure_step(f"Verify {step_name} can continue", page=self.page):
+            try:
+                expect(self.next_button).to_be_enabled(timeout=10_000)
+                return
+            except AssertionError as error:
+                raise AssertionError(
+                    f"{step_name} has disabled Next. Product-required fields must be discovered and filled before submission."
+                ) from error
+
+    def fill_required_step_three(self, data: CompanyRegistrationData) -> None:
+        with allure_step(
+            "Fill Register Company step 3 branch fields",
+            page=self.page,
+            data={"branch_name": data.branch_name, "company_name": data.company_name},
+        ):
+            self.fill_text_field(self.branch_name, data.branch_name)
+            if not self._try_fill_branch_from_company_records():
+                self.fill_text_field(self.street_address, data.street_address)
+                self.choose_field_option(self.country, data.location.country)
+                self.choose_field_option(self.province, data.location.province)
+                self.choose_field_option(self.city, data.location.city)
+                self.choose_field_option(self.district, data.location.district)
+                self.choose_field_option(self.zone, data.location.zone)
+                self.choose_or_fill_field(self.postal_code, data.location.postal_code)
+            self.accept_terms()
 
     def expect_submit_enabled(self) -> None:
-        expect(self.submit_button).to_be_enabled(timeout=10_000)
+        with allure_step("Verify Submit button enabled", page=self.page):
+            expect(self.submit_button).to_be_enabled(timeout=10_000)
 
     def accept_terms(self) -> None:
-        checkbox = self.first_visible(
-            [
-                ("terms checkbox role", self.page.get_by_role("checkbox").first),
-                ("stable terms checkbox", self.page.locator("input[type='checkbox']").first),
-            ],
-            "terms and conditions checkbox",
-            timeout_ms=10_000,
-        )
-        if not checkbox.is_checked():
-            checkbox.check()
+        with allure_step("Accept Register Company terms", page=self.page):
+            checkbox = self.first_visible(
+                [
+                    ("terms checkbox role", self.page.get_by_role("checkbox").first),
+                    ("stable terms checkbox", self.page.locator("input[type='checkbox']").first),
+                ],
+                "terms and conditions checkbox",
+                timeout_ms=10_000,
+            )
+            if not checkbox.is_checked():
+                checkbox.check()
 
     def _try_fill_branch_from_company_records(self) -> bool:
-        button = self.page.get_by_role(
-            "button",
-            # Text fallback in accessible name is justified because eSuite exposes this exact branch-copy action.
-            name=re.compile(r"Fill in with the same data from the Company records", re.I),
-        ).first
-        try:
-            expect(button).to_be_visible(timeout=5_000)
-            button.click()
-            self._after_selection()
-            return True
-        except (AssertionError, TimeoutError, PlaywrightError):
-            return False
+        with allure_step("Try copy branch data from company records", page=self.page):
+            button = self.page.get_by_role(
+                "button",
+                # Text fallback in accessible name is justified because eSuite exposes this exact branch-copy action.
+                name=re.compile(r"Fill in with the same data from the Company records", re.I),
+            ).first
+            try:
+                expect(button).to_be_visible(timeout=5_000)
+                button.click()
+                self._after_selection()
+                return True
+            except (AssertionError, TimeoutError, PlaywrightError):
+                return False
 
     def fill_text_field(self, spec: FieldSpec, value: str) -> None:
-        control = self._text_control(spec)
-        self._assert_required_control_editable(control, spec)
-        control.fill(value)
-        self._expect_text_value(control, value, spec.label)
+        with allure_step(
+            f"Input {spec.label}",
+            page=self.page,
+            data={"field": spec.label, "value": value},
+        ):
+            control = self._text_control(spec)
+            self._assert_required_control_editable(control, spec)
+            control.fill(value)
+            self._expect_text_value(control, value, spec.label)
 
     def choose_or_fill_field(self, spec: FieldSpec, value: str) -> None:
-        if spec.label == "Postal Code":
-            if self._field_value_is_visible(value):
-                return
-        try:
-            self.choose_field_option(spec, value)
-        except AssertionError as choice_error:
-            try:
-                self.fill_text_field(spec, value)
-            except AssertionError as fill_error:
-                if spec.label == "Postal Code" and self._field_value_is_visible(value):
+        with allure_step(
+            f"Choose or input {spec.label}",
+            page=self.page,
+            data={"field": spec.label, "value": value},
+        ):
+            if spec.label == "Postal Code":
+                if self._field_value_is_visible(value):
                     return
-                raise AssertionError(
-                    f"Could not choose or fill {spec.label}. Choice error: {choice_error}. Fill error: {fill_error}"
-                ) from fill_error
+            try:
+                self.choose_field_option(spec, value)
+            except AssertionError as choice_error:
+                try:
+                    self.fill_text_field(spec, value)
+                except AssertionError as fill_error:
+                    if spec.label == "Postal Code" and self._field_value_is_visible(value):
+                        return
+                    raise AssertionError(
+                        f"Could not choose or fill {spec.label}. Choice error: {choice_error}. Fill error: {fill_error}"
+                    ) from fill_error
 
     def choose_field_option(self, spec: FieldSpec, value: str) -> None:
-        errors: list[str] = []
-        for description, control in self._choice_controls(spec):
-            try:
-                expect(control).to_be_visible(timeout=1_000)
-                self._assert_required_control_editable(control, spec)
-                if self._try_native_select(control, value):
-                    self._after_selection()
-                    return
-                control.click()
-                if (
-                    self._try_click_visible_option(value, timeout_ms=750)
-                    or self._try_filter_and_click_option(value)
-                    or self._try_click_visible_option(value, timeout_ms=3_000)
-                ):
-                    self._after_selection()
-                    return
-            except (AssertionError, TimeoutError, PlaywrightError) as error:
-                errors.append(f"{description}: {error}")
-        raise AssertionError(f"Could not choose {value!r} for {spec.label}; tried {len(errors)} controls")
+        with allure_step(
+            f"Choose {spec.label}",
+            page=self.page,
+            data={"field": spec.label, "value": value},
+        ):
+            errors: list[str] = []
+            for description, control in self._choice_controls(spec):
+                try:
+                    expect(control).to_be_visible(timeout=1_000)
+                    self._assert_required_control_editable(control, spec)
+                    if self._try_native_select(control, value):
+                        self._after_selection()
+                        return
+                    control.click()
+                    if (
+                        self._try_click_visible_option(value, timeout_ms=750)
+                        or self._try_filter_and_click_option(value)
+                        or self._try_click_visible_option(value, timeout_ms=3_000)
+                    ):
+                        self._after_selection()
+                        return
+                except (AssertionError, TimeoutError, PlaywrightError) as error:
+                    errors.append(f"{description}: {error}")
+            raise AssertionError(f"Could not choose {value!r} for {spec.label}; tried {len(errors)} controls")
 
     def _text_control(self, spec: FieldSpec) -> Locator:
         label_regex = re.compile(re.escape(spec.label), re.I)

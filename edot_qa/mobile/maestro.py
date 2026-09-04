@@ -6,8 +6,8 @@ from pathlib import Path
 
 from edot_qa.config import ROOT_DIR
 from edot_qa.mobile.config import MobileSettings
-from edot_qa.mobile.device import command_available
-from edot_qa.reporting.allure_helpers import attach_file, attach_json, attach_text
+from edot_qa.mobile.device import capture_device_screenshot, command_available
+from edot_qa.reporting.allure_helpers import allure_step, attach_file, attach_json, attach_png, attach_text
 
 
 SENSITIVE_MAESTRO_KEYS = {"EWORK_EMAIL", "EWORK_PASSWORD", "EWORK_COMPANY_CODE"}
@@ -77,25 +77,37 @@ class MaestroRunner:
         maestro_variables = self.settings.maestro_variables(extra_env)
         command = self.build_command(flow_path, include_env_flags=True, extra_env=extra_env)
         redacted_command = redact_command(command, maestro_variables)
-        attach_json("maestro-command", {"command": redacted_command, "flow": str(flow_path)})
+        with allure_step(
+            f"Run Maestro flow: {flow_path.name}",
+            data={
+                "flow": str(flow_path),
+                "timeout_seconds": timeout_seconds,
+                "device_id": self.settings.mobile_device_id or "<auto>",
+                "extra_env_keys": sorted((extra_env or {}).keys()),
+            },
+            screenshot=False,
+        ):
+            attach_json("maestro-command", {"command": redacted_command, "flow": str(flow_path)})
+            attach_file("maestro-flow-yaml", flow_path)
 
-        completed = subprocess.run(
-            command,
-            cwd=ROOT_DIR,
-            env=self.settings.maestro_environment(extra_env),
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-        )
-        result = MaestroResult(
-            flow_path=flow_path,
-            command=redacted_command,
-            returncode=completed.returncode,
-            stdout=redact_sensitive_text(completed.stdout, maestro_variables),
-            stderr=redact_sensitive_text(completed.stderr, maestro_variables),
-        )
-        self.attach_result(result)
-        return result
+            completed = subprocess.run(
+                command,
+                cwd=ROOT_DIR,
+                env=self.settings.maestro_environment(extra_env),
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
+            result = MaestroResult(
+                flow_path=flow_path,
+                command=redacted_command,
+                returncode=completed.returncode,
+                stdout=redact_sensitive_text(completed.stdout, maestro_variables),
+                stderr=redact_sensitive_text(completed.stderr, maestro_variables),
+            )
+            self.attach_result(result)
+            self.attach_device_screenshot()
+            return result
 
     def attach_result(self, result: MaestroResult) -> None:
         attach_text("maestro-stdout", result.stdout)
@@ -116,6 +128,15 @@ class MaestroRunner:
         for path in sorted(self.settings.maestro_output_dir.rglob("*")):
             if path.is_file() and path.suffix.lower() in {".log", ".mp4", ".png", ".txt", ".webm"}:
                 attach_file(f"maestro-artifact-{path.name}", path)
+
+    def attach_device_screenshot(self) -> None:
+        image = capture_device_screenshot(
+            self.settings.adb_command,
+            device_id=self.settings.mobile_device_id,
+            timeout_seconds=5,
+        )
+        if image:
+            attach_png("maestro-device-screenshot", image)
 
 
 def assert_maestro_passed(result: MaestroResult) -> MaestroResult:

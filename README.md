@@ -232,7 +232,7 @@ npm run allure:open:mobile
 
 The Allure binary comes from `allure-commandline` in `devDependencies`, same as a local Node-based automation project. No global Allure PATH is required.
 
-Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report.
+Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Each test result is normalized to include executable steps. UI steps attach page URL/title/viewport and screenshots, input steps attach redacted input payloads, failure hooks attach full-page evidence, and Maestro steps attach redacted commands, flow YAML, stdout/stderr, result JSON, device screenshots, and supported output artifacts.
 
 ## AI Failure Triage
 

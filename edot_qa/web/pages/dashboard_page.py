@@ -4,12 +4,14 @@ import re
 
 from playwright.sync_api import Locator, expect
 
+from edot_qa.reporting.allure_helpers import allure_step
 from edot_qa.web.base_page import BasePage
 
 
 class DashboardPage(BasePage):
     def open(self) -> None:
-        self.open_path("/")
+        with allure_step("Open eSuite dashboard", page=self.page):
+            self.open_path("/")
 
     @property
     def welcome_back_greeting(self) -> Locator:
@@ -26,4 +28,9 @@ class DashboardPage(BasePage):
         return text
 
     def expect_loaded(self) -> None:
-        expect(self.welcome_back_greeting).to_be_visible()
+        with allure_step(
+            "Verify eSuite dashboard greeting",
+            page=self.page,
+            data={"expected_text": "Welcome Back,"},
+        ):
+            expect(self.welcome_back_greeting).to_be_visible()

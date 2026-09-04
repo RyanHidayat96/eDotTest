@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from edot_qa.config import DEFAULT_BASE_URL, load_settings
+from edot_qa.reporting.allure_helpers import redact_payload
 from edot_qa.reporting.allure_metadata import metadata_for_node
 from edot_qa.web.pages.company_detail_page import CompanyDetailDataNotLoadedError, CompanyDetailPage
+from tools.generate_allure_report import _ensure_step_evidence
 
 
 def test_settings_default_to_assignment_target(monkeypatch):
@@ -53,6 +57,39 @@ def test_allure_metadata_groups_web_mobile_handoff_as_e2e():
     assert metadata.sub_suite == "Web to Mobile Handoff"
     assert metadata.test_case_id == "E2E-WEB-MOBILE-001"
     assert "requires_device" in metadata.tags
+
+
+def test_allure_payload_redacts_sensitive_values():
+    redacted = redact_payload(
+        {
+            "email": "qa@example.test",
+            "password": "secret",
+            "nested": {"api_token": "token-value"},
+        }
+    )
+
+    assert redacted["email"] == "qa@example.test"
+    assert redacted["password"] == "<redacted>"
+    assert redacted["nested"]["api_token"] == "<redacted>"
+
+
+def test_allure_report_generator_adds_step_evidence(tmp_path):
+    result = {
+        "name": "test_sample",
+        "fullName": "tests.web.test_sample#test_sample",
+        "status": "passed",
+        "labels": [{"name": "parentSuite", "value": "eSuite Web"}, {"name": "tag", "value": "web"}],
+        "parameters": [{"name": "browser", "value": "chromium"}],
+    }
+
+    _ensure_step_evidence(result, tmp_path)
+
+    assert result["steps"][0]["name"] == "Test evidence summary"
+    attachment = result["steps"][0]["attachments"][0]
+    assert attachment["name"] == "step-runtime-info"
+    payload = json.loads((tmp_path / attachment["source"]).read_text(encoding="utf-8"))
+    assert payload["test"]["name"] == "test_sample"
+    assert payload["suite"]["parentSuite"] == "eSuite Web"
 
 
 def test_company_detail_empty_name_reloads_five_times_before_error(monkeypatch):

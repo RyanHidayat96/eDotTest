@@ -6,6 +6,7 @@ import re
 import urllib.error
 import urllib.request
 import uuid
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -13,7 +14,7 @@ from faker import Faker
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from edot_qa.config import Settings, load_settings
-from edot_qa.reporting.allure_helpers import attach_json, attach_text
+from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_text
 
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -167,40 +168,56 @@ class TestDataGenerator:
         resolved_run_id = run_id or uuid.uuid4().hex
         provider = self.model_provider or self._default_model_provider()
         model = self.settings.gemini_test_data_model
-        if provider is None:
-            return self._fallback(resolved_run_id, attach_to_allure=attach_to_allure, reason="missing_api_key")
         if isinstance(provider, tuple):
             provider, model = provider
 
-        last_error: str | None = None
-        schema = business_test_data_json_schema()
-        for attempt in range(1, self.settings.ai_test_data_max_attempts + 1):
-            try:
-                raw_response = provider.generate(
-                    build_prompt(resolved_run_id),
-                    schema,
-                    model=model,
-                    max_output_tokens=self.settings.ai_test_data_max_output_tokens,
-                )
-                parsed_data = BusinessTestData.model_validate(json.loads(raw_response))
-                generated = GeneratedTestData(
-                    data=parsed_data,
-                    source="ai_model",
-                    model=model,
-                    attempts=attempt,
-                    run_id=resolved_run_id,
-                )
-                self._attach(generated, attach_to_allure)
-                return generated
-            except (json.JSONDecodeError, ValidationError, RuntimeError) as error:
-                last_error = str(error)
-                attach_text("ai-test-data-invalid-output", last_error)
-
-        return self._fallback(
-            resolved_run_id,
-            attach_to_allure=attach_to_allure,
-            reason=f"invalid_model_output_after_{self.settings.ai_test_data_max_attempts}_attempts",
+        context = (
+            allure_step(
+                "Generate AI-backed test data",
+                data={
+                    "run_id": resolved_run_id,
+                    "provider": type(provider).__name__ if provider is not None else "FakerFallbackProvider",
+                    "model": model if provider is not None else None,
+                    "max_attempts": self.settings.ai_test_data_max_attempts,
+                },
+                screenshot=False,
+            )
+            if attach_to_allure
+            else nullcontext()
         )
+        with context:
+            if provider is None:
+                return self._fallback(resolved_run_id, attach_to_allure=attach_to_allure, reason="missing_api_key")
+
+            last_error: str | None = None
+            schema = business_test_data_json_schema()
+            for attempt in range(1, self.settings.ai_test_data_max_attempts + 1):
+                try:
+                    raw_response = provider.generate(
+                        build_prompt(resolved_run_id),
+                        schema,
+                        model=model,
+                        max_output_tokens=self.settings.ai_test_data_max_output_tokens,
+                    )
+                    parsed_data = BusinessTestData.model_validate(json.loads(raw_response))
+                    generated = GeneratedTestData(
+                        data=parsed_data,
+                        source="ai_model",
+                        model=model,
+                        attempts=attempt,
+                        run_id=resolved_run_id,
+                    )
+                    self._attach(generated, attach_to_allure)
+                    return generated
+                except (json.JSONDecodeError, ValidationError, RuntimeError) as error:
+                    last_error = str(error)
+                    attach_text("ai-test-data-invalid-output", last_error)
+
+            return self._fallback(
+                resolved_run_id,
+                attach_to_allure=attach_to_allure,
+                reason=f"invalid_model_output_after_{self.settings.ai_test_data_max_attempts}_attempts",
+            )
 
     def _default_model_provider(self) -> tuple[ModelProvider, str] | None:
         if self.settings.gemini_api_key:

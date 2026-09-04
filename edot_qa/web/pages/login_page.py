@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import Locator, TimeoutError
 
+from edot_qa.reporting.allure_helpers import allure_step
 from edot_qa.web.base_page import BasePage
 
 
@@ -16,8 +17,13 @@ SUBMIT_ACTION = re.compile(r"^(continue|next|submit|login|log in|sign in|masuk|l
 
 class LoginPage(BasePage):
     def open(self) -> None:
-        self.page.goto(self.settings.esuite_base_url)
-        self.page.wait_for_load_state("domcontentloaded")
+        with allure_step(
+            "Open eSuite login page",
+            page=self.page,
+            data={"base_url": self.settings.esuite_base_url},
+        ):
+            self.page.goto(self.settings.esuite_base_url)
+            self.page.wait_for_load_state("domcontentloaded")
 
     @property
     def use_email_or_username_button(self) -> Locator:
@@ -73,15 +79,26 @@ class LoginPage(BasePage):
         )
 
     def choose_email_or_username(self) -> None:
-        self.use_email_or_username_button.click()
+        with allure_step("Choose email or username login method", page=self.page):
+            self.use_email_or_username_button.click()
 
     def submit_email(self, email: str) -> None:
-        self.email_or_username_input.fill(email)
-        self.submit_button.click()
+        with allure_step(
+            "Input eSuite email or username",
+            page=self.page,
+            data={"field": "email_or_username", "email": email},
+        ):
+            self.email_or_username_input.fill(email)
+            self.submit_button.click()
 
     def submit_password(self, password: str) -> None:
-        self.password_input.fill(password)
-        self.submit_button.click()
+        with allure_step(
+            "Input eSuite password",
+            page=self.page,
+            data={"field": "password", "password": password},
+        ):
+            self.password_input.fill(password)
+            self.submit_button.click()
 
     def wait_for_esuite_return(self) -> None:
         expected_host = urlparse(self.settings.esuite_base_url).netloc
@@ -89,18 +106,24 @@ class LoginPage(BasePage):
         def is_esuite_url(url: str) -> bool:
             return urlparse(url).netloc == expected_host
 
-        try:
-            self.page.wait_for_url(is_esuite_url, timeout=20_000)
-        except TimeoutError:
-            current_host = urlparse(self.page.url).netloc
-            raise AssertionError(
-                f"Expected redirect back to {expected_host}; current host is {current_host}"
-            ) from None
-        self.page.wait_for_load_state("domcontentloaded")
+        with allure_step(
+            "Wait for redirect back to eSuite",
+            page=self.page,
+            data={"expected_host": expected_host},
+        ):
+            try:
+                self.page.wait_for_url(is_esuite_url, timeout=20_000)
+            except TimeoutError:
+                current_host = urlparse(self.page.url).netloc
+                raise AssertionError(
+                    f"Expected redirect back to {expected_host}; current host is {current_host}"
+                ) from None
+            self.page.wait_for_load_state("domcontentloaded")
 
     def login(self, email: str, password: str) -> None:
-        self.open()
-        self.choose_email_or_username()
-        self.submit_email(email)
-        self.submit_password(password)
-        self.wait_for_esuite_return()
+        with allure_step("Login to eSuite", page=self.page, data={"email": email, "password": password}, screenshot=False):
+            self.open()
+            self.choose_email_or_username()
+            self.submit_email(email)
+            self.submit_password(password)
+            self.wait_for_esuite_return()

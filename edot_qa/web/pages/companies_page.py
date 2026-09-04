@@ -4,6 +4,7 @@ import re
 
 from playwright.sync_api import Locator, TimeoutError, Error as PlaywrightError
 
+from edot_qa.reporting.allure_helpers import allure_step
 from edot_qa.web.base_page import BasePage
 from edot_qa.web.pages.company_manage_page import CompanyManagePage
 from edot_qa.web.pages.register_company_wizard_page import RegisterCompanyWizardPage
@@ -53,29 +54,36 @@ class CompaniesPage(BasePage):
         )
 
     def open(self) -> None:
-        if not self.page.url.rstrip("/").endswith("/companies"):
-            self.companies_navigation.click()
-        self.page.wait_for_load_state("domcontentloaded")
-        self._wait_for_company_list()
+        with allure_step("Open eSuite Companies page", page=self.page):
+            if not self.page.url.rstrip("/").endswith("/companies"):
+                self.companies_navigation.click()
+            self.page.wait_for_load_state("domcontentloaded")
+            self._wait_for_company_list()
 
     def open_register_company_wizard(self) -> RegisterCompanyWizardPage:
-        self.open()
-        self.add_company_button.click()
-        wizard = RegisterCompanyWizardPage(self.page, self.settings)
-        wizard.expect_open()
-        return wizard
+        with allure_step("Open Register Company wizard", page=self.page):
+            self.open()
+            self.add_company_button.click()
+            wizard = RegisterCompanyWizardPage(self.page, self.settings)
+            wizard.expect_open()
+            return wizard
 
     def open_manage(self) -> CompanyManagePage:
-        if "/profile" in self.page.url:
-            self._try_back_to_company_list()
-        self.open()
-        self.page.wait_for_load_state("domcontentloaded")
-        self._wait_for_company_list()
-        return CompanyManagePage(self.page, self.settings)
+        with allure_step("Open Companies Manage page", page=self.page):
+            if "/profile" in self.page.url:
+                self._try_back_to_company_list()
+            self.open()
+            self.page.wait_for_load_state("domcontentloaded")
+            self._wait_for_company_list()
+            return CompanyManagePage(self.page, self.settings)
 
     def _try_back_to_company_list(self) -> bool:
         if "/profile" not in self.page.url:
             return False
+        with allure_step("Return from company detail to Companies list", page=self.page):
+            return self._try_back_link_to_company_list()
+
+    def _try_back_link_to_company_list(self) -> bool:
         for back_link in (
             self.page.get_by_role("link", name=re.compile(r"Back to Company List", re.I)).first,
             # Text fallback is justified because eSuite profile page exposes this exact return action.

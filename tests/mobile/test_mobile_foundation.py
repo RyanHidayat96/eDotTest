@@ -9,6 +9,7 @@ from edot_qa.config import ROOT_DIR
 from edot_qa.mobile.config import MobileSettings, load_mobile_settings
 from edot_qa.mobile.device import (
     adb_devices,
+    capture_device_screenshot,
     clear_app_data,
     command_available,
     package_installed,
@@ -97,6 +98,16 @@ def test_clear_app_data_uses_device_scoped_pm_clear(monkeypatch):
     assert clear_app_data("com.example.app", device_id="emulator-5554") == "Success"
 
 
+def test_capture_device_screenshot_uses_exec_out_png(monkeypatch):
+    def fake_run(command, **kwargs):
+        assert command == ["adb", "-s", "emulator-5554", "exec-out", "screencap", "-p"]
+        return subprocess.CompletedProcess(command, 0, stdout=b"\x89PNG\r\n", stderr=b"")
+
+    monkeypatch.setattr("edot_qa.mobile.device.subprocess.run", fake_run)
+
+    assert capture_device_screenshot(device_id="emulator-5554") == b"\x89PNG\r\n"
+
+
 def test_maestro_runner_builds_device_scoped_command(tmp_path):
     settings = _mobile_settings(tmp_path, mobile_device_id="emulator-5554")
     flow_path = settings.maestro_flow_dir / "login.yaml"
@@ -139,6 +150,7 @@ def test_maestro_runner_redacts_sensitive_cli_values(monkeypatch, tmp_path):
         }
     )
     monkeypatch.setattr("edot_qa.mobile.maestro.subprocess.run", fake_run)
+    monkeypatch.setattr("edot_qa.mobile.maestro.capture_device_screenshot", lambda *args, **kwargs: b"\x89PNG\r\n")
 
     result = MaestroRunner(redaction_settings).run_flow("login.yaml")
 
@@ -158,6 +170,7 @@ def test_maestro_runner_returns_failed_result_without_swallowing(monkeypatch, tm
         return subprocess.CompletedProcess(args=args[0], returncode=1, stdout="flow failed", stderr="bad selector")
 
     monkeypatch.setattr("edot_qa.mobile.maestro.subprocess.run", fake_run)
+    monkeypatch.setattr("edot_qa.mobile.maestro.capture_device_screenshot", lambda *args, **kwargs: b"\x89PNG\r\n")
 
     result = MaestroRunner(settings).run_flow("login.yaml")
 
@@ -178,6 +191,7 @@ def test_maestro_runner_merges_generated_data_env(monkeypatch, tmp_path):
         return subprocess.CompletedProcess(args=args[0], returncode=0, stdout="ok", stderr="")
 
     monkeypatch.setattr("edot_qa.mobile.maestro.subprocess.run", fake_run)
+    monkeypatch.setattr("edot_qa.mobile.maestro.capture_device_screenshot", lambda *args, **kwargs: b"\x89PNG\r\n")
 
     result = MaestroRunner(settings).run_flow(
         "create_customer.yaml",

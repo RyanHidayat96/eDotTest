@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from edot_qa.reporting.allure_metadata import apply_allure_metadata
-from edot_qa.reporting.allure_helpers import attach_png
+from edot_qa.reporting.allure_helpers import attach_page_evidence
 
 
 @pytest.fixture(autouse=True)
@@ -25,6 +25,6 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[object]):
 
     try:
         if not page.is_closed():
-            attach_png(f"failure-screenshot-{report.when}", page.screenshot(full_page=True))
+            attach_page_evidence(f"failure-evidence-{report.when}", page, full_page=True)
     except Exception as error:
         report.sections.append(("screenshot attachment failed", str(error)))

@@ -66,6 +66,23 @@ def clear_app_data(
     return completed.stdout.strip()
 
 
+def capture_device_screenshot(
+    adb_command: str = "adb",
+    *,
+    device_id: str | None = None,
+    timeout_seconds: int = 10,
+) -> bytes | None:
+    command = [adb_command]
+    if device_id:
+        command.extend(["-s", device_id])
+    command.extend(["exec-out", "screencap", "-p"])
+    try:
+        completed = subprocess.run(command, check=True, capture_output=True, timeout=timeout_seconds)
+    except (RuntimeError, FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
+        return None
+    return completed.stdout or None
+
+
 def parse_adb_devices(output: str) -> list[MobileDevice]:
     devices: list[MobileDevice] = []
     for raw_line in output.splitlines():

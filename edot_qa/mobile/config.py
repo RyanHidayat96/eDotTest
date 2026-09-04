@@ -62,6 +62,7 @@ class MobileSettings:
     ework_customer_ktp_field_id: str | None
     ework_customer_upload_button_id: str | None
     ework_customer_camera_capture_button_id: str | None
+    ework_customer_document_submit_button_id: str | None
     ework_customer_signature_title_text: str | None
     ework_customer_signature_view_id: str | None
     ework_customer_save_button_id: str | None
@@ -135,6 +136,7 @@ class MobileSettings:
             "EWORK_CUSTOMER_KTP_FIELD_ID": self.ework_customer_ktp_field_id,
             "EWORK_CUSTOMER_UPLOAD_BUTTON_ID": self.ework_customer_upload_button_id,
             "EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID": self.ework_customer_camera_capture_button_id,
+            "EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID": self.ework_customer_document_submit_button_id,
             "EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT": self.ework_customer_signature_title_text,
             "EWORK_CUSTOMER_SIGNATURE_VIEW_ID": self.ework_customer_signature_view_id,
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id,
@@ -196,6 +198,7 @@ class MobileSettings:
             "EWORK_CUSTOMER_KTP_FIELD_ID": self.ework_customer_ktp_field_id or "<missing>",
             "EWORK_CUSTOMER_UPLOAD_BUTTON_ID": self.ework_customer_upload_button_id or "<missing>",
             "EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID": self.ework_customer_camera_capture_button_id or "<missing>",
+            "EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID": self.ework_customer_document_submit_button_id or "<missing>",
             "EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT": self.ework_customer_signature_title_text or "<missing>",
             "EWORK_CUSTOMER_SIGNATURE_VIEW_ID": self.ework_customer_signature_view_id or "<missing>",
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id or "<missing>",
@@ -254,6 +257,7 @@ class MobileSettings:
             "EWORK_CUSTOMER_KTP_FIELD_ID": self.ework_customer_ktp_field_id,
             "EWORK_CUSTOMER_UPLOAD_BUTTON_ID": self.ework_customer_upload_button_id,
             "EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID": self.ework_customer_camera_capture_button_id,
+            "EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID": self.ework_customer_document_submit_button_id,
             "EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT": self.ework_customer_signature_title_text,
             "EWORK_CUSTOMER_SIGNATURE_VIEW_ID": self.ework_customer_signature_view_id,
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id,
@@ -319,6 +323,7 @@ def load_mobile_settings() -> MobileSettings:
         ework_customer_ktp_field_id=os.getenv("EWORK_CUSTOMER_KTP_FIELD_ID") or None,
         ework_customer_upload_button_id=os.getenv("EWORK_CUSTOMER_UPLOAD_BUTTON_ID") or None,
         ework_customer_camera_capture_button_id=os.getenv("EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID") or None,
+        ework_customer_document_submit_button_id=os.getenv("EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID") or None,
         ework_customer_signature_title_text=os.getenv("EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT") or None,
         ework_customer_signature_view_id=os.getenv("EWORK_CUSTOMER_SIGNATURE_VIEW_ID") or None,
         ework_customer_save_button_id=os.getenv("EWORK_CUSTOMER_SAVE_BUTTON_ID") or None,

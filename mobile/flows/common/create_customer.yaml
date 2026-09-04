@@ -34,18 +34,70 @@ appId: ${EWORK_APP_ID}
 - assertVisible: ${EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT}
 - tapOn:
     id: ${EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID}
-# Remaining final save/search selectors must be captured from the real app before EDOT_LIVE=true.
-- tapOn:
+- assertVisible:
     id: ${EWORK_CUSTOMER_ADDRESS_FIELD_ID}
-- inputText: ${EWORK_CUSTOMER_ADDRESS}
+- tapOn:
+    text: ${EWORK_CUSTOMER_PROVINCE_FIELD_TEXT}
+- tapOn:
+    text: ${EWORK_CUSTOMER_PROVINCE_OPTION_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}
+- tapOn:
+    text: ${EWORK_CUSTOMER_CITY_FIELD_TEXT}
+- tapOn:
+    text: ${EWORK_CUSTOMER_CITY_OPTION_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}
+- tapOn:
+    text: ${EWORK_CUSTOMER_DISTRICT_FIELD_TEXT}
+- tapOn:
+    text: ${EWORK_CUSTOMER_DISTRICT_OPTION_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}
+- tapOn:
+    text: ${EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT}
+- tapOn:
+    text: ${EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}
+# The app may advance to Documents after the final location choice; otherwise Continue is the only exposed stable text.
+- tapOn:
+    text: Continue
+    optional: true
+- assertVisible: KTP *
+- tapOn:
+    id: ${EWORK_CUSTOMER_KTP_FIELD_ID}
+- inputText: ${EWORK_CUSTOMER_KTP_NUMBER}
+- hideKeyboard
+- tapOn:
+    id: ${EWORK_CUSTOMER_UPLOAD_BUTTON_ID}
+- tapOn:
+    id: ${EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID}
+- assertVisible: Preview
+- tapOn:
+    id: ${EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID}
+- assertVisible: ${EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT}
+- assertVisible:
+    id: ${EWORK_CUSTOMER_SIGNATURE_VIEW_ID}
+# Signature canvas has no text input or semantic value; pointer stroke is required by the widget.
+- swipe:
+    start: "20%, 70%"
+    end: "80%, 70%"
+    duration: 500
 - tapOn:
     id: ${EWORK_CUSTOMER_SAVE_BUTTON_ID}
 - tapOn:
-    id: ${EWORK_CUSTOMER_SEARCH_FIELD_ID}
-- inputText: ${EWORK_CUSTOMER_NAME}
+    id: ${EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID}
+- assertVisible: ${EWORK_CUSTOMER_SUCCESS_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID}
+- assertVisible: New Customer List
+- scrollUntilVisible:
+    element:
+      text: ${EWORK_CUSTOMER_NAME}
+    direction: DOWN
+    timeout: 60000
 # Tier 2: created customer name must appear after save.
 - assertVisible: ${EWORK_CUSTOMER_NAME}
-# Tier 2: created customer contact must match submitted data.
-- assertVisible: ${EWORK_CUSTOMER_CONTACT}
 # Tier 2: created customer address must match submitted data.
 - assertVisible: ${EWORK_CUSTOMER_ADDRESS}

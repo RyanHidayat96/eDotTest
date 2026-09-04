@@ -145,8 +145,26 @@ EWORK_CUSTOMER_BASIC_CONTINUE_BUTTON_ID=id.edot.ework:id/noo_registration_action
 EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID=id.edot.ework:id/noo_registration_input_address_type
 EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT=Delivery Address
 EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID=id.edot.ework:id/noo_registration_container_use_my_current_location
-EWORK_CUSTOMER_ADDRESS_FIELD_ID=
-EWORK_CUSTOMER_SAVE_BUTTON_ID=
+EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID=id.edot.ework:id/noo_location_option_action_apply
+EWORK_CUSTOMER_PROVINCE_FIELD_TEXT=Choose Province
+EWORK_CUSTOMER_PROVINCE_OPTION_TEXT=DKI JAKARTA
+EWORK_CUSTOMER_CITY_FIELD_TEXT=Choose City
+EWORK_CUSTOMER_CITY_OPTION_TEXT=JAKARTA BARAT
+EWORK_CUSTOMER_DISTRICT_FIELD_TEXT=Choose District
+EWORK_CUSTOMER_DISTRICT_OPTION_TEXT=KEBON JERUK
+EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT=Choose Sub district
+EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT=KEBON JERUK
+EWORK_CUSTOMER_ADDRESS_FIELD_ID=id.edot.ework:id/noo_registration_input_address
+EWORK_CUSTOMER_KTP_FIELD_ID=id.edot.ework:id/update_info_item_input_value
+EWORK_CUSTOMER_UPLOAD_BUTTON_ID=id.edot.ework:id/btn_upload
+EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID=id.edot.ework:id/btn_capture
+EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID=id.edot.ework:id/noo_registration_doc_action_continue
+EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT=Approval Signature
+EWORK_CUSTOMER_SIGNATURE_VIEW_ID=id.edot.ework:id/signature_view
+EWORK_CUSTOMER_SAVE_BUTTON_ID=id.edot.ework:id/update_info_action_submit
+EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID=id.edot.ework:id/btn_positive
+EWORK_CUSTOMER_SUCCESS_TEXT=Data Saved Successfully
+EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID=id.edot.ework:id/btn_success_continue
 EWORK_CUSTOMER_SEARCH_FIELD_ID=
 ```
 
@@ -194,7 +212,7 @@ maestro --version
 adb devices
 ```
 
-The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Dashboard text `Revenue` and the customer path through `New Customer`, `New Customer Registration`, Basic fields, channel/type dropdowns, and address-type dropdown were also captured from the real app. Final address/save/search selectors still must be captured before a full `EDOT_LIVE=true` customer evidence run. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
+The eWork SFA app package is `id.edot.ework`. Current login selectors were confirmed from Android UI hierarchy: `tv_company_id`, `tv_username`, `tv_password`, and `btn_signin`. Dashboard text `Revenue` and the customer path through `New Customer`, `New Customer Registration`, Basic fields, channel/type dropdowns, location dropdowns, KTP document upload, signature, register, confirmation, and success screen were captured from the real app. The New Customer List screen did not expose a search input in hierarchy, so the flow scrolls until the unique generated customer name is visible. Flows live in `mobile/flows`. Reused login is in `mobile/flows/common/login.yaml` and is called with `runFlow`.
 
 Run mobile checks:
 
@@ -221,7 +239,7 @@ Ordinary developer mobile runs skip external checks with an explicit reason when
 Implemented mobile behaviors:
 
 - Login flow launches eWork SFA, runs the shared login sub-flow, and asserts dashboard text.
-- Customer creation flow runs login, creates a customer from AI-generated or fallback data, then asserts the saved name, contact, and address as Tier 2 checks when required selectors are configured.
+- Customer creation flow runs login, creates a customer from AI-generated or fallback data, then scrolls the list until the unique saved name is visible and asserts the saved name/address currently exposed by the list.
 - Maestro stdout, stderr, command details, and supported output artifacts are attached to Allure.
 
 For local live mobile verification in this repository, the assignment-provided fallback eWork account was used because no web-created company handoff was available. The fallback password is not stored in this README and must stay only in ignored local environment configuration.

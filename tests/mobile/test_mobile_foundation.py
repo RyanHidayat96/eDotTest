@@ -62,6 +62,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     monkeypatch.setenv("EWORK_CUSTOMER_KTP_FIELD_ID", "customer-ktp")
     monkeypatch.setenv("EWORK_CUSTOMER_UPLOAD_BUTTON_ID", "customer-upload")
     monkeypatch.setenv("EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID", "customer-camera-capture")
+    monkeypatch.setenv("EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID", "customer-document-submit")
     monkeypatch.setenv("EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT", "Approval Signature")
     monkeypatch.setenv("EWORK_CUSTOMER_SIGNATURE_VIEW_ID", "customer-signature")
     monkeypatch.setenv("EWORK_CUSTOMER_SAVE_BUTTON_ID", "customer-register")
@@ -85,6 +86,7 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID"] == "customer-address-type"
     assert safe["EWORK_CUSTOMER_KTP_FIELD_ID"] == "customer-ktp"
     assert safe["EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID"] == "customer-camera-capture"
+    assert safe["EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID"] == "customer-document-submit"
     assert safe["EWORK_CUSTOMER_SAVE_BUTTON_ID"] == "customer-register"
     assert "secret-value" not in str(safe)
 
@@ -299,11 +301,12 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "${EWORK_CUSTOMER_KTP_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_UPLOAD_BUTTON_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_SIGNATURE_VIEW_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_SUCCESS_TEXT}" in shared_flow
+    assert "scrollUntilVisible:" in shared_flow
     assert "Tier 2: created customer name" in shared_flow
-    assert "Tier 2: created customer contact" in shared_flow
     assert "Tier 2: created customer address" in shared_flow
     assert "@edot" not in combined.lower()
 
@@ -397,6 +400,7 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         ework_customer_ktp_field_id="customer-ktp",
         ework_customer_upload_button_id="customer-upload",
         ework_customer_camera_capture_button_id="customer-camera-capture",
+        ework_customer_document_submit_button_id="customer-document-submit",
         ework_customer_signature_title_text="Approval Signature",
         ework_customer_signature_view_id="customer-signature",
         ework_customer_save_button_id="customer-register",

@@ -58,5 +58,5 @@ def generate_mobile_customer_data(run_id: str | None = None) -> MobileCustomerDa
 
 def _fake_ktp_number(seed: str) -> str:
     digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
-    suffix = int(digest[:16], 16) % 10**14
-    return f"31{suffix:014d}"
+    suffix = int(digest[:8], 16) % 10**4
+    return f"317507010190{suffix:04d}"

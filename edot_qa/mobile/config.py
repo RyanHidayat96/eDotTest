@@ -36,9 +36,19 @@ class MobileSettings:
     ework_login_button_id: str | None
     ework_dashboard_text: str | None
     ework_customers_menu_id: str | None
+    ework_customers_menu_text: str | None
     ework_add_customer_button_id: str | None
     ework_customer_name_field_id: str | None
     ework_customer_contact_field_id: str | None
+    ework_customer_contact_person_field_id: str | None
+    ework_customer_channel_field_id: str | None
+    ework_customer_channel_option_text: str | None
+    ework_customer_type_field_id: str | None
+    ework_customer_type_option_text: str | None
+    ework_customer_basic_continue_button_id: str | None
+    ework_customer_address_type_field_id: str | None
+    ework_customer_address_type_option_text: str | None
+    ework_customer_current_location_button_id: str | None
     ework_customer_address_field_id: str | None
     ework_customer_save_button_id: str | None
     ework_customer_search_field_id: str | None
@@ -83,15 +93,27 @@ class MobileSettings:
 
     def missing_customer_requirements(self) -> list[str]:
         requirements = {
-            "EWORK_CUSTOMERS_MENU_ID": self.ework_customers_menu_id,
             "EWORK_ADD_CUSTOMER_BUTTON_ID": self.ework_add_customer_button_id,
             "EWORK_CUSTOMER_NAME_FIELD_ID": self.ework_customer_name_field_id,
             "EWORK_CUSTOMER_CONTACT_FIELD_ID": self.ework_customer_contact_field_id,
+            "EWORK_CUSTOMER_CONTACT_PERSON_FIELD_ID": self.ework_customer_contact_person_field_id,
+            "EWORK_CUSTOMER_CHANNEL_FIELD_ID": self.ework_customer_channel_field_id,
+            "EWORK_CUSTOMER_CHANNEL_OPTION_TEXT": self.ework_customer_channel_option_text,
+            "EWORK_CUSTOMER_TYPE_FIELD_ID": self.ework_customer_type_field_id,
+            "EWORK_CUSTOMER_TYPE_OPTION_TEXT": self.ework_customer_type_option_text,
+            "EWORK_CUSTOMER_BASIC_CONTINUE_BUTTON_ID": self.ework_customer_basic_continue_button_id,
+            "EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID": self.ework_customer_address_type_field_id,
+            "EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT": self.ework_customer_address_type_option_text,
+            "EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID": self.ework_customer_current_location_button_id,
             "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id,
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id,
             "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id,
         }
-        return self.missing_login_requirements() + [key for key, value in requirements.items() if not value]
+        missing = self.missing_login_requirements()
+        if not (self.ework_customers_menu_id or self.ework_customers_menu_text):
+            missing.append("EWORK_CUSTOMERS_MENU_ID or EWORK_CUSTOMERS_MENU_TEXT")
+        missing.extend(key for key, value in requirements.items() if not value)
+        return missing
 
     def ensure_runtime_dirs(self) -> None:
         self.maestro_output_dir.mkdir(parents=True, exist_ok=True)
@@ -115,9 +137,19 @@ class MobileSettings:
             "EWORK_LOGIN_BUTTON_ID": self.ework_login_button_id or "<missing>",
             "EWORK_DASHBOARD_TEXT": self.ework_dashboard_text or "<missing>",
             "EWORK_CUSTOMERS_MENU_ID": self.ework_customers_menu_id or "<missing>",
+            "EWORK_CUSTOMERS_MENU_TEXT": self.ework_customers_menu_text or "<missing>",
             "EWORK_ADD_CUSTOMER_BUTTON_ID": self.ework_add_customer_button_id or "<missing>",
             "EWORK_CUSTOMER_NAME_FIELD_ID": self.ework_customer_name_field_id or "<missing>",
             "EWORK_CUSTOMER_CONTACT_FIELD_ID": self.ework_customer_contact_field_id or "<missing>",
+            "EWORK_CUSTOMER_CONTACT_PERSON_FIELD_ID": self.ework_customer_contact_person_field_id or "<missing>",
+            "EWORK_CUSTOMER_CHANNEL_FIELD_ID": self.ework_customer_channel_field_id or "<missing>",
+            "EWORK_CUSTOMER_CHANNEL_OPTION_TEXT": self.ework_customer_channel_option_text or "<missing>",
+            "EWORK_CUSTOMER_TYPE_FIELD_ID": self.ework_customer_type_field_id or "<missing>",
+            "EWORK_CUSTOMER_TYPE_OPTION_TEXT": self.ework_customer_type_option_text or "<missing>",
+            "EWORK_CUSTOMER_BASIC_CONTINUE_BUTTON_ID": self.ework_customer_basic_continue_button_id or "<missing>",
+            "EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID": self.ework_customer_address_type_field_id or "<missing>",
+            "EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT": self.ework_customer_address_type_option_text or "<missing>",
+            "EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID": self.ework_customer_current_location_button_id or "<missing>",
             "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id or "<missing>",
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id or "<missing>",
             "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id or "<missing>",
@@ -146,9 +178,19 @@ class MobileSettings:
             "EWORK_LOGIN_BUTTON_ID": self.ework_login_button_id,
             "EWORK_DASHBOARD_TEXT": self.ework_dashboard_text,
             "EWORK_CUSTOMERS_MENU_ID": self.ework_customers_menu_id,
+            "EWORK_CUSTOMERS_MENU_TEXT": self.ework_customers_menu_text,
             "EWORK_ADD_CUSTOMER_BUTTON_ID": self.ework_add_customer_button_id,
             "EWORK_CUSTOMER_NAME_FIELD_ID": self.ework_customer_name_field_id,
             "EWORK_CUSTOMER_CONTACT_FIELD_ID": self.ework_customer_contact_field_id,
+            "EWORK_CUSTOMER_CONTACT_PERSON_FIELD_ID": self.ework_customer_contact_person_field_id,
+            "EWORK_CUSTOMER_CHANNEL_FIELD_ID": self.ework_customer_channel_field_id,
+            "EWORK_CUSTOMER_CHANNEL_OPTION_TEXT": self.ework_customer_channel_option_text,
+            "EWORK_CUSTOMER_TYPE_FIELD_ID": self.ework_customer_type_field_id,
+            "EWORK_CUSTOMER_TYPE_OPTION_TEXT": self.ework_customer_type_option_text,
+            "EWORK_CUSTOMER_BASIC_CONTINUE_BUTTON_ID": self.ework_customer_basic_continue_button_id,
+            "EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID": self.ework_customer_address_type_field_id,
+            "EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT": self.ework_customer_address_type_option_text,
+            "EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID": self.ework_customer_current_location_button_id,
             "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id,
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id,
             "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id,
@@ -184,9 +226,19 @@ def load_mobile_settings() -> MobileSettings:
         ework_login_button_id=os.getenv("EWORK_LOGIN_BUTTON_ID") or None,
         ework_dashboard_text=os.getenv("EWORK_DASHBOARD_TEXT") or None,
         ework_customers_menu_id=os.getenv("EWORK_CUSTOMERS_MENU_ID") or None,
+        ework_customers_menu_text=os.getenv("EWORK_CUSTOMERS_MENU_TEXT") or None,
         ework_add_customer_button_id=os.getenv("EWORK_ADD_CUSTOMER_BUTTON_ID") or None,
         ework_customer_name_field_id=os.getenv("EWORK_CUSTOMER_NAME_FIELD_ID") or None,
         ework_customer_contact_field_id=os.getenv("EWORK_CUSTOMER_CONTACT_FIELD_ID") or None,
+        ework_customer_contact_person_field_id=os.getenv("EWORK_CUSTOMER_CONTACT_PERSON_FIELD_ID") or None,
+        ework_customer_channel_field_id=os.getenv("EWORK_CUSTOMER_CHANNEL_FIELD_ID") or None,
+        ework_customer_channel_option_text=os.getenv("EWORK_CUSTOMER_CHANNEL_OPTION_TEXT") or None,
+        ework_customer_type_field_id=os.getenv("EWORK_CUSTOMER_TYPE_FIELD_ID") or None,
+        ework_customer_type_option_text=os.getenv("EWORK_CUSTOMER_TYPE_OPTION_TEXT") or None,
+        ework_customer_basic_continue_button_id=os.getenv("EWORK_CUSTOMER_BASIC_CONTINUE_BUTTON_ID") or None,
+        ework_customer_address_type_field_id=os.getenv("EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID") or None,
+        ework_customer_address_type_option_text=os.getenv("EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT") or None,
+        ework_customer_current_location_button_id=os.getenv("EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID") or None,
         ework_customer_address_field_id=os.getenv("EWORK_CUSTOMER_ADDRESS_FIELD_ID") or None,
         ework_customer_save_button_id=os.getenv("EWORK_CUSTOMER_SAVE_BUTTON_ID") or None,
         ework_customer_search_field_id=os.getenv("EWORK_CUSTOMER_SEARCH_FIELD_ID") or None,

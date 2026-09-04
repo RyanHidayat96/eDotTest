@@ -30,6 +30,7 @@ class MobileCustomerData:
         return {
             "EWORK_CUSTOMER_NAME": self.name,
             "EWORK_CUSTOMER_CONTACT": self.contact,
+            "EWORK_CUSTOMER_CONTACT_PERSON": self.name,
             "EWORK_CUSTOMER_ADDRESS": self.address,
         }
 

@@ -42,6 +42,7 @@ def test_mobile_customer_data_maps_ai_payload():
     assert customer.as_maestro_env() == {
         "EWORK_CUSTOMER_NAME": "Budi Santoso QA CUSTOMER",
         "EWORK_CUSTOMER_CONTACT": "+6281299900111",
+        "EWORK_CUSTOMER_CONTACT_PERSON": "Budi Santoso QA CUSTOMER",
         "EWORK_CUSTOMER_ADDRESS": "Jl. Melati Raya No. 8, Jakarta Selatan",
     }
 

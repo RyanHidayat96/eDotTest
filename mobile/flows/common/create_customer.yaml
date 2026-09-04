@@ -1,15 +1,40 @@
 appId: ${EWORK_APP_ID}
 ---
+# Home menu item has repeated generic IDs in hierarchy; text fallback is the captured stable locator.
 - tapOn:
-    id: ${EWORK_CUSTOMERS_MENU_ID}
+    text: ${EWORK_CUSTOMERS_MENU_TEXT}
+- assertVisible: New Customer List
 - tapOn:
     id: ${EWORK_ADD_CUSTOMER_BUTTON_ID}
+- assertVisible: New Customer Registration
 - tapOn:
     id: ${EWORK_CUSTOMER_NAME_FIELD_ID}
 - inputText: ${EWORK_CUSTOMER_NAME}
 - tapOn:
     id: ${EWORK_CUSTOMER_CONTACT_FIELD_ID}
 - inputText: ${EWORK_CUSTOMER_CONTACT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_CONTACT_PERSON_FIELD_ID}
+- inputText: ${EWORK_CUSTOMER_CONTACT_PERSON}
+- tapOn:
+    id: ${EWORK_CUSTOMER_CHANNEL_FIELD_ID}
+- tapOn:
+    text: ${EWORK_CUSTOMER_CHANNEL_OPTION_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_TYPE_FIELD_ID}
+- tapOn:
+    text: ${EWORK_CUSTOMER_TYPE_OPTION_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_BASIC_CONTINUE_BUTTON_ID}
+- assertVisible: Locations
+- tapOn:
+    id: ${EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID}
+- tapOn:
+    text: ${EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT}
+- assertVisible: ${EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID}
+# Remaining final save/search selectors must be captured from the real app before EDOT_LIVE=true.
 - tapOn:
     id: ${EWORK_CUSTOMER_ADDRESS_FIELD_ID}
 - inputText: ${EWORK_CUSTOMER_ADDRESS}

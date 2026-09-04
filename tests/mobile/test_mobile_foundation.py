@@ -36,9 +36,19 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     monkeypatch.setenv("EWORK_LOGIN_BUTTON_ID", "login-submit")
     monkeypatch.setenv("EWORK_DASHBOARD_TEXT", "Dashboard")
     monkeypatch.setenv("EWORK_CUSTOMERS_MENU_ID", "customers-menu")
+    monkeypatch.setenv("EWORK_CUSTOMERS_MENU_TEXT", "New Customer")
     monkeypatch.setenv("EWORK_ADD_CUSTOMER_BUTTON_ID", "customer-add")
     monkeypatch.setenv("EWORK_CUSTOMER_NAME_FIELD_ID", "customer-name")
     monkeypatch.setenv("EWORK_CUSTOMER_CONTACT_FIELD_ID", "customer-contact")
+    monkeypatch.setenv("EWORK_CUSTOMER_CONTACT_PERSON_FIELD_ID", "customer-contact-person")
+    monkeypatch.setenv("EWORK_CUSTOMER_CHANNEL_FIELD_ID", "customer-channel")
+    monkeypatch.setenv("EWORK_CUSTOMER_CHANNEL_OPTION_TEXT", "Modern Trade (MT)")
+    monkeypatch.setenv("EWORK_CUSTOMER_TYPE_FIELD_ID", "customer-type")
+    monkeypatch.setenv("EWORK_CUSTOMER_TYPE_OPTION_TEXT", "Semi Grosir")
+    monkeypatch.setenv("EWORK_CUSTOMER_BASIC_CONTINUE_BUTTON_ID", "customer-basic-continue")
+    monkeypatch.setenv("EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID", "customer-address-type")
+    monkeypatch.setenv("EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT", "Delivery Address")
+    monkeypatch.setenv("EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID", "customer-current-location")
     monkeypatch.setenv("EWORK_CUSTOMER_ADDRESS_FIELD_ID", "customer-address")
     monkeypatch.setenv("EWORK_CUSTOMER_SAVE_BUTTON_ID", "customer-save")
     monkeypatch.setenv("EWORK_CUSTOMER_SEARCH_FIELD_ID", "customer-search")
@@ -53,7 +63,9 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_COMPANY_CODE"] == "<set>"
     assert safe["EWORK_COMPANY_ID_FIELD_ID"] == "company-id"
     assert safe["EWORK_DASHBOARD_TEXT"] == "Dashboard"
+    assert safe["EWORK_CUSTOMERS_MENU_TEXT"] == "New Customer"
     assert safe["EWORK_CUSTOMER_NAME_FIELD_ID"] == "customer-name"
+    assert safe["EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID"] == "customer-address-type"
     assert "secret-value" not in str(safe)
 
 
@@ -76,6 +88,7 @@ def test_mobile_settings_reports_missing_login_requirements(tmp_path):
     assert "EWORK_PASSWORD" in settings.missing_login_requirements()
     assert "EWORK_EMAIL" in settings.missing_customer_requirements()
     assert "EWORK_CUSTOMER_NAME_FIELD_ID" not in settings.missing_customer_requirements()
+    assert "EWORK_CUSTOMERS_MENU_ID or EWORK_CUSTOMERS_MENU_TEXT" not in settings.missing_customer_requirements()
 
 
 def test_adb_devices_parser_detects_ready_device():
@@ -248,9 +261,15 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
 
     assert "runFlow: common/login.yaml" in entry_flow
     assert "runFlow: common/create_customer.yaml" in entry_flow
+    assert "${EWORK_CUSTOMERS_MENU_TEXT}" in shared_flow
     assert "${EWORK_CUSTOMER_NAME}" in shared_flow
     assert "${EWORK_CUSTOMER_CONTACT}" in shared_flow
+    assert "${EWORK_CUSTOMER_CONTACT_PERSON}" in shared_flow
     assert "${EWORK_CUSTOMER_ADDRESS}" in shared_flow
+    assert "${EWORK_CUSTOMER_CHANNEL_FIELD_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_TYPE_FIELD_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID}" in shared_flow
     assert "Tier 2: created customer name" in shared_flow
     assert "Tier 2: created customer contact" in shared_flow
     assert "Tier 2: created customer address" in shared_flow
@@ -320,9 +339,19 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         ework_login_button_id="login-submit",
         ework_dashboard_text="Dashboard",
         ework_customers_menu_id="customers-menu",
+        ework_customers_menu_text="New Customer",
         ework_add_customer_button_id="customer-add",
         ework_customer_name_field_id="customer-name",
         ework_customer_contact_field_id="customer-contact",
+        ework_customer_contact_person_field_id="customer-contact-person",
+        ework_customer_channel_field_id="customer-channel",
+        ework_customer_channel_option_text="Modern Trade (MT)",
+        ework_customer_type_field_id="customer-type",
+        ework_customer_type_option_text="Semi Grosir",
+        ework_customer_basic_continue_button_id="customer-basic-continue",
+        ework_customer_address_type_field_id="customer-address-type",
+        ework_customer_address_type_option_text="Delivery Address",
+        ework_customer_current_location_button_id="customer-current-location",
         ework_customer_address_field_id="customer-address",
         ework_customer_save_button_id="customer-save",
         ework_customer_search_field_id="customer-search",

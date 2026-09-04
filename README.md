@@ -123,6 +123,7 @@ EWORK_EMAIL=
 EWORK_PASSWORD=
 EWORK_COMPANY_NAME=
 EWORK_COMPANY_CODE=
+EWORK_PREFER_HANDOFF=false
 EWORK_COMPANY_HANDOFF_PATH=artifacts/handoff/web_company.json
 EWORK_STORAGE_STATE=artifacts/auth/ework_session_state.json
 MAESTRO_FLOW_DIR=mobile/flows
@@ -171,7 +172,7 @@ EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID=id.edot.ework:id/btn_success_continue
 EWORK_CUSTOMER_SEARCH_FIELD_ID=
 ```
 
-Mobile credentials should come from the web-created company handoff where possible. If handoff data is not available, set valid mobile credentials only in local environment variables.
+Mobile credentials should come from the web-created company handoff only when the product has proven that the created company can log in to eWork. Default mobile runs keep explicit `.env` fallback identity first. Set `EWORK_PREFER_HANDOFF=true` only for the dedicated handoff proof; the password still comes from secure local environment variables.
 
 ## Web Execution
 
@@ -267,7 +268,7 @@ Direct Pytest forms:
 
 ## Web-to-Mobile Handoff
 
-When a web company is created, `edot_qa.handoff` can write non-secret runtime company data to `artifacts/handoff/web_company.json`. Mobile config reads this file for company name/email when explicit mobile environment values are absent. Passwords are never written to handoff files.
+When a web company is created, `edot_qa.handoff` can write non-secret runtime company data to `artifacts/handoff/web_company.json`, including company name, company email, and captured Company ID/code. Mobile config normally reads this only when explicit mobile environment values are absent. In the dedicated handoff proof, `EWORK_PREFER_HANDOFF=true` makes handoff company identity override fallback identity. Passwords are never written to handoff files, and company email is not assumed to be a valid mobile username unless the live mobile login succeeds with it.
 
 ## Allure Reporting
 

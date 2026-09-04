@@ -657,6 +657,7 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         mobile_device_id=mobile_device_id,
         mobile_flow_timeout_seconds=300,
         edot_live=False,
+        prefer_company_handoff=False,
         ework_app_id="id.edot.ework",
         ework_email=None,
         ework_password=None,

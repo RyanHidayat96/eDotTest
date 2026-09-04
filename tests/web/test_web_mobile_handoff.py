@@ -38,7 +38,11 @@ def test_company_handoff_file_is_secret_free(tmp_path):
         language="English",
         street_address="Jl. Sudirman No. 10, Jakarta Selatan",
     )
-    handoff = CompanyHandoff.from_registration(registration, source_run_id="abc12345")
+    handoff = CompanyHandoff.from_registration(
+        registration,
+        source_run_id="abc12345",
+        company_code="5120380",
+    )
     path = write_company_handoff(handoff, tmp_path / "handoff.json", attach_to_allure=False)
 
     loaded = read_company_handoff(path)
@@ -47,6 +51,7 @@ def test_company_handoff_file_is_secret_free(tmp_path):
     assert loaded.as_mobile_environment() == {
         "EWORK_COMPANY_NAME": "PT Handoff Nusantara QA ABC12345",
         "EWORK_EMAIL": "qa.company.abc12345@example.test",
+        "EWORK_COMPANY_CODE": "5120380",
     }
     assert loaded.trial_days == 30
     assert "password" not in path.read_text(encoding="utf-8").lower()
@@ -56,9 +61,12 @@ def test_mobile_settings_consumes_company_handoff(monkeypatch, tmp_path):
     monkeypatch.setattr(mobile_config, "_load_dotenv", lambda: None)
     monkeypatch.delenv("EWORK_EMAIL", raising=False)
     monkeypatch.delenv("EWORK_COMPANY_NAME", raising=False)
+    monkeypatch.delenv("EWORK_COMPANY_CODE", raising=False)
+    monkeypatch.delenv("EWORK_PREFER_HANDOFF", raising=False)
     handoff = CompanyHandoff(
         company_name="PT Handoff Nusantara QA ABC12345",
         company_email="qa.company.abc12345@example.test",
+        company_code="5120380",
         source_run_id="abc12345",
     )
     path = write_company_handoff(handoff, tmp_path / "handoff.json", attach_to_allure=False)
@@ -68,7 +76,58 @@ def test_mobile_settings_consumes_company_handoff(monkeypatch, tmp_path):
 
     assert settings.ework_email == "qa.company.abc12345@example.test"
     assert settings.ework_company_name == "PT Handoff Nusantara QA ABC12345"
+    assert settings.ework_company_code == "5120380"
     assert "EWORK_EMAIL" not in settings.missing_login_requirements()
+    assert "EWORK_COMPANY_CODE" not in settings.missing_login_requirements()
+
+
+def test_mobile_settings_default_keeps_environment_identity_over_handoff(monkeypatch, tmp_path):
+    monkeypatch.setattr(mobile_config, "_load_dotenv", lambda: None)
+    monkeypatch.setenv("EWORK_EMAIL", "fallback-user@example.test")
+    monkeypatch.setenv("EWORK_COMPANY_NAME", "Fallback Company")
+    monkeypatch.setenv("EWORK_COMPANY_CODE", "fallback-code")
+    monkeypatch.delenv("EWORK_PREFER_HANDOFF", raising=False)
+    handoff = CompanyHandoff(
+        company_name="PT Handoff Nusantara QA ABC12345",
+        company_email="qa.company.abc12345@example.test",
+        company_code="5120380",
+        source_run_id="abc12345",
+    )
+    path = write_company_handoff(handoff, tmp_path / "handoff.json", attach_to_allure=False)
+    monkeypatch.setenv("EWORK_COMPANY_HANDOFF_PATH", str(path))
+
+    settings = mobile_config.load_mobile_settings()
+
+    assert settings.prefer_company_handoff is False
+    assert settings.ework_email == "fallback-user@example.test"
+    assert settings.ework_company_name == "Fallback Company"
+    assert settings.ework_company_code == "fallback-code"
+
+
+def test_mobile_settings_handoff_mode_prefers_handoff_identity(monkeypatch, tmp_path):
+    monkeypatch.setattr(mobile_config, "_load_dotenv", lambda: None)
+    monkeypatch.setenv("EWORK_EMAIL", "fallback-user@example.test")
+    monkeypatch.setenv("EWORK_PASSWORD", "secret-value")
+    monkeypatch.setenv("EWORK_COMPANY_NAME", "Fallback Company")
+    monkeypatch.setenv("EWORK_COMPANY_CODE", "fallback-code")
+    monkeypatch.setenv("EWORK_PREFER_HANDOFF", "true")
+    handoff = CompanyHandoff(
+        company_name="PT Handoff Nusantara QA ABC12345",
+        company_email="qa.company.abc12345@example.test",
+        company_code="5120380",
+        source_run_id="abc12345",
+    )
+    path = write_company_handoff(handoff, tmp_path / "handoff.json", attach_to_allure=False)
+    monkeypatch.setenv("EWORK_COMPANY_HANDOFF_PATH", str(path))
+
+    settings = mobile_config.load_mobile_settings()
+
+    assert settings.prefer_company_handoff is True
+    assert settings.ework_email == "qa.company.abc12345@example.test"
+    assert settings.ework_password == "secret-value"
+    assert settings.ework_company_name == "PT Handoff Nusantara QA ABC12345"
+    assert settings.ework_company_code == "5120380"
+    assert "secret-value" not in str(settings.as_safe_dict())
 
 
 @pytest.mark.requires_credentials
@@ -82,8 +141,12 @@ def test_mobile_settings_consumes_company_handoff(monkeypatch, tmp_path):
 )
 def test_web_created_company_handoff_drives_mobile_login(settings, authenticated_page):
     with allure_step("Validate mobile handoff prerequisites", screenshot=False):
-        mobile_probe = load_mobile_settings()
-        missing_mobile = [item for item in mobile_probe.missing_login_requirements() if item != "EWORK_EMAIL"]
+        mobile_probe = load_mobile_settings(prefer_handoff=True)
+        missing_mobile = [
+            item
+            for item in mobile_probe.missing_login_requirements()
+            if item not in {"EWORK_EMAIL", "EWORK_COMPANY_CODE"}
+        ]
         if missing_mobile:
             pytest.skip(f"Missing mobile handoff login environment values: {', '.join(missing_mobile)}")
         if not command_available(mobile_probe.maestro_cli):
@@ -125,11 +188,17 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
             created_company_id = detail_page.company_id_value()
 
         with allure_step("Create and verify company handoff file", screenshot=False):
-            handoff = CompanyHandoff.from_registration(registration, source_run_id=generated_data.run_id)
+            handoff = CompanyHandoff.from_registration(
+                registration,
+                source_run_id=generated_data.run_id,
+                company_code=created_company_id,
+            )
             write_company_handoff(handoff, mobile_probe.company_handoff_path)
-            mobile_settings = load_mobile_settings()
+            mobile_settings = load_mobile_settings(prefer_handoff=True)
+            assert mobile_settings.prefer_company_handoff is True
             assert mobile_settings.ework_email == registration.email
             assert mobile_settings.ework_company_name == registration.company_name
+            assert mobile_settings.ework_company_code == created_company_id
 
         assert_maestro_passed(MaestroRunner(mobile_settings).run_flow("login.yaml"))
     except Exception as error:

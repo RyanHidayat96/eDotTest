@@ -26,6 +26,7 @@ class MobileSettings:
     mobile_device_id: str | None
     mobile_flow_timeout_seconds: int
     edot_live: bool
+    prefer_company_handoff: bool
     ework_app_id: str | None
     ework_email: str | None = field(repr=False)
     ework_password: str | None = field(repr=False)
@@ -167,6 +168,7 @@ class MobileSettings:
             "MOBILE_DEVICE_ID": self.mobile_device_id or "<auto>",
             "MOBILE_FLOW_TIMEOUT_SECONDS": str(self.mobile_flow_timeout_seconds),
             "EDOT_LIVE": str(self.edot_live).lower(),
+            "EWORK_PREFER_HANDOFF": str(self.prefer_company_handoff).lower(),
             "EWORK_APP_ID": self.ework_app_id or "<missing>",
             "EWORK_EMAIL": "<set>" if self.ework_email else "<missing>",
             "EWORK_PASSWORD": "<set>" if self.ework_password else "<missing>",
@@ -288,21 +290,26 @@ class MobileSettings:
         return variables
 
 
-def load_mobile_settings() -> MobileSettings:
+def load_mobile_settings(*, prefer_handoff: bool | None = None) -> MobileSettings:
     _load_dotenv()
     handoff_path = _path_from_env("EWORK_COMPANY_HANDOFF_PATH", DEFAULT_COMPANY_HANDOFF_PATH)
     handoff = read_company_handoff(handoff_path)
+    prefer_company_handoff = _bool_from_env("EWORK_PREFER_HANDOFF") if prefer_handoff is None else prefer_handoff
+    handoff_email = handoff.company_email if handoff else None
+    handoff_name = handoff.company_name if handoff else None
+    handoff_code = handoff.company_code if handoff else None
     return MobileSettings(
         maestro_cli=os.getenv("MAESTRO_CLI", "maestro"),
         adb_command=os.getenv("ADB_COMMAND", "adb"),
         mobile_device_id=os.getenv("MOBILE_DEVICE_ID") or None,
         mobile_flow_timeout_seconds=_int_from_env("MOBILE_FLOW_TIMEOUT_SECONDS", 300),
         edot_live=_bool_from_env("EDOT_LIVE"),
+        prefer_company_handoff=prefer_company_handoff,
         ework_app_id=os.getenv("EWORK_APP_ID") or None,
-        ework_email=os.getenv("EWORK_EMAIL") or (handoff.company_email if handoff else None),
+        ework_email=_company_identity_value("EWORK_EMAIL", handoff_email, prefer_company_handoff),
         ework_password=os.getenv("EWORK_PASSWORD") or None,
-        ework_company_name=os.getenv("EWORK_COMPANY_NAME") or (handoff.company_name if handoff else None),
-        ework_company_code=os.getenv("EWORK_COMPANY_CODE") or (handoff.company_code if handoff else None),
+        ework_company_name=_company_identity_value("EWORK_COMPANY_NAME", handoff_name, prefer_company_handoff),
+        ework_company_code=_company_identity_value("EWORK_COMPANY_CODE", handoff_code, prefer_company_handoff),
         ework_login_screen_text=os.getenv("EWORK_LOGIN_SCREEN_TEXT") or None,
         ework_company_id_field_id=os.getenv("EWORK_COMPANY_ID_FIELD_ID") or None,
         ework_username_field_id=os.getenv("EWORK_USERNAME_FIELD_ID") or None,
@@ -365,6 +372,13 @@ def _path_from_env(name: str, default: Path) -> Path:
         return default
     path = Path(raw_value)
     return path if path.is_absolute() else ROOT_DIR / path
+
+
+def _company_identity_value(name: str, handoff_value: str | None, prefer_handoff: bool) -> str | None:
+    env_value = os.getenv(name) or None
+    if prefer_handoff and handoff_value:
+        return handoff_value
+    return env_value or handoff_value
 
 
 def _bool_from_env(name: str) -> bool:

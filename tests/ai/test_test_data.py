@@ -44,6 +44,15 @@ class MissingModelProvider:
         raise GeminiModelNotFoundError("Gemini model not found: gemini-old")
 
 
+class ApiErrorProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def generate(self, prompt: str, schema: dict, *, model: str, max_output_tokens: int) -> str:
+        self.calls += 1
+        raise RuntimeError("Gemini API request failed: timed out")
+
+
 VALID_PAYLOAD = {
     "company": {
         "legal_name": "PT Ritel Nusantara QA ABC12345",
@@ -137,6 +146,19 @@ def test_missing_gemini_model_falls_back_without_retry(monkeypatch):
 
     assert provider.calls == 1
     assert generated.source == "faker_fallback:model_not_found"
+
+
+def test_gemini_api_error_falls_back_without_retry(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
+    provider = ApiErrorProvider()
+
+    generated = TestDataGenerator(settings=load_settings(), model_provider=provider).generate(
+        "api-error-run",
+        attach_to_allure=False,
+    )
+
+    assert provider.calls == 1
+    assert generated.source == "faker_fallback:api_request_failed"
 
 
 def test_prompt_keeps_guardrails():

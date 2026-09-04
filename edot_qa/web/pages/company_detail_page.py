@@ -137,6 +137,88 @@ DETAIL_COMPANY_NAME_FIELD_SCRIPT = """
   });
 }
 """
+DETAIL_FIELD_VALUES_SCRIPT = """
+(payload) => {
+  const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim();
+  const visible = (element) => {
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const meaningful = (value) => {
+    const text = normalize(value);
+    return (
+      text.length > 0 &&
+      !/^choose\\b/i.test(text) &&
+      !/^input\\b/i.test(text) &&
+      !/^select\\b/i.test(text)
+    );
+  };
+  const valuesFrom = (element) => {
+    const values = [];
+    if (!element || !visible(element)) return values;
+    values.push(element.value);
+    values.push(element.textContent);
+    values.push(element.getAttribute("value"));
+    values.push(element.getAttribute("aria-label"));
+    values.push(element.getAttribute("title"));
+    values.push(element.getAttribute("data-value"));
+    if (element.selectedOptions) {
+      values.push(...Array.from(element.selectedOptions).map((option) => option.textContent));
+      values.push(...Array.from(element.selectedOptions).map((option) => option.value));
+    }
+    return values.map(normalize).filter(meaningful);
+  };
+  const controlsFrom = (root) => Array.from(
+    root?.querySelectorAll?.(
+      [
+        "input",
+        "textarea",
+        "select",
+        "button[role='combobox']",
+        "[role='combobox']",
+        "[data-testid]",
+        "[aria-label]",
+      ].join(",")
+    ) || []
+  );
+  const controls = [];
+  for (const placeholder of payload.placeholders || []) {
+    const escaped = CSS.escape(placeholder);
+    controls.push(...document.querySelectorAll(
+      `input[placeholder='${escaped}'], textarea[placeholder='${escaped}']`
+    ));
+  }
+  for (const stableName of [...(payload.stable_names || []), ...(payload.test_ids || [])]) {
+    const escaped = CSS.escape(stableName);
+    controls.push(...document.querySelectorAll(
+      [
+        `[name='${escaped}']`,
+        `[id='${escaped}']`,
+        `[data-testid='${escaped}']`,
+        `[aria-label='${escaped}']`,
+        `input[name*='${escaped}' i]`,
+        `textarea[name*='${escaped}' i]`,
+        `select[name*='${escaped}' i]`,
+        `[data-testid*='${escaped}' i]`,
+      ].join(",")
+    ));
+  }
+  const escapedLabel = normalize(payload.label)
+    .split("")
+    .map((char) => "\\\\^$*+?.()|{}[]".includes(char) ? `\\\\${char}` : char)
+    .join("");
+  const labelPattern = new RegExp(`^${escapedLabel}\\\\*?$`, "i");
+  const labels = Array.from(document.querySelectorAll("label, div, span, p"))
+    .filter((element) => visible(element) && labelPattern.test(normalize(element.textContent)));
+  for (const label of labels) {
+    for (const root of [label.parentElement, label.nextElementSibling]) {
+      controls.push(...controlsFrom(root));
+    }
+  }
+  return Array.from(new Set(controls.flatMap(valuesFrom)));
+}
+"""
 
 @dataclass(frozen=True)
 class DetailFieldSpec:
@@ -238,6 +320,11 @@ class CompanyDetailPage(BasePage):
             page=self.page,
             data={"field": spec.label, "expected_value": expected_value},
         ):
+            observed_values = self._detail_field_observed_values(spec)
+            for observed_value in observed_values:
+                if _detail_values_match(observed_value, expected_value):
+                    return
+
             errors: list[str] = []
             for description, locator in self._detail_value_candidates(spec, expected_value):
                 try:
@@ -245,6 +332,11 @@ class CompanyDetailPage(BasePage):
                     return
                 except (AssertionError, PlaywrightError, TimeoutError) as error:
                     errors.append(f"{description}: {error}")
+            if observed_values:
+                attach_json(
+                    "company-detail-observed-values",
+                    {"field": spec.label, "expected_value": expected_value, "observed_values": observed_values},
+                )
             raise AssertionError(
                 f"Could not verify company detail {spec.label!r} value {expected_value!r}; tried {len(errors)} locators"
             )
@@ -344,6 +436,21 @@ class CompanyDetailPage(BasePage):
         candidates.extend((f"stable name/id {stable_name}", self.page.locator(stable_detail_selector(stable_name)).first) for stable_name in spec.stable_names)
         candidates.append(("textbox labelled field", self.page.get_by_label(label).first))
         return candidates
+
+    def _detail_field_observed_values(self, spec: DetailFieldSpec) -> list[str]:
+        try:
+            values = self.page.evaluate(
+                DETAIL_FIELD_VALUES_SCRIPT,
+                {
+                    "label": spec.label,
+                    "test_ids": list(spec.test_ids),
+                    "stable_names": list(spec.stable_names),
+                    "placeholders": list(spec.placeholders),
+                },
+            )
+        except PlaywrightError:
+            return []
+        return [str(value) for value in values if str(value).strip()]
 
     @staticmethod
     def _expect_locator_has_value(locator: Locator, expected_value: str) -> None:
@@ -622,4 +729,11 @@ def _is_meaningful_detail_value(value: str) -> bool:
 def _detail_values_match(actual_value: str, expected_value: str) -> bool:
     actual = " ".join(actual_value.split()).casefold()
     expected = " ".join(expected_value.split()).casefold()
-    return bool(actual and expected) and (actual == expected or expected in actual)
+    if not actual or not expected:
+        return False
+    if actual == expected or expected in actual:
+        return True
+    if actual.endswith(("...", "…")):
+        prefix = actual.rstrip(".…").strip()
+        return bool(prefix) and expected.startswith(prefix)
+    return False

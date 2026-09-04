@@ -13,6 +13,7 @@
     "test:web:login": ".venv\\Scripts\\python.exe -m pytest tests/web/test_login.py -q",
     "test:web:company:step1": ".venv\\Scripts\\python.exe -m pytest tests/web/test_create_company.py::test_register_company_step_one_requires_valid_data -q",
     "test:web:company:full": ".venv\\Scripts\\python.exe -m pytest tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data -q",
+    "test:web:company:full:debug": "set E2E_CONSOLE_STEPS=true&& .venv\\Scripts\\python.exe -m pytest tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data -q -s",
     "test:mobile": ".venv\\Scripts\\python.exe -m pytest tests/mobile -q -rs",
     "test:mobile:foundation": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_foundation.py -q -rs",
     "test:mobile:login": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_login.py -q -rs",

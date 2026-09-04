@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+import os
 from dataclasses import dataclass
+from typing import Any
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, TimeoutError, expect
@@ -232,10 +234,21 @@ class RegisterCompanyWizardPage(BasePage):
             page=self.page,
             data={"field": spec.label, "value": value},
         ):
+            if spec.label == "Street Address":
+                _console_debug("street address: try direct DOM fill")
+                if self._try_fill_street_address(value):
+                    _console_debug("street address: direct DOM fill pass")
+                    return
+                _console_debug("street address: direct DOM fill fallback to locator")
+            _console_debug(f"{spec.label}: resolving input")
             control = self._text_control(spec)
+            _console_debug(f"{spec.label}: input resolved")
             self._assert_required_control_editable(control, spec)
-            control.fill(value)
+            _console_debug(f"{spec.label}: fill")
+            control.fill(value, timeout=2_000)
+            _console_debug(f"{spec.label}: verify value")
             self._expect_text_value(control, value, spec.label)
+            _console_debug(f"{spec.label}: pass")
 
     def choose_or_fill_field(self, spec: FieldSpec, value: str) -> None:
         with allure_step(
@@ -285,6 +298,22 @@ class RegisterCompanyWizardPage(BasePage):
             raise AssertionError(f"Could not choose {value!r} for {spec.label}; tried {len(errors)} controls")
 
     def _text_control(self, spec: FieldSpec) -> Locator:
+        if spec.label == "Street Address":
+            return self.first_visible(
+                [
+                    ("street address label-adjacent input", self._input_after_label("Street Address")),
+                    (
+                        "street address visible placeholder",
+                        self.page.locator(
+                            "input[placeholder='Input Address']:visible, textarea[placeholder='Input Address']:visible, "
+                            "input[placeholder*='Address']:visible, textarea[placeholder*='Address']:visible"
+                        ).first,
+                    ),
+                ],
+                f"{spec.label} input",
+                timeout_ms=1_000,
+            )
+
         label_regex = re.compile(re.escape(spec.label), re.I)
         candidates = existing_locator_candidates(
             [
@@ -309,7 +338,17 @@ class RegisterCompanyWizardPage(BasePage):
             )
         )
         candidates.append((f"textbox named {spec.label}", self.page.get_by_role("textbox", name=label_regex).first))
-        return self.first_visible(candidates, f"{spec.label} input", timeout_ms=5_000)
+        return self.first_visible(candidates, f"{spec.label} input", timeout_ms=1_500)
+
+    def _input_after_label(self, label: str) -> Locator:
+        return self.page.locator(
+            "xpath=("
+            f"//*[self::label or self::div or self::span][contains(normalize-space(.), '{label}') "
+            "and string-length(normalize-space(.)) <= 40]"
+            "/following::*[self::input or self::textarea][(not(@type) or @type!='hidden') "
+            "and not(ancestor-or-self::*[contains(@style, 'display: none')])][1]"
+            ")[1]"
+        )
 
     def _choice_controls(self, spec: FieldSpec) -> list[tuple[str, Locator]]:
         label_regex = re.compile(re.escape(spec.label), re.I)
@@ -404,6 +443,61 @@ class RegisterCompanyWizardPage(BasePage):
         except (AssertionError, TimeoutError, PlaywrightError):
             return False
 
+    def _try_fill_street_address(self, value: str) -> bool:
+        try:
+            _console_debug("street address: page.evaluate start")
+            result: Any = self.page.evaluate(
+                """value => {
+                    const isVisible = element => Boolean(
+                        element.offsetWidth || element.offsetHeight || element.getClientRects().length
+                    );
+                    const isEditable = element => !element.disabled
+                        && !element.readOnly
+                        && element.getAttribute('aria-disabled') !== 'true';
+                    const controls = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea'))
+                        .filter(element => isVisible(element) && isEditable(element));
+                    const labels = Array.from(document.querySelectorAll('label, div, span'))
+                        .filter(element => {
+                            const text = (element.textContent || '').trim();
+                            return text.includes('Street Address') && text.length <= 40 && isVisible(element);
+                        });
+                    const byLabel = labels
+                        .map(label => controls.find(control => Boolean(
+                            label.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING
+                        )))
+                        .find(Boolean);
+                    const control = byLabel || controls.find(element => {
+                        const placeholder = element.getAttribute('placeholder') || '';
+                        return placeholder.toLowerCase().includes('address');
+                    });
+                    if (!control) return {ok: false, reason: 'street address input not found'};
+                    control.scrollIntoView({block: 'center', inline: 'nearest'});
+                    control.focus();
+                    const prototype = control.tagName.toLowerCase() === 'textarea'
+                        ? HTMLTextAreaElement.prototype
+                        : HTMLInputElement.prototype;
+                    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+                    if (descriptor && descriptor.set) {
+                        descriptor.set.call(control, value);
+                    } else {
+                        control.value = value;
+                    }
+                    control.dispatchEvent(new Event('input', {bubbles: true}));
+                    control.dispatchEvent(new Event('change', {bubbles: true}));
+                    control.blur();
+                    return {
+                        ok: control.value === value,
+                        value: control.value,
+                        placeholder: control.getAttribute('placeholder') || '',
+                    };
+                }""",
+                value,
+            )
+        except PlaywrightError:
+            return False
+        _console_debug(f"street address: page.evaluate result={result}")
+        return isinstance(result, dict) and result.get("ok") is True
+
     def _visible_control_is_disabled(self, text: str) -> bool:
         try:
             return bool(
@@ -492,10 +586,10 @@ class RegisterCompanyWizardPage(BasePage):
     @staticmethod
     def _expect_text_value(control: Locator, value: str, label: str) -> None:
         try:
-            expect(control).to_have_value(value, timeout=5_000)
+            expect(control).to_have_value(value, timeout=2_000)
         except AssertionError:
             # Some custom controls expose text content rather than input value.
-            expect(control).to_contain_text(value, timeout=5_000)
+            expect(control).to_contain_text(value, timeout=2_000)
 
 
 def stable_text_selector(stable_name: str) -> str:
@@ -522,3 +616,8 @@ def existing_locator_candidates(candidates: list[tuple[str, Locator]]) -> list[t
         except PlaywrightError:
             continue
     return existing
+
+
+def _console_debug(message: str) -> None:
+    if os.getenv("E2E_CONSOLE_STEPS", "").strip().lower() in {"1", "true", "yes", "on"}:
+        print(f"[DEBUG] {message}", flush=True)

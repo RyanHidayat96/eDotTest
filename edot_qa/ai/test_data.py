@@ -115,7 +115,7 @@ class GeminiGenerateContentProvider:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with urllib.request.urlopen(request, timeout=10) as response:
                 body = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             if error.code == 404:
@@ -224,7 +224,11 @@ class TestDataGenerator:
                     fallback_reason = "model_not_found"
                     attempt_errors.append({"attempt": attempt, "error": str(error)})
                     break
-                except (json.JSONDecodeError, ValidationError, RuntimeError) as error:
+                except RuntimeError as error:
+                    fallback_reason = "api_request_failed"
+                    attempt_errors.append({"attempt": attempt, "error": str(error)})
+                    break
+                except (json.JSONDecodeError, ValidationError) as error:
                     attempt_errors.append({"attempt": attempt, "error": str(error)})
 
             if attempt_errors and attach_to_allure:

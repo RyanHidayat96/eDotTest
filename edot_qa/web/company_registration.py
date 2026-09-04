@@ -61,7 +61,7 @@ class CompanyRegistrationData(BaseModel):
             industry_type=normalize_industry_for_web(company.industry),
             company_type=os.getenv("ESUITE_COMPANY_TYPE", cls.model_fields["company_type"].default),
             language=os.getenv("ESUITE_COMPANY_LANGUAGE", cls.model_fields["language"].default),
-            street_address=company.street_address,
+            street_address=normalize_street_address_for_web(company.street_address),
             branch_name=os.getenv("ESUITE_BRANCH_NAME", cls.model_fields["branch_name"].default),
         )
 
@@ -104,14 +104,34 @@ def normalize_phone_for_web(phone: str) -> str:
         digits = digits[2:]
     if digits.startswith("0"):
         digits = digits[1:]
+    if not digits:
+        return "8123456789"
+    if not digits.startswith("8"):
+        digits = f"8{digits}"
+    if len(digits) < 10:
+        digits = digits.ljust(10, "0")
     return digits[:13]
 
 
 def normalize_email_for_web(email: str, suffix: str) -> str:
     cleaned = email.strip().lower()
+    local_part = cleaned.split("@", 1)[0]
+    if cleaned.endswith(".dummy") or not cleaned.endswith((".test", ".com", ".co.id", ".id")):
+        return f"{local_part[:12] or 'qa'}{suffix.lower()}@example.test"
     if len(cleaned) <= 30:
         return cleaned
     return f"qa{suffix.lower()}@qa.test"
+
+
+def normalize_street_address_for_web(address: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9 ]+", " ", address)
+    words = cleaned.split()
+    if not words:
+        return "Jalan Sudirman Jakarta"
+    normalized = " ".join(words[:6])
+    if len(normalized) < 10:
+        normalized = f"{normalized} Jakarta".strip()
+    return normalized[:80]
 
 
 def normalize_industry_for_web(industry: str) -> str:

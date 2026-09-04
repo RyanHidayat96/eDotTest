@@ -273,7 +273,7 @@ When a web company is created, `edot_qa.handoff` can write non-secret runtime co
 Run the dedicated live handoff proof:
 
 ```powershell
-npm run test:e2e:handoff
+npm run test:handoff
 ```
 
 ## Bonus Features
@@ -281,7 +281,7 @@ npm run test:e2e:handoff
 Implemented bonus scope:
 
 - Parallel execution: `npm run test:parallel` runs safe non-live Pytest checks with `pytest-xdist -n auto`. Live web/mobile/device flows stay outside that script because they share external accounts, storage state, browser state, and a single Android device.
-- Genuine web-to-mobile handoff: `npm run test:e2e:handoff` creates a company through eSuite web, verifies Tier 2 web detail, writes only non-secret handoff data, then attempts eWork login using that created company identity. Treat this bonus as proven only when the live run passes.
+- Genuine web-to-mobile handoff: `npm run test:handoff` creates a company through eSuite web, verifies Tier 2 web detail, writes only non-secret handoff data, then attempts eWork login using that created company identity. Treat this bonus as proven only when the live run passes.
 
 Run safe parallel checks locally:
 

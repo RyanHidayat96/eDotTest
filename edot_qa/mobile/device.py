@@ -81,6 +81,27 @@ def force_stop_app(
     return completed.stdout.strip()
 
 
+def wake_device(
+    adb_command: str = "adb",
+    *,
+    device_id: str | None = None,
+    timeout_seconds: int = 10,
+) -> str:
+    base_command = [adb_command]
+    if device_id:
+        base_command.extend(["-s", device_id])
+
+    outputs = []
+    for shell_command in (
+        ["shell", "input", "keyevent", "KEYCODE_WAKEUP"],
+        ["shell", "wm", "dismiss-keyguard"],
+    ):
+        completed = _run_adb([*base_command, *shell_command], timeout_seconds=timeout_seconds)
+        if completed.stdout.strip():
+            outputs.append(completed.stdout.strip())
+    return "\n".join(outputs)
+
+
 def capture_device_screenshot(
     adb_command: str = "adb",
     *,

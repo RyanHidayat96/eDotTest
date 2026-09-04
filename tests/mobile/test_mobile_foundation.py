@@ -16,6 +16,7 @@ from edot_qa.mobile.device import (
     package_installed,
     parse_adb_devices,
     ready_device,
+    wake_device,
 )
 from edot_qa.mobile.maestro import MaestroResult, MaestroRunner, assert_maestro_passed
 from edot_qa.mobile.session_state import mobile_session_state_exists, write_mobile_session_state
@@ -156,6 +157,22 @@ def test_force_stop_app_uses_device_scoped_am_force_stop(monkeypatch):
     monkeypatch.setattr("edot_qa.mobile.device.subprocess.run", fake_run)
 
     assert force_stop_app("com.example.app", device_id="emulator-5554") == ""
+
+
+def test_wake_device_wakes_and_dismisses_keyguard(monkeypatch):
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("edot_qa.mobile.device.subprocess.run", fake_run)
+
+    assert wake_device(device_id="emulator-5554") == ""
+    assert commands == [
+        ["adb", "-s", "emulator-5554", "shell", "input", "keyevent", "KEYCODE_WAKEUP"],
+        ["adb", "-s", "emulator-5554", "shell", "wm", "dismiss-keyguard"],
+    ]
 
 
 def test_capture_device_screenshot_uses_exec_out_png(monkeypatch):

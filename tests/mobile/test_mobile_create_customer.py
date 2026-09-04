@@ -4,7 +4,7 @@ import pytest
 
 from edot_qa.ai.test_data import GeneratedTestData
 from edot_qa.mobile.customer import MobileCustomerData, generate_mobile_customer_data
-from edot_qa.mobile.device import adb_devices, command_available, force_stop_app, package_installed, ready_device
+from edot_qa.mobile.device import adb_devices, command_available, force_stop_app, package_installed, ready_device, wake_device
 from edot_qa.mobile.session_state import mobile_session_state_exists
 from edot_qa.reporting.allure_helpers import allure_step, attach_json
 
@@ -131,6 +131,11 @@ def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_ma
             )
 
     with allure_step("Start eWork from stored mobile session", data={"package": mobile_settings.ework_app_id}, screenshot=False):
+        wake_device(
+            mobile_settings.adb_command,
+            device_id=mobile_settings.mobile_device_id or device.serial,
+            timeout_seconds=10,
+        )
         force_stop_app(
             mobile_settings.ework_app_id or "",
             mobile_settings.adb_command,

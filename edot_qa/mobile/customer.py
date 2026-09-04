@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -12,6 +13,7 @@ class MobileCustomerData:
     name: str
     contact: str
     address: str
+    ktp_number: str
     run_id: str
     source: str
 
@@ -22,6 +24,7 @@ class MobileCustomerData:
             name=customer.name,
             contact=customer.contact,
             address=customer.address,
+            ktp_number=_fake_ktp_number(generated.run_id),
             run_id=generated.run_id,
             source=generated.source,
         )
@@ -32,6 +35,7 @@ class MobileCustomerData:
             "EWORK_CUSTOMER_CONTACT": self.contact,
             "EWORK_CUSTOMER_CONTACT_PERSON": self.name,
             "EWORK_CUSTOMER_ADDRESS": self.address,
+            "EWORK_CUSTOMER_KTP_NUMBER": self.ktp_number,
         }
 
     def as_allure_payload(self) -> dict[str, Any]:
@@ -39,6 +43,7 @@ class MobileCustomerData:
             "name": self.name,
             "contact": self.contact,
             "address": self.address,
+            "ktp_number": self.ktp_number,
             "run_id": self.run_id,
             "source": self.source,
         }
@@ -49,3 +54,9 @@ def generate_mobile_customer_data(run_id: str | None = None) -> MobileCustomerDa
         customer = MobileCustomerData.from_generated_test_data(generate_test_data(run_id=run_id))
         attach_json("mobile-customer-data", customer.as_allure_payload())
         return customer
+
+
+def _fake_ktp_number(seed: str) -> str:
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+    suffix = int(digest[:16], 16) % 10**14
+    return f"31{suffix:014d}"

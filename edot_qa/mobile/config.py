@@ -49,8 +49,25 @@ class MobileSettings:
     ework_customer_address_type_field_id: str | None
     ework_customer_address_type_option_text: str | None
     ework_customer_current_location_button_id: str | None
+    ework_customer_location_apply_button_id: str | None
+    ework_customer_province_field_text: str | None
+    ework_customer_province_option_text: str | None
+    ework_customer_city_field_text: str | None
+    ework_customer_city_option_text: str | None
+    ework_customer_district_field_text: str | None
+    ework_customer_district_option_text: str | None
+    ework_customer_subdistrict_field_text: str | None
+    ework_customer_subdistrict_option_text: str | None
     ework_customer_address_field_id: str | None
+    ework_customer_ktp_field_id: str | None
+    ework_customer_upload_button_id: str | None
+    ework_customer_camera_capture_button_id: str | None
+    ework_customer_signature_title_text: str | None
+    ework_customer_signature_view_id: str | None
     ework_customer_save_button_id: str | None
+    ework_customer_save_confirm_button_id: str | None
+    ework_customer_success_text: str | None
+    ework_customer_success_continue_button_id: str | None
     ework_customer_search_field_id: str | None
     maestro_flow_dir: Path
     maestro_output_dir: Path
@@ -105,9 +122,25 @@ class MobileSettings:
             "EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID": self.ework_customer_address_type_field_id,
             "EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT": self.ework_customer_address_type_option_text,
             "EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID": self.ework_customer_current_location_button_id,
+            "EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID": self.ework_customer_location_apply_button_id,
+            "EWORK_CUSTOMER_PROVINCE_FIELD_TEXT": self.ework_customer_province_field_text,
+            "EWORK_CUSTOMER_PROVINCE_OPTION_TEXT": self.ework_customer_province_option_text,
+            "EWORK_CUSTOMER_CITY_FIELD_TEXT": self.ework_customer_city_field_text,
+            "EWORK_CUSTOMER_CITY_OPTION_TEXT": self.ework_customer_city_option_text,
+            "EWORK_CUSTOMER_DISTRICT_FIELD_TEXT": self.ework_customer_district_field_text,
+            "EWORK_CUSTOMER_DISTRICT_OPTION_TEXT": self.ework_customer_district_option_text,
+            "EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT": self.ework_customer_subdistrict_field_text,
+            "EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT": self.ework_customer_subdistrict_option_text,
             "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id,
+            "EWORK_CUSTOMER_KTP_FIELD_ID": self.ework_customer_ktp_field_id,
+            "EWORK_CUSTOMER_UPLOAD_BUTTON_ID": self.ework_customer_upload_button_id,
+            "EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID": self.ework_customer_camera_capture_button_id,
+            "EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT": self.ework_customer_signature_title_text,
+            "EWORK_CUSTOMER_SIGNATURE_VIEW_ID": self.ework_customer_signature_view_id,
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id,
-            "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id,
+            "EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID": self.ework_customer_save_confirm_button_id,
+            "EWORK_CUSTOMER_SUCCESS_TEXT": self.ework_customer_success_text,
+            "EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID": self.ework_customer_success_continue_button_id,
         }
         missing = self.missing_login_requirements()
         if not (self.ework_customers_menu_id or self.ework_customers_menu_text):
@@ -150,8 +183,25 @@ class MobileSettings:
             "EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID": self.ework_customer_address_type_field_id or "<missing>",
             "EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT": self.ework_customer_address_type_option_text or "<missing>",
             "EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID": self.ework_customer_current_location_button_id or "<missing>",
+            "EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID": self.ework_customer_location_apply_button_id or "<missing>",
+            "EWORK_CUSTOMER_PROVINCE_FIELD_TEXT": self.ework_customer_province_field_text or "<missing>",
+            "EWORK_CUSTOMER_PROVINCE_OPTION_TEXT": self.ework_customer_province_option_text or "<missing>",
+            "EWORK_CUSTOMER_CITY_FIELD_TEXT": self.ework_customer_city_field_text or "<missing>",
+            "EWORK_CUSTOMER_CITY_OPTION_TEXT": self.ework_customer_city_option_text or "<missing>",
+            "EWORK_CUSTOMER_DISTRICT_FIELD_TEXT": self.ework_customer_district_field_text or "<missing>",
+            "EWORK_CUSTOMER_DISTRICT_OPTION_TEXT": self.ework_customer_district_option_text or "<missing>",
+            "EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT": self.ework_customer_subdistrict_field_text or "<missing>",
+            "EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT": self.ework_customer_subdistrict_option_text or "<missing>",
             "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id or "<missing>",
+            "EWORK_CUSTOMER_KTP_FIELD_ID": self.ework_customer_ktp_field_id or "<missing>",
+            "EWORK_CUSTOMER_UPLOAD_BUTTON_ID": self.ework_customer_upload_button_id or "<missing>",
+            "EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID": self.ework_customer_camera_capture_button_id or "<missing>",
+            "EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT": self.ework_customer_signature_title_text or "<missing>",
+            "EWORK_CUSTOMER_SIGNATURE_VIEW_ID": self.ework_customer_signature_view_id or "<missing>",
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id or "<missing>",
+            "EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID": self.ework_customer_save_confirm_button_id or "<missing>",
+            "EWORK_CUSTOMER_SUCCESS_TEXT": self.ework_customer_success_text or "<missing>",
+            "EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID": self.ework_customer_success_continue_button_id or "<missing>",
             "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id or "<missing>",
             "MAESTRO_FLOW_DIR": str(self.maestro_flow_dir),
             "MAESTRO_OUTPUT_DIR": str(self.maestro_output_dir),
@@ -191,8 +241,25 @@ class MobileSettings:
             "EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID": self.ework_customer_address_type_field_id,
             "EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT": self.ework_customer_address_type_option_text,
             "EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID": self.ework_customer_current_location_button_id,
+            "EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID": self.ework_customer_location_apply_button_id,
+            "EWORK_CUSTOMER_PROVINCE_FIELD_TEXT": self.ework_customer_province_field_text,
+            "EWORK_CUSTOMER_PROVINCE_OPTION_TEXT": self.ework_customer_province_option_text,
+            "EWORK_CUSTOMER_CITY_FIELD_TEXT": self.ework_customer_city_field_text,
+            "EWORK_CUSTOMER_CITY_OPTION_TEXT": self.ework_customer_city_option_text,
+            "EWORK_CUSTOMER_DISTRICT_FIELD_TEXT": self.ework_customer_district_field_text,
+            "EWORK_CUSTOMER_DISTRICT_OPTION_TEXT": self.ework_customer_district_option_text,
+            "EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT": self.ework_customer_subdistrict_field_text,
+            "EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT": self.ework_customer_subdistrict_option_text,
             "EWORK_CUSTOMER_ADDRESS_FIELD_ID": self.ework_customer_address_field_id,
+            "EWORK_CUSTOMER_KTP_FIELD_ID": self.ework_customer_ktp_field_id,
+            "EWORK_CUSTOMER_UPLOAD_BUTTON_ID": self.ework_customer_upload_button_id,
+            "EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID": self.ework_customer_camera_capture_button_id,
+            "EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT": self.ework_customer_signature_title_text,
+            "EWORK_CUSTOMER_SIGNATURE_VIEW_ID": self.ework_customer_signature_view_id,
             "EWORK_CUSTOMER_SAVE_BUTTON_ID": self.ework_customer_save_button_id,
+            "EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID": self.ework_customer_save_confirm_button_id,
+            "EWORK_CUSTOMER_SUCCESS_TEXT": self.ework_customer_success_text,
+            "EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID": self.ework_customer_success_continue_button_id,
             "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id,
         }
         variables = {}
@@ -239,8 +306,25 @@ def load_mobile_settings() -> MobileSettings:
         ework_customer_address_type_field_id=os.getenv("EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID") or None,
         ework_customer_address_type_option_text=os.getenv("EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT") or None,
         ework_customer_current_location_button_id=os.getenv("EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID") or None,
+        ework_customer_location_apply_button_id=os.getenv("EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID") or None,
+        ework_customer_province_field_text=os.getenv("EWORK_CUSTOMER_PROVINCE_FIELD_TEXT") or None,
+        ework_customer_province_option_text=os.getenv("EWORK_CUSTOMER_PROVINCE_OPTION_TEXT") or None,
+        ework_customer_city_field_text=os.getenv("EWORK_CUSTOMER_CITY_FIELD_TEXT") or None,
+        ework_customer_city_option_text=os.getenv("EWORK_CUSTOMER_CITY_OPTION_TEXT") or None,
+        ework_customer_district_field_text=os.getenv("EWORK_CUSTOMER_DISTRICT_FIELD_TEXT") or None,
+        ework_customer_district_option_text=os.getenv("EWORK_CUSTOMER_DISTRICT_OPTION_TEXT") or None,
+        ework_customer_subdistrict_field_text=os.getenv("EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT") or None,
+        ework_customer_subdistrict_option_text=os.getenv("EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT") or None,
         ework_customer_address_field_id=os.getenv("EWORK_CUSTOMER_ADDRESS_FIELD_ID") or None,
+        ework_customer_ktp_field_id=os.getenv("EWORK_CUSTOMER_KTP_FIELD_ID") or None,
+        ework_customer_upload_button_id=os.getenv("EWORK_CUSTOMER_UPLOAD_BUTTON_ID") or None,
+        ework_customer_camera_capture_button_id=os.getenv("EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID") or None,
+        ework_customer_signature_title_text=os.getenv("EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT") or None,
+        ework_customer_signature_view_id=os.getenv("EWORK_CUSTOMER_SIGNATURE_VIEW_ID") or None,
         ework_customer_save_button_id=os.getenv("EWORK_CUSTOMER_SAVE_BUTTON_ID") or None,
+        ework_customer_save_confirm_button_id=os.getenv("EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID") or None,
+        ework_customer_success_text=os.getenv("EWORK_CUSTOMER_SUCCESS_TEXT") or None,
+        ework_customer_success_continue_button_id=os.getenv("EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID") or None,
         ework_customer_search_field_id=os.getenv("EWORK_CUSTOMER_SEARCH_FIELD_ID") or None,
         maestro_flow_dir=_path_from_env("MAESTRO_FLOW_DIR", DEFAULT_MAESTRO_FLOW_DIR),
         maestro_output_dir=_path_from_env("MAESTRO_OUTPUT_DIR", DEFAULT_MAESTRO_OUTPUT_DIR),

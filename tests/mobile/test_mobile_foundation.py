@@ -49,8 +49,25 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     monkeypatch.setenv("EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID", "customer-address-type")
     monkeypatch.setenv("EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT", "Delivery Address")
     monkeypatch.setenv("EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID", "customer-current-location")
+    monkeypatch.setenv("EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID", "customer-location-apply")
+    monkeypatch.setenv("EWORK_CUSTOMER_PROVINCE_FIELD_TEXT", "Choose Province")
+    monkeypatch.setenv("EWORK_CUSTOMER_PROVINCE_OPTION_TEXT", "DKI JAKARTA")
+    monkeypatch.setenv("EWORK_CUSTOMER_CITY_FIELD_TEXT", "Choose City")
+    monkeypatch.setenv("EWORK_CUSTOMER_CITY_OPTION_TEXT", "JAKARTA BARAT")
+    monkeypatch.setenv("EWORK_CUSTOMER_DISTRICT_FIELD_TEXT", "Choose District")
+    monkeypatch.setenv("EWORK_CUSTOMER_DISTRICT_OPTION_TEXT", "KEBON JERUK")
+    monkeypatch.setenv("EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT", "Choose Sub district")
+    monkeypatch.setenv("EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT", "KEBON JERUK")
     monkeypatch.setenv("EWORK_CUSTOMER_ADDRESS_FIELD_ID", "customer-address")
-    monkeypatch.setenv("EWORK_CUSTOMER_SAVE_BUTTON_ID", "customer-save")
+    monkeypatch.setenv("EWORK_CUSTOMER_KTP_FIELD_ID", "customer-ktp")
+    monkeypatch.setenv("EWORK_CUSTOMER_UPLOAD_BUTTON_ID", "customer-upload")
+    monkeypatch.setenv("EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID", "customer-camera-capture")
+    monkeypatch.setenv("EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT", "Approval Signature")
+    monkeypatch.setenv("EWORK_CUSTOMER_SIGNATURE_VIEW_ID", "customer-signature")
+    monkeypatch.setenv("EWORK_CUSTOMER_SAVE_BUTTON_ID", "customer-register")
+    monkeypatch.setenv("EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID", "customer-confirm-save")
+    monkeypatch.setenv("EWORK_CUSTOMER_SUCCESS_TEXT", "Data Saved Successfully")
+    monkeypatch.setenv("EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID", "customer-success-continue")
     monkeypatch.setenv("EWORK_CUSTOMER_SEARCH_FIELD_ID", "customer-search")
 
     safe = load_mobile_settings().as_safe_dict()
@@ -66,6 +83,9 @@ def test_mobile_settings_are_secret_safe(monkeypatch):
     assert safe["EWORK_CUSTOMERS_MENU_TEXT"] == "New Customer"
     assert safe["EWORK_CUSTOMER_NAME_FIELD_ID"] == "customer-name"
     assert safe["EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID"] == "customer-address-type"
+    assert safe["EWORK_CUSTOMER_KTP_FIELD_ID"] == "customer-ktp"
+    assert safe["EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID"] == "customer-camera-capture"
+    assert safe["EWORK_CUSTOMER_SAVE_BUTTON_ID"] == "customer-register"
     assert "secret-value" not in str(safe)
 
 
@@ -270,6 +290,18 @@ def test_mobile_create_customer_flow_uses_run_flow_and_customer_values():
     assert "${EWORK_CUSTOMER_TYPE_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID}" in shared_flow
     assert "${EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_PROVINCE_OPTION_TEXT}" in shared_flow
+    assert "${EWORK_CUSTOMER_CITY_OPTION_TEXT}" in shared_flow
+    assert "${EWORK_CUSTOMER_DISTRICT_OPTION_TEXT}" in shared_flow
+    assert "${EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT}" in shared_flow
+    assert "${EWORK_CUSTOMER_KTP_NUMBER}" in shared_flow
+    assert "${EWORK_CUSTOMER_KTP_FIELD_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_UPLOAD_BUTTON_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_SIGNATURE_VIEW_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID}" in shared_flow
+    assert "${EWORK_CUSTOMER_SUCCESS_TEXT}" in shared_flow
     assert "Tier 2: created customer name" in shared_flow
     assert "Tier 2: created customer contact" in shared_flow
     assert "Tier 2: created customer address" in shared_flow
@@ -352,8 +384,25 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         ework_customer_address_type_field_id="customer-address-type",
         ework_customer_address_type_option_text="Delivery Address",
         ework_customer_current_location_button_id="customer-current-location",
+        ework_customer_location_apply_button_id="customer-location-apply",
+        ework_customer_province_field_text="Choose Province",
+        ework_customer_province_option_text="DKI JAKARTA",
+        ework_customer_city_field_text="Choose City",
+        ework_customer_city_option_text="JAKARTA BARAT",
+        ework_customer_district_field_text="Choose District",
+        ework_customer_district_option_text="KEBON JERUK",
+        ework_customer_subdistrict_field_text="Choose Sub district",
+        ework_customer_subdistrict_option_text="KEBON JERUK",
         ework_customer_address_field_id="customer-address",
-        ework_customer_save_button_id="customer-save",
+        ework_customer_ktp_field_id="customer-ktp",
+        ework_customer_upload_button_id="customer-upload",
+        ework_customer_camera_capture_button_id="customer-camera-capture",
+        ework_customer_signature_title_text="Approval Signature",
+        ework_customer_signature_view_id="customer-signature",
+        ework_customer_save_button_id="customer-register",
+        ework_customer_save_confirm_button_id="customer-confirm-save",
+        ework_customer_success_text="Data Saved Successfully",
+        ework_customer_success_continue_button_id="customer-success-continue",
         ework_customer_search_field_id="customer-search",
         maestro_flow_dir=flow_dir,
         maestro_output_dir=tmp_path / "maestro-output",

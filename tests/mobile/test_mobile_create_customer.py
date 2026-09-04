@@ -39,11 +39,14 @@ def test_mobile_customer_data_maps_ai_payload():
     assert customer.name == "Budi Santoso QA CUSTOMER"
     assert customer.contact == "+6281299900111"
     assert customer.address == "Jl. Melati Raya No. 8, Jakarta Selatan"
+    assert customer.ktp_number.isdigit()
+    assert len(customer.ktp_number) == 16
     assert customer.as_maestro_env() == {
         "EWORK_CUSTOMER_NAME": "Budi Santoso QA CUSTOMER",
         "EWORK_CUSTOMER_CONTACT": "+6281299900111",
         "EWORK_CUSTOMER_CONTACT_PERSON": "Budi Santoso QA CUSTOMER",
         "EWORK_CUSTOMER_ADDRESS": "Jl. Melati Raya No. 8, Jakarta Selatan",
+        "EWORK_CUSTOMER_KTP_NUMBER": customer.ktp_number,
     }
 
 

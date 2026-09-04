@@ -152,7 +152,6 @@ def scroll_list_to_end_and_find_texts(
             timeout_seconds=15,
         )
         down_swipes += batch_size
-        time.sleep(0.15)
         visible_texts = _visible_text_signature(adb_command, device_id=device_id, timeout_seconds=10)
         if _all_required_texts_visible(required_texts, visible_texts):
             return ScrollSearchResult(
@@ -194,7 +193,6 @@ def scroll_list_to_end_and_find_texts(
             timeout_seconds=10,
         )
         up_swipes += 1
-        time.sleep(0.35)
         visible_texts = _visible_text_signature(adb_command, device_id=device_id, timeout_seconds=10)
         if _all_required_texts_visible(required_texts, visible_texts):
             return ScrollSearchResult(

@@ -88,7 +88,7 @@ class RegisterCompanyWizardPage(BasePage):
                 ("stable submit button", self.page.locator("button[type='submit']").first),
             ],
             "company registration submit action",
-            timeout_ms=10_000,
+            timeout_ms=3_000,
         )
 
     def expect_open(self) -> None:
@@ -162,7 +162,7 @@ class RegisterCompanyWizardPage(BasePage):
                 screenshot=False,
                 force=True,
             ):
-                self.submit_button.click()
+                self.submit_button.click(timeout=5_000)
                 self._wait_for_submit_success(data.company_name)
                 attach_page_evidence("Submit success", self.page, screenshot=True)
 
@@ -175,19 +175,19 @@ class RegisterCompanyWizardPage(BasePage):
             expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=30_000)
 
     def _wait_for_submit_success(self, company_name: str) -> None:
-        if self._success_notification_visible(timeout_ms=15_000):
+        if self._success_notification_visible(timeout_ms=10_000):
             return
         try:
             self.page.wait_for_url(
                 lambda url: "/companies" in url and "registration-companies" not in url,
-                timeout=10_000,
+                timeout=5_000,
             )
             self.page.wait_for_load_state("domcontentloaded")
             return
         except TimeoutError:
             pass
         try:
-            expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=10_000)
+            expect(self.page.get_by_text(company_name, exact=True).first).to_be_visible(timeout=5_000)
         except AssertionError as error:
             raise AssertionError(
                 f"Company registration submit did not show a success notification or created company {company_name!r}."
@@ -198,18 +198,7 @@ class RegisterCompanyWizardPage(BasePage):
             self.page.wait_for_function(
                 """pattern => {
                     const regex = new RegExp(pattern, 'i');
-                    const visible = element => {
-                        const style = window.getComputedStyle(element);
-                        const rect = element.getBoundingClientRect();
-                        return style.display !== 'none'
-                            && style.visibility !== 'hidden'
-                            && rect.width > 0
-                            && rect.height > 0;
-                    };
-                    return Array.from(document.querySelectorAll(
-                        "[data-sonner-toast], [role='alert'], [role='status'], "
-                        + "[class*='toast' i], [class*='notification' i], [class*='alert' i], body *"
-                    )).some(element => visible(element) && regex.test(element.textContent || ''));
+                    return regex.test(document.body?.innerText || '');
                 }""",
                 arg=SUBMIT_SUCCESS_TEXT.pattern,
                 timeout=timeout_ms,
@@ -247,7 +236,7 @@ class RegisterCompanyWizardPage(BasePage):
 
     def expect_submit_enabled(self) -> None:
         with allure_step("Verify Submit button enabled", page=self.page):
-            expect(self.submit_button).to_be_enabled(timeout=10_000)
+            expect(self.submit_button).to_be_enabled(timeout=5_000)
 
     def accept_terms(self) -> None:
         with allure_step(

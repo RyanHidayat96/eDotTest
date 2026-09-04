@@ -67,6 +67,24 @@ def test_locator_uniqueness_signal_is_script_environment_defect(tmp_path):
     assert report.verdicts[0].matched_rule.startswith("2.")
 
 
+def test_missing_playwright_test_id_is_locator_defect_not_precondition(tmp_path):
+    _write_result(
+        tmp_path,
+        "wrong-locator",
+        "failed",
+        message=(
+            "AssertionError: Locator expected to be visible "
+            "Error: element(s) not found "
+            "waiting for get_by_test_id(\"edot-deliberate-missing-submit\")"
+        ),
+    )
+
+    report = triage_allure_results(tmp_path, tmp_path / "triage.md", use_ai=False)
+
+    assert report.verdicts[0].verdict == SCRIPT_ENVIRONMENT_DEFECT
+    assert report.verdicts[0].matched_rule.startswith("2.")
+
+
 def test_failed_precondition_is_script_environment_defect(tmp_path):
     _write_result(
         tmp_path,

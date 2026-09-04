@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from playwright.sync_api import Locator, TimeoutError, Error as PlaywrightError
+from playwright.sync_api import Locator, TimeoutError, Error as PlaywrightError, expect
 
 from edot_qa.reporting.allure_helpers import allure_step
 from edot_qa.web.base_page import BasePage
@@ -14,14 +14,9 @@ class CompaniesPage(BasePage):
     @property
     def companies_navigation(self) -> Locator:
         return self.first_visible(
-            [
-                ("navigation item with Companies text", self.page.get_by_role("link", name=re.compile(r"^Companies$", re.I)).first),
-                ("button with Companies text", self.page.get_by_role("button", name=re.compile(r"^Companies$", re.I)).first),
-                # Text fallback is justified because the assignment names this exact navigation item.
-                ("assignment-required Companies text", self.page.get_by_text("Companies", exact=True).first),
-            ],
+            self._companies_navigation_candidates(),
             "Companies navigation",
-            timeout_ms=15_000,
+            timeout_ms=5_000,
         )
 
     @property
@@ -50,13 +45,14 @@ class CompaniesPage(BasePage):
                 ("assignment-required Manage text", self.page.get_by_text("Manage", exact=True).first),
             ],
             "Companies Manage navigation",
-            timeout_ms=15_000,
+            timeout_ms=3_000,
         )
 
     def open(self) -> None:
         with allure_step("Open eSuite Companies page", page=self.page):
             if not self.page.url.rstrip("/").endswith("/companies"):
-                self.companies_navigation.click()
+                if not self._try_click_companies_navigation():
+                    self.page.goto("/companies")
             self.page.wait_for_load_state("domcontentloaded")
             self._wait_for_company_list()
 
@@ -73,9 +69,17 @@ class CompaniesPage(BasePage):
             if "/profile" in self.page.url:
                 self._try_back_to_company_list()
             self.open()
+            manage_page = CompanyManagePage(self.page, self.settings)
+            if "/manage-companies" not in self.page.url:
+                before_url = self.page.url
+                self.manage_navigation.click(timeout=5_000)
+                try:
+                    self.page.wait_for_url(lambda url: "/manage-companies" in url or url != before_url, timeout=5_000)
+                except TimeoutError:
+                    pass
             self.page.wait_for_load_state("domcontentloaded")
-            self._wait_for_company_list()
-            return CompanyManagePage(self.page, self.settings)
+            manage_page.expect_loaded()
+            return manage_page
 
     def _try_back_to_company_list(self) -> bool:
         if "/profile" not in self.page.url:
@@ -107,5 +111,23 @@ class CompaniesPage(BasePage):
                 ("company list My Company text", self.page.get_by_text("My Company", exact=True).first),
             ],
             "company list",
-            timeout_ms=30_000,
+            timeout_ms=5_000,
         )
+
+    def _companies_navigation_candidates(self) -> list[tuple[str, Locator]]:
+        return [
+            ("navigation item with Companies text", self.page.get_by_role("link", name=re.compile(r"^Companies$", re.I)).first),
+            ("button with Companies text", self.page.get_by_role("button", name=re.compile(r"^Companies$", re.I)).first),
+            # Text fallback is justified because the assignment names this exact navigation item.
+            ("assignment-required Companies text", self.page.get_by_text("Companies", exact=True).first),
+        ]
+
+    def _try_click_companies_navigation(self) -> bool:
+        for _, locator in self._companies_navigation_candidates():
+            try:
+                expect(locator).to_be_visible(timeout=1_000)
+                locator.click(timeout=2_000)
+                return True
+            except (AssertionError, PlaywrightError, TimeoutError):
+                continue
+        return False

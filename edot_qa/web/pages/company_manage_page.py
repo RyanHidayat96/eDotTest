@@ -24,14 +24,9 @@ class CompanyManagePage(BasePage):
     @property
     def heading(self) -> Locator:
         return self.first_visible(
-            [
-                ("heading named Manage", self.page.get_by_role("heading", name=re.compile(r"Manage", re.I)).first),
-                ("region named Manage", self.page.get_by_role("region", name=re.compile(r"Manage", re.I)).first),
-                # Text fallback is justified because the assignment names this exact Companies sub-page.
-                ("assignment-required Manage text", self.page.get_by_text("Manage", exact=True).first),
-            ],
+            self._heading_candidates(),
             "Companies Manage page",
-            timeout_ms=15_000,
+            timeout_ms=5_000,
         )
 
     @property
@@ -47,12 +42,23 @@ class CompanyManagePage(BasePage):
                 ("stable search input", self.page.locator(stable_search_selector()).first),
             ],
             "company search control",
-            timeout_ms=5_000,
+            timeout_ms=1_500,
         )
 
     def expect_loaded(self) -> None:
         with allure_step("Verify Companies Manage page loaded", page=self.page):
-            expect(self.heading).to_be_visible(timeout=15_000)
+            expect(self.heading).to_be_visible(timeout=5_000)
+
+    def is_loaded(self, *, timeout_ms: int = 1_000) -> bool:
+        if "/manage-companies" in self.page.url and "/profile" not in self.page.url:
+            return True
+        for _, locator in self._heading_candidates():
+            try:
+                expect(locator).to_be_visible(timeout=timeout_ms)
+                return True
+            except AssertionError:
+                continue
+        return False
 
     def search_company(self, company_name: str) -> None:
         with allure_step("Search company in Manage list", page=self.page, data={"search_text": company_name}):
@@ -75,7 +81,7 @@ class CompanyManagePage(BasePage):
         with allure_step("Verify company exists in Manage list", page=self.page, data={"company_name": company_name}):
             self.search_company(company_name)
             # Tier 2: created company must exist in Manage results after submit.
-            expect(self._company_record(company_name)).to_be_visible(timeout=15_000)
+            expect(self._company_record(company_name)).to_be_visible(timeout=5_000)
             attach_json("company-manage-record-present", {"company_name": company_name})
 
     def expect_company_absent(self, company_name: str, company_id: str | None = None) -> None:
@@ -159,12 +165,20 @@ class CompanyManagePage(BasePage):
             detail.delete_current_company()
             attach_json("company-cleanup-delete-requested", {"company_name": company_name, "source": "detail"})
 
-    def _company_record(self, company_name: str, timeout_ms: int = 15_000) -> Locator:
+    def _company_record(self, company_name: str, timeout_ms: int = 3_000) -> Locator:
         return self.first_visible(
             self._company_record_candidates(company_name),
             f"company record {company_name}",
             timeout_ms=timeout_ms,
         )
+
+    def _heading_candidates(self) -> list[tuple[str, Locator]]:
+        return [
+            ("heading named Manage", self.page.get_by_role("heading", name=re.compile(r"Manage", re.I)).first),
+            ("region named Manage", self.page.get_by_role("region", name=re.compile(r"Manage", re.I)).first),
+            # Text fallback is justified because the assignment names this exact Companies sub-page.
+            ("assignment-required Manage text", self.page.get_by_text("Manage", exact=True).first),
+        ]
 
     def _company_record_candidates(self, company_name: str) -> list[tuple[str, Locator]]:
         company_name_pattern = re.compile(re.escape(company_name), re.I)

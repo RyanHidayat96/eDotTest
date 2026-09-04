@@ -4,7 +4,6 @@ from contextvars import ContextVar
 from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 import json
-import os
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -69,13 +68,11 @@ def allure_step(
 
     depth = _STEP_DEPTH.get()
     if depth > 0 and not force:
-        _print_console_step("START", title)
         if input_data is not None:
             _record_input(title, input_data)
         try:
             yield
         except Exception as error:
-            _print_console_step("FAIL", title)
             attach_json(
                 f"Error - {title}",
                 {"error_type": type(error).__name__, "message": str(error)},
@@ -83,20 +80,16 @@ def allure_step(
             if page is not None:
                 attach_page_evidence(f"Failure - {title}", page, screenshot=True, full_page=True)
             raise
-        else:
-            _print_console_step("PASS", title)
         return
 
     with allure.step(title):
         token = _STEP_DEPTH.set(depth + 1)
         input_token = _STEP_INPUTS.set([])
-        _print_console_step("START", title)
         if input_data is not None:
             _record_input(title, input_data)
         try:
             yield
         except Exception as error:
-            _print_console_step("FAIL", title)
             _attach_collected_inputs()
             attach_json(
                 "Error",
@@ -106,7 +99,6 @@ def allure_step(
                 attach_page_evidence("Failure", page, screenshot=True, full_page=True)
             raise
         else:
-            _print_console_step("PASS", title)
             _attach_collected_inputs()
             if page is not None and screenshot:
                 attach_page_evidence("Evidence", page, screenshot=True, full_page=full_page)
@@ -151,12 +143,6 @@ def _record_input(title: str, data: Any) -> None:
         attach_json("Inputs", data)
         return
     inputs.append({"step": title, "data": redact_payload(data)})
-
-
-def _print_console_step(status: str, title: str) -> None:
-    if os.getenv("E2E_CONSOLE_STEPS", "").strip().lower() not in {"1", "true", "yes", "on"}:
-        return
-    print(f"[{status}] {title}", flush=True)
 
 
 def _attach_collected_inputs() -> None:

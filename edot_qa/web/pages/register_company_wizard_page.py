@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -195,24 +194,29 @@ class RegisterCompanyWizardPage(BasePage):
             ) from error
 
     def _success_notification_visible(self, timeout_ms: int) -> bool:
-        candidates = [
-            self.page.get_by_role("alert").filter(has_text=SUBMIT_SUCCESS_TEXT).first,
-            self.page.get_by_role("status").filter(has_text=SUBMIT_SUCCESS_TEXT).first,
-            self.page.locator(
-                "[data-sonner-toast], [role='alert'], [role='status'], "
-                "[class*='toast' i], [class*='notification' i], [class*='alert' i]"
-            ).filter(has_text=SUBMIT_SUCCESS_TEXT).first,
-            # Text fallback is justified because eSuite success toasts may lack stable roles/classes.
-            self.page.get_by_text(SUBMIT_SUCCESS_TEXT).first,
-        ]
-        timeout_per_candidate = max(1_000, timeout_ms // len(candidates))
-        for locator in candidates:
-            try:
-                expect(locator).to_be_visible(timeout=timeout_per_candidate)
-                return True
-            except (AssertionError, TimeoutError, PlaywrightError):
-                continue
-        return False
+        try:
+            self.page.wait_for_function(
+                """pattern => {
+                    const regex = new RegExp(pattern, 'i');
+                    const visible = element => {
+                        const style = window.getComputedStyle(element);
+                        const rect = element.getBoundingClientRect();
+                        return style.display !== 'none'
+                            && style.visibility !== 'hidden'
+                            && rect.width > 0
+                            && rect.height > 0;
+                    };
+                    return Array.from(document.querySelectorAll(
+                        "[data-sonner-toast], [role='alert'], [role='status'], "
+                        + "[class*='toast' i], [class*='notification' i], [class*='alert' i], body *"
+                    )).some(element => visible(element) && regex.test(element.textContent || ''));
+                }""",
+                arg=SUBMIT_SUCCESS_TEXT.pattern,
+                timeout=timeout_ms,
+            )
+            return True
+        except (TimeoutError, PlaywrightError):
+            return False
 
     def assert_step_can_continue(self, step_name: str) -> None:
         with allure_step(f"Verify {step_name} can continue", page=self.page):
@@ -284,20 +288,12 @@ class RegisterCompanyWizardPage(BasePage):
             input_data={"field": spec.label, "value": value},
         ):
             if spec.label == "Street Address":
-                _console_debug("street address: try direct DOM fill")
                 if self._try_fill_street_address(value):
-                    _console_debug("street address: direct DOM fill pass")
                     return
-                _console_debug("street address: direct DOM fill fallback to locator")
-            _console_debug(f"{spec.label}: resolving input")
             control = self._text_control(spec)
-            _console_debug(f"{spec.label}: input resolved")
             self._assert_required_control_editable(control, spec)
-            _console_debug(f"{spec.label}: fill")
             control.fill(value, timeout=2_000)
-            _console_debug(f"{spec.label}: verify value")
             self._expect_text_value(control, value, spec.label)
-            _console_debug(f"{spec.label}: pass")
 
     def choose_or_fill_field(self, spec: FieldSpec, value: str) -> None:
         with allure_step(
@@ -493,7 +489,6 @@ class RegisterCompanyWizardPage(BasePage):
 
     def _try_fill_street_address(self, value: str) -> bool:
         try:
-            _console_debug("street address: page.evaluate start")
             result: Any = self.page.evaluate(
                 """value => {
                     const isVisible = element => Boolean(
@@ -543,7 +538,6 @@ class RegisterCompanyWizardPage(BasePage):
             )
         except PlaywrightError:
             return False
-        _console_debug(f"street address: page.evaluate result={result}")
         return isinstance(result, dict) and result.get("ok") is True
 
     def _visible_control_is_disabled(self, text: str) -> bool:
@@ -664,8 +658,3 @@ def existing_locator_candidates(candidates: list[tuple[str, Locator]]) -> list[t
         except PlaywrightError:
             continue
     return existing
-
-
-def _console_debug(message: str) -> None:
-    if os.getenv("E2E_CONSOLE_STEPS", "").strip().lower() in {"1", "true", "yes", "on"}:
-        print(f"[DEBUG] {message}", flush=True)

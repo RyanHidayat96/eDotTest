@@ -232,7 +232,7 @@ npm run allure:open:mobile
 
 The Allure binary comes from `allure-commandline` in `devDependencies`, same as a local Node-based automation project. No global Allure PATH is required.
 
-Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Reports are intentionally lean: tests show business-level steps, input steps attach redacted payloads, successful UI screenshots are captured only at important milestones, failures attach full-page evidence, and Maestro steps attach redacted commands, flow YAML, stdout/stderr, result JSON, device screenshots, and supported output artifacts.
+Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Reports are intentionally lean: page-level web steps show one redacted input summary only when fields are entered, successful UI screenshots are captured at important milestones such as submit success, failures attach full-page evidence, and Maestro steps attach redacted commands, flow YAML, stdout/stderr, result JSON, device screenshots, and supported output artifacts.
 
 ## AI Failure Triage
 
@@ -262,4 +262,4 @@ Triage verdicts are human-review proposals only. The script never changes tests,
 
 ## Current Local Verification Notes
 
-Local unit and guardrail tests pass without committed secrets. Live mobile login has been verified on a physical ADB device using the assignment-provided fallback eWork account. Live mobile customer creation still requires post-login customer selectors. Live web execution still depends on valid eSuite credentials or storage state.
+Local unit and guardrail tests pass without committed secrets. Live web login and company step-one validation pass with valid eSuite credentials. The full web company flow creates the company and verifies detail values; cleanup still intentionally fails when eSuite continues showing the deleted company in Companies results after confirmation. Live mobile login has been verified on a physical ADB device using the assignment-provided fallback eWork account. Live mobile customer creation still requires post-login customer selectors.

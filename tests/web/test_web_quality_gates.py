@@ -65,16 +65,22 @@ def test_no_tracked_runtime_or_tool_artifacts():
         ".claude/",
         ".cursor/",
         ".continue/",
+        ".allure/",
+        ".maestro/",
+        ".venv/",
         ".egg-info/",
         ".pytest_cache/",
         "__pycache__/",
+        "allure-report/",
+        "allure-results/",
         "artifacts/",
+        "maestro-output/",
+        "node_modules/",
         "playwright-report/",
-        "reports/allure-report/",
-        "reports/allure-results/",
+        "reports/",
         "test-results/",
     )
-    banned_names = ("~$", ".tmp", ".temp", ".bak", ".orig", ".rej")
+    banned_names = ("~$", ".tmp", ".temp", ".bak", ".orig", ".rej", ".sqlite", ".sqlite3", ".db")
 
     offenders = [
         path

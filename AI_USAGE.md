@@ -4,22 +4,22 @@ This project includes two runtime AI capabilities required by the eDOT QA Automa
 
 ## Model
 
-Default test-data model: `gemini-2.5-flash-lite`.
+Default test-data model: `gemini-3.1-flash-lite`.
 
-Default triage model: `gemini-2.5-flash-lite`.
+Default triage model: `gemini-3.1-flash-lite`.
 
 Why this model:
 
 - The tasks are structured and low-context: create one compact JSON test-data payload or summarize one already-classified failure.
 - Cost control matters more than long-form reasoning.
 - Deterministic code performs validation and classification first, so the model is never trusted as the only control.
-- `gemini-2.5-flash-lite` is used for test-data generation because it is a low-latency, cost-effective Gemini API model suitable for simple structured output.
+- `gemini-3.1-flash-lite` is used for test-data generation because it is a low-latency Gemini API model suitable for simple structured output.
 
 The model can be changed through environment variables:
 
 ```text
-GEMINI_TEST_DATA_MODEL=gemini-2.5-flash-lite
-GEMINI_TRIAGE_MODEL=gemini-2.5-flash-lite
+GEMINI_TEST_DATA_MODEL=gemini-3.1-flash-lite
+GEMINI_TRIAGE_MODEL=gemini-3.1-flash-lite
 ```
 
 ## Where AI Runs

@@ -35,17 +35,28 @@ pip-wheel-metadata/
 # Playwright, reports, and runtime artifacts
 test-results/
 playwright-report/
+allure-results/
+allure-report/
 reports/allure-results*/
 reports/allure-report*/
 reports/triage/
+reports/
 artifacts/
 maestro-output/
 .maestro/
+.allure/
+.playwright/
 trace.zip
 *.trace.zip
 *.webm
+*.mp4
+*.m4v
+*.mov
 *.har
+*.zip
 *.png.tmp
+screenshots/
+videos/
 
 # Generated spreadsheet lock/temp files
 ~$*.xls
@@ -62,6 +73,11 @@ node_modules/
 *.bak
 *.orig
 *.rej
+*.pid
+*.prof
+*.sqlite
+*.sqlite3
+*.db
 tmp/
 temp/
 .tmp/
@@ -85,3 +101,5 @@ desktop.ini
 .vscode/
 *.swp
 *.swo
+
+CODEX_EDOT_QA_V4_REMEDIATION_PLAN.md

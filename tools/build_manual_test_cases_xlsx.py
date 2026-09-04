@@ -28,7 +28,7 @@ HEADERS = [
 METADATA_ROWS = [
     ["Field", "Value"],
     ["Source of truth", "Take Home Test QA Automation Engineer eDOT V4.pdf"],
-    ["Execution framework", "edot_codex_qa_automation_plan.md"],
+    ["Project", "eDOT QA Automation Take-Home V4"],
     ["Repository link", "https://github.com/RyanHidayat96/TestEdot"],
     ["Credential policy", "Use environment variables only; no credentials or API keys stored in workbook"],
     ["Runtime data token", "${RUN_ID} is replaced by suite-generated unique run id"],

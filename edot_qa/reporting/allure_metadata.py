@@ -25,12 +25,19 @@ CONTROLLED_LABELS = {
 IGNORED_MARKERS = {"parametrize", "skipif", "usefixtures", "filterwarnings"}
 
 EXPLICIT_TEST_CASE_IDS = {
-    "tests/web/test_login.py::test_esuite_login_shows_dashboard_greeting": "WEB-LOGIN-001",
-    "tests/web/test_create_company.py::test_register_company_step_one_requires_valid_data": "WEB-COMPANY-001",
-    "tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data": "WEB-COMPANY-002",
+    "tests/web/test_login.py::test_esuite_login_shows_dashboard_greeting": "WEB-TC-001",
+    "tests/web/test_create_company.py::test_register_company_step_one_requires_valid_data": "WEB-TC-002",
+    "tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data": "WEB-TC-003",
     "tests/web/test_web_mobile_handoff.py::test_web_created_company_handoff_drives_mobile_login": "E2E-WEB-MOBILE-001",
-    "tests/mobile/test_mobile_login.py::test_ework_login_displays_dashboard": "MOBILE-LOGIN-001",
-    "tests/mobile/test_mobile_create_customer.py::test_ework_create_customer_appears_with_correct_data": "MOBILE-CUSTOMER-001",
+    "tests/mobile/test_mobile_login.py::test_ework_login_displays_dashboard": "MOB-TC-001",
+    "tests/mobile/test_mobile_create_customer.py::test_ework_create_customer_appears_with_correct_data": "MOB-TC-002",
+}
+
+ADDITIONAL_TEST_CASE_TAGS = {
+    "tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data": {
+        "WEB-TC-004",
+        "WEB-TC-005",
+    },
 }
 
 
@@ -94,8 +101,10 @@ def metadata_for_node(node_id: str, marker_names: Iterable[str] = ()) -> AllureM
         )
 
     clean_path = path.replace("\\", "/")
-    case_id = EXPLICIT_TEST_CASE_IDS.get(f"{clean_path}::{test_name}")
-    tags = tuple(sorted(set(metadata.tags) | markers | {"edot"} | ({case_id} if case_id else set())))
+    node_key = f"{clean_path}::{test_name}"
+    case_id = EXPLICIT_TEST_CASE_IDS.get(node_key)
+    case_tags = set(ADDITIONAL_TEST_CASE_TAGS.get(node_key, set())) | ({case_id} if case_id else set())
+    tags = tuple(sorted(set(metadata.tags) | markers | {"edot"} | case_tags))
     return AllureMetadata(
         parent_suite=metadata.parent_suite,
         suite=metadata.suite,

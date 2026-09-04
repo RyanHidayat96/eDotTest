@@ -42,7 +42,9 @@ def test_allure_metadata_groups_company_flow_as_esuite_web():
     assert metadata.epic == "eSuite Web"
     assert metadata.feature == "Company Management"
     assert metadata.story == "Three Step Company Registration"
-    assert metadata.test_case_id == "WEB-COMPANY-002"
+    assert metadata.test_case_id == "WEB-TC-003"
+    assert "WEB-TC-004" in metadata.tags
+    assert "WEB-TC-005" in metadata.tags
     assert "requires_cleanup" in metadata.tags
 
 

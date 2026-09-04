@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from typing import Callable, TypeVar
+
 import pytest
 
 from edot_qa.mobile.config import MobileSettings, load_mobile_settings
 from edot_qa.mobile.maestro import MaestroResult, MaestroRunner, assert_maestro_passed
+from edot_qa.mobile.runtime import MobilePrerequisiteError
 from edot_qa.reporting.allure_helpers import attach_json
+
+
+T = TypeVar("T")
 
 
 @pytest.fixture(scope="session")
@@ -35,5 +41,18 @@ def run_maestro_flow(maestro_runner: MaestroRunner):
                 extra_env=extra_env,
             )
         )
+
+    return _run
+
+
+@pytest.fixture()
+def run_mobile_scenario(mobile_settings: MobileSettings) -> Callable[[Callable[[], T]], T]:
+    def _run(action: Callable[[], T]) -> T:
+        try:
+            return action()
+        except MobilePrerequisiteError as error:
+            if mobile_settings.edot_live:
+                pytest.fail(str(error))
+            pytest.skip(str(error))
 
     return _run

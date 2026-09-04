@@ -17,9 +17,13 @@ Repository link: https://github.com/RyanHidayat96/TestEdot
 ```text
 edot_qa/
   ai/                  AI test-data and failure-triage modules
-  mobile/              Maestro runner, ADB checks, mobile config, customer data mapping
+  mobile/              Mobile config, scenario orchestration, Maestro runner, ADB/device helpers
+    scenarios/         Thin business flows for login and customer creation
+    customer_list.py   Customer-list card parsing and Tier 2 validation helpers
+    runtime.py         Mobile prerequisite checks and app-session actions
   reporting/           Allure attachment, metadata, and category helpers
-  web/                 eSuite page objects, registration model, storage state helpers
+  web/                 eSuite page objects, registration model, scenarios, storage state helpers
+    scenarios/         Thin business flows for login and company registration
 mobile/flows/          Maestro entry flows and reusable runFlow sub-flows
 test_cases/            Manual test case CSV and Excel workbook
 tests/                 Pytest suites for web, mobile, AI, quality gates

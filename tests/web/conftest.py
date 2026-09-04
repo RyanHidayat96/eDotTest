@@ -7,9 +7,8 @@ from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_
 
 from edot_qa.config import Settings, load_settings
 from edot_qa.reporting.allure_helpers import attach_json, attach_png, attach_text
-from edot_qa.web.pages.dashboard_page import DashboardPage
-from edot_qa.web.pages.login_page import LoginPage
-from edot_qa.web.session_state import has_storage_state, new_context, save_storage_state
+from edot_qa.web.scenarios.login import EsuiteLoginScenario
+from edot_qa.web.session_state import has_storage_state, new_context
 
 
 @pytest.fixture(scope="session")
@@ -57,9 +56,7 @@ def esuite_storage_state(settings: Settings) -> Path:
         context = new_context(browser_instance, settings)
         page = context.new_page()
         try:
-            LoginPage(page, settings).login(settings.esuite_email or "", settings.esuite_password or "")
-            DashboardPage(page, settings).expect_loaded()
-            save_storage_state(context, settings.storage_state_path)
+            EsuiteLoginScenario(page, settings).run()
         except Exception:
             if not page.is_closed():
                 try:

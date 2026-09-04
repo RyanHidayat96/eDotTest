@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ from edot_qa.config import ROOT_DIR
 from edot_qa.mobile import device as mobile_device
 from edot_qa.mobile.config import MobileSettings, load_mobile_settings
 from edot_qa.mobile.device import (
+    MobileDevice,
     adb_devices,
     capture_device_screenshot,
     clear_app_data,
@@ -21,6 +23,10 @@ from edot_qa.mobile.device import (
     visible_texts_by_resource_id,
     wake_device,
 )
+from edot_qa.mobile.customer import MobileCustomerData
+from edot_qa.mobile.runtime import MobilePrerequisiteError, MobileRuntimeContext, require_login_runtime
+from edot_qa.mobile.scenarios.create_customer import MobileCreateCustomerScenario
+from edot_qa.mobile.scenarios.login import MobileLoginScenario
 from edot_qa.mobile.maestro import MaestroResult, MaestroRunner, assert_maestro_passed
 from edot_qa.mobile.session_state import mobile_session_state_exists, write_mobile_session_state
 
@@ -204,8 +210,6 @@ def test_scroll_list_to_end_then_searches_up_for_target(monkeypatch):
     monkeypatch.setattr("edot_qa.mobile.device._visible_text_signature", fake_visible_text_signature)
     monkeypatch.setattr("edot_qa.mobile.device._adb_swipe", fake_swipe)
     monkeypatch.setattr("edot_qa.mobile.device._adb_swipe_batch", fake_swipe)
-    monkeypatch.setattr("edot_qa.mobile.device.time.sleep", lambda _: None)
-
     result = scroll_list_to_end_and_find_texts(
         ["Budi QA", "Jl. Test", "Grosir"],
         device_id="emulator-5554",
@@ -258,8 +262,6 @@ def test_scroll_list_stops_when_target_appears_while_scrolling_down(monkeypatch)
     monkeypatch.setattr("edot_qa.mobile.device._visible_text_signature", fake_visible_text_signature)
     monkeypatch.setattr("edot_qa.mobile.device._adb_swipe", fake_swipe)
     monkeypatch.setattr("edot_qa.mobile.device._adb_swipe_batch", fake_swipe)
-    monkeypatch.setattr("edot_qa.mobile.device.time.sleep", lambda _: None)
-
     result = scroll_list_to_end_and_find_texts(
         ["Jalan Test No. 1"],
         device_id="emulator-5554",
@@ -295,8 +297,6 @@ def test_scroll_list_fails_after_four_slow_up_swipes(monkeypatch):
     monkeypatch.setattr("edot_qa.mobile.device._visible_text_signature", fake_visible_text_signature)
     monkeypatch.setattr("edot_qa.mobile.device._adb_swipe", fake_swipe)
     monkeypatch.setattr("edot_qa.mobile.device._adb_swipe_batch", fake_swipe)
-    monkeypatch.setattr("edot_qa.mobile.device.time.sleep", lambda _: None)
-
     with pytest.raises(AssertionError, match="Missing: Toko QA404"):
         scroll_list_to_end_and_find_texts(
             ["Toko QA404"],
@@ -520,6 +520,80 @@ def test_mobile_session_state_marker_has_no_credentials(tmp_path):
     assert "secret" not in raw_state.lower()
 
 
+def test_mobile_runtime_missing_login_requirements_fail_before_device_probe(tmp_path):
+    settings = _mobile_settings(tmp_path)
+
+    with pytest.raises(MobilePrerequisiteError, match="EWORK_EMAIL"):
+        require_login_runtime(settings)
+
+
+def test_mobile_login_scenario_runs_flow_and_writes_session(monkeypatch, tmp_path):
+    settings = _mobile_settings_with_credentials(tmp_path)
+    context = MobileRuntimeContext(settings=settings, device=MobileDevice("emulator-5554", "device"))
+    flows = []
+
+    monkeypatch.setattr("edot_qa.mobile.scenarios.login.require_login_runtime", lambda loaded_settings: context)
+    monkeypatch.setattr("edot_qa.mobile.scenarios.login.reset_app_data_for_login", lambda loaded_context: None)
+
+    def fake_run_flow(flow: str, **kwargs):
+        flows.append((flow, kwargs))
+        return MaestroResult(tmp_path / flow, ["maestro", "test", flow], 0, "ok", "")
+
+    result = MobileLoginScenario(settings, fake_run_flow).run()
+
+    assert result.passed
+    assert flows == [("login.yaml", {})]
+    assert mobile_session_state_exists(settings.ework_storage_state_path, app_id=settings.ework_app_id)
+
+
+def test_mobile_create_customer_scenario_runs_create_then_validate(monkeypatch, tmp_path):
+    settings = _mobile_settings_with_credentials(tmp_path)
+    customer = MobileCustomerData(
+        name="Toko QA ABC12345",
+        contact="+6281234567890",
+        contact_person="Dina QA PIC 123456",
+        address="Jl. Melati Raya No. 8",
+        ktp_number="3175070101909999",
+        run_id="scenario-unit",
+        source="unit",
+    )
+    context = MobileRuntimeContext(settings=settings, device=MobileDevice("emulator-5554", "device"))
+    flows = []
+    card_checks = []
+
+    monkeypatch.setattr(
+        "edot_qa.mobile.scenarios.create_customer.require_customer_runtime",
+        lambda loaded_settings: context,
+    )
+    monkeypatch.setattr(
+        "edot_qa.mobile.scenarios.create_customer.start_app_from_stored_session",
+        lambda loaded_context: None,
+    )
+    monkeypatch.setattr("edot_qa.mobile.scenarios.create_customer.generate_mobile_customer_data", lambda: customer)
+    monkeypatch.setattr(
+        "edot_qa.mobile.scenarios.create_customer.customer_card_address_from_maestro_result",
+        lambda result: "Jl. Saved From Location",
+    )
+
+    def fake_find_customer_card(*args, **kwargs):
+        card_checks.append((args, kwargs))
+        return {"skipped_scroll": True}
+
+    def fake_run_flow(flow: str, *, extra_env: dict[str, str] | None = None, **kwargs):
+        flows.append((flow, extra_env or {}))
+        return MaestroResult(tmp_path / flow, ["maestro", "test", flow], 0, "ok", "")
+
+    monkeypatch.setattr("edot_qa.mobile.scenarios.create_customer.find_created_customer_card", fake_find_customer_card)
+
+    result = MobileCreateCustomerScenario(settings, fake_run_flow).run()
+
+    assert result == customer
+    assert [flow for flow, _ in flows] == ["create_customer.yaml", "validate_customer_list_card.yaml"]
+    assert flows[0][1]["EWORK_CUSTOMER_NAME"] == customer.name
+    assert flows[1][1]["EWORK_CUSTOMER_CARD_ADDRESS"] == "Jl. Saved From Location"
+    assert card_checks[0][1]["customer_card_address"] == "Jl. Saved From Location"
+
+
 def test_mobile_login_flow_uses_run_flow_and_environment_values():
     entry_flow = (ROOT_DIR / "mobile" / "flows" / "login.yaml").read_text(encoding="utf-8")
     shared_flow = (ROOT_DIR / "mobile" / "flows" / "common" / "login.yaml").read_text(encoding="utf-8")
@@ -711,6 +785,15 @@ def _mobile_settings(tmp_path: Path, mobile_device_id: str | None = None) -> Mob
         allure_results_dir=tmp_path / "allure-results",
         company_handoff_path=tmp_path / "handoff.json",
         ework_storage_state_path=tmp_path / "auth" / "ework_session_state.json",
+    )
+
+
+def _mobile_settings_with_credentials(tmp_path: Path) -> MobileSettings:
+    return replace(
+        _mobile_settings(tmp_path, mobile_device_id="emulator-5554"),
+        ework_email="salesmanqaauto",
+        ework_password="secret-value",
+        ework_company_code="5049209",
     )
 
 

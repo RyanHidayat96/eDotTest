@@ -9,6 +9,8 @@ from edot_qa.config import Settings
 from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_text
 from edot_qa.web.company_registration import CompanyRegistrationData
 from edot_qa.web.pages.companies_page import CompaniesPage
+from edot_qa.web.pages.company_detail_page import CompanyDetailPage
+from edot_qa.web.pages.company_manage_page import CompanyManagePage
 
 
 @dataclass(frozen=True)
@@ -26,6 +28,7 @@ class CompanyRegistrationScenario:
         registration = prepare_company_registration_data()
         primary_error: Exception | None = None
         created_company_id: str | None = None
+        detail_page: CompanyDetailPage | None = None
         try:
             with allure_step("Create company through three step wizard", page=self.page):
                 wizard = CompaniesPage(self.page, self.settings).open_register_company_wizard()
@@ -44,7 +47,7 @@ class CompanyRegistrationScenario:
             raise
         finally:
             try:
-                self.cleanup_created_company(registration, created_company_id)
+                self.cleanup_created_company(registration, created_company_id, detail_page=detail_page)
             except Exception as cleanup_error:
                 attach_text("company-cleanup-error", str(cleanup_error))
                 if primary_error is None:
@@ -54,6 +57,8 @@ class CompanyRegistrationScenario:
         self,
         registration: CompanyRegistrationData,
         company_id: str | None,
+        *,
+        detail_page: CompanyDetailPage | None = None,
     ) -> None:
         with allure_step(
             "Cleanup created company",
@@ -61,8 +66,13 @@ class CompanyRegistrationScenario:
             screenshot=True,
             data={"company_name": registration.company_name, "company_id": company_id},
         ):
-            cleanup_page = CompaniesPage(self.page, self.settings).open_manage()
-            cleanup_page.delete_company_if_present(registration.company_name)
+            if detail_page is not None and "/profile" in self.page.url:
+                detail_page.delete_current_company()
+                cleanup_page = CompanyManagePage(self.page, self.settings)
+            else:
+                cleanup_page = CompaniesPage(self.page, self.settings).open_manage()
+                cleanup_page.delete_company_if_present(registration.company_name)
+
             cleanup_page.expect_company_absent(registration.company_name, company_id=company_id)
 
 

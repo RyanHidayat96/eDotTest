@@ -18,6 +18,19 @@ from edot_qa.web.pages.company_detail_page import (
 DETAIL_ACTION = re.compile(r"^(Manage|Detail|View|Open|Lihat|Kelola)$", re.I)
 DELETE_ACTION = re.compile(r"^(Delete|Hapus|Remove)$", re.I)
 DETAIL_OPEN_ATTEMPTS_AFTER_EMPTY_REFRESH = 2
+COMPANY_LIST_READY_SCRIPT = """
+() => {
+  const visible = (element) => {
+    if (!element) return false;
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const root = document.querySelector("[id$='-content-single_company']");
+  if (!visible(root)) return false;
+  return Array.from(root.querySelectorAll(".bg-card")).some(visible);
+}
+"""
 COMPANY_TEXT_VISIBLE_SCRIPT = """
 (companyName) => {
   const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim();
@@ -27,8 +40,9 @@ COMPANY_TEXT_VISIBLE_SCRIPT = """
     const rect = element.getBoundingClientRect();
     return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
   };
+  const root = document.querySelector("[id$='-content-single_company']") || document.body;
   const expected = normalize(companyName);
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode();
   while (node) {
     if (normalize(node.nodeValue) === expected && visible(node.parentElement)) return true;
@@ -57,12 +71,20 @@ COMPANY_ACTION_MARK_SCRIPT = """
     element.getAttribute("title") ||
     element.value
   );
+  const isCompanyCard = (element) => {
+    if (!element || !element.classList) return false;
+    return element.classList.contains("bg-card") &&
+      element.classList.contains("text-card-foreground") &&
+      element.classList.contains("p-5") &&
+      String(element.className || "").includes("rounded");
+  };
   const expectedName = normalize(payload.companyName);
   const actionRegex = new RegExp(payload.actionPattern, "i");
+  const root = document.querySelector("[id$='-content-single_company']") || document.body;
   document.querySelectorAll(`[${markerAttribute}]`).forEach((element) => element.removeAttribute(markerAttribute));
 
   const nameElements = [];
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode();
   while (node) {
     if (normalize(node.nodeValue) === expectedName && visible(node.parentElement)) {
@@ -75,6 +97,37 @@ COMPANY_ACTION_MARK_SCRIPT = """
   for (const nameElement of nameElements) {
     let container = nameElement;
     let depth = 0;
+    let companyCard = null;
+    while (container && container !== document.body && depth <= 12) {
+      if (!companyCard && isCompanyCard(container)) {
+        companyCard = container;
+        break;
+      }
+      container = container.parentElement;
+      depth += 1;
+    }
+
+    if (companyCard) {
+      const rect = companyCard.getBoundingClientRect();
+      const actions = Array.from(companyCard.querySelectorAll("button, a, [role='button']"))
+        .filter((element) => visible(element) && enabled(element) && actionRegex.test(actionText(element)));
+      for (const action of actions) {
+        candidates.push({
+          action,
+          depth,
+          area: rect.width * rect.height,
+          isCompanyCard: true,
+          actionText: actionText(action),
+          containerText: normalize(companyCard.textContent).slice(0, 240),
+          tagName: companyCard.tagName,
+          className: String(companyCard.className || "").slice(0, 160),
+        });
+      }
+      continue;
+    }
+
+    container = nameElement;
+    depth = 0;
     while (container && container !== document.body && depth <= 12) {
       const actions = Array.from(container.querySelectorAll("button, a, [role='button']"))
         .filter((element) => visible(element) && enabled(element) && actionRegex.test(actionText(element)));
@@ -84,6 +137,7 @@ COMPANY_ACTION_MARK_SCRIPT = """
           action,
           depth,
           area: rect.width * rect.height,
+          isCompanyCard: isCompanyCard(container),
           actionText: actionText(action),
           containerText: normalize(container.textContent).slice(0, 240),
           tagName: container.tagName,
@@ -95,7 +149,11 @@ COMPANY_ACTION_MARK_SCRIPT = """
     }
   }
 
-  candidates.sort((left, right) => left.depth - right.depth || left.area - right.area);
+  candidates.sort(
+    (left, right) => Number(right.isCompanyCard) - Number(left.isCompanyCard) ||
+      left.depth - right.depth ||
+      left.area - right.area
+  );
   const selected = candidates[0];
   if (!selected) {
     return {
@@ -114,6 +172,7 @@ COMPANY_ACTION_MARK_SCRIPT = """
     exactTextMatches: nameElements.length,
     depth: selected.depth,
     area: selected.area,
+    isCompanyCard: selected.isCompanyCard,
     actionText: selected.actionText,
     containerText: selected.containerText,
     tagName: selected.tagName,
@@ -328,7 +387,7 @@ class CompanyManagePage(BasePage):
             page=self.page,
             data={label.replace(" ", "_"): identifier},
         ):
-            if self._is_exact_text_visible(identifier, timeout_ms=3_000):
+            if self._is_exact_text_visible_now(identifier):
                 raise AssertionError(f"Deleted company {label} {identifier!r} is still visible in Companies results")
 
     def _reload_companies_page(self) -> None:
@@ -345,6 +404,7 @@ class CompanyManagePage(BasePage):
                 "company list after cleanup",
                 timeout_ms=10_000,
             )
+            self.page.wait_for_function(COMPANY_LIST_READY_SCRIPT, timeout=5_000)
 
     def _is_company_visible(self, company_name: str, timeout_ms: int) -> bool:
         return self._is_exact_text_visible(company_name, timeout_ms=timeout_ms)
@@ -372,6 +432,12 @@ class CompanyManagePage(BasePage):
             return True
         except TimeoutError:
             return False
+
+    def _is_exact_text_visible_now(self, text: str) -> bool:
+        try:
+            return bool(self.page.evaluate(COMPANY_TEXT_VISIBLE_SCRIPT, text))
+        except PlaywrightError as error:
+            raise AssertionError(f"Could not evaluate company text visibility for {text!r}") from error
 
     def _try_fast_search(self, search_text: str) -> dict[str, object]:
         try:
@@ -416,4 +482,3 @@ def stable_search_selector() -> str:
         "input[name='search'], input[id='search'], "
         "input[aria-label='Search'], input[placeholder='Search']"
     )
-

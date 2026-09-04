@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from edot_qa.config import ROOT_DIR
+from edot_qa.mobile import device as mobile_device
 from edot_qa.mobile.config import MobileSettings, load_mobile_settings
 from edot_qa.mobile.device import (
     adb_devices,
@@ -323,6 +324,30 @@ def test_visible_texts_by_resource_id_reads_locator_values(monkeypatch):
         "id.edot.ework:id/tv_address": ["Jalan Test No. 1"],
         "id.edot.ework:id/tv_first_customer_group": ["Grosir"],
     }
+
+
+def test_dump_window_xml_uses_compressed_hierarchy_first(monkeypatch):
+    commands = []
+
+    def fake_run_adb(command, *, timeout_seconds):
+        commands.append(command)
+        if "exec-out" in command:
+            return subprocess.CompletedProcess(command, 0, stdout="<hierarchy />", stderr="")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("edot_qa.mobile.device._run_adb", fake_run_adb)
+
+    assert mobile_device._dump_window_xml("adb", device_id="emulator-5554", timeout_seconds=10) == "<hierarchy />"
+    assert commands[0] == [
+        "adb",
+        "-s",
+        "emulator-5554",
+        "shell",
+        "uiautomator",
+        "dump",
+        "--compressed",
+        "/sdcard/edot-window.xml",
+    ]
 
 
 def test_capture_device_screenshot_uses_exec_out_png(monkeypatch):

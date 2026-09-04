@@ -103,6 +103,17 @@ def test_customer_card_address_marker_is_read_from_maestro_stdout():
     assert _customer_card_address_from_maestro_stdout(stdout) == "Jl. Musyawarah"
 
 
+def test_customer_card_address_marker_ignores_maestro_command_metadata():
+    stdout = "\n".join(
+        [
+            "Run ${console.log('__EWORK_CUSTOMER_CARD_ADDRESS__=' + output.customerAddress)} COMPLETED",
+            "JsConsole: __EWORK_CUSTOMER_CARD_ADDRESS__=Jl. Musyawarah No.3A",
+        ]
+    )
+
+    assert _customer_card_address_from_maestro_stdout(stdout) == "Jl. Musyawarah No.3A"
+
+
 def test_customer_card_address_marker_missing_fails_clearly():
     with pytest.raises(AssertionError, match="address marker not found"):
         _customer_card_address_from_maestro_stdout("noise only")
@@ -246,7 +257,12 @@ def _customer_card_address_from_maestro_stdout(stdout: str) -> str:
     for line in stdout.splitlines():
         if CUSTOMER_CARD_ADDRESS_MARKER not in line:
             continue
+        stripped_line = line.strip()
+        if "console.log(" in stripped_line or "output.customerAddress" in stripped_line:
+            continue
+        if not (stripped_line.startswith(CUSTOMER_CARD_ADDRESS_MARKER) or "JsConsole:" in stripped_line):
+            continue
         value = line.split(CUSTOMER_CARD_ADDRESS_MARKER, 1)[1].strip()
-        if value:
+        if value and "COMPLETED" not in value:
             return value
     raise AssertionError("Created customer card address marker not found in Maestro output")

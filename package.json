@@ -25,11 +25,8 @@
     "evidence:deliberate:dry-run": ".venv\\Scripts\\python.exe tools/evidence_workflow.py deliberate-failure --dry-run",
     "evidence:validate": ".venv\\Scripts\\python.exe tools/evidence_workflow.py validate-paths",
     "evidence:scan": ".venv\\Scripts\\python.exe tools/evidence_workflow.py scan --evidence-dir evidence",
-    "allure:clean": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; foreach ($p in @('reports/allure-results','reports/allure-results-mobile-live','reports/allure-report','reports/allure-report-mobile')) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force } }\"",
-    "allure:generate": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --results-dir reports/allure-results --report-dir reports/allure-report",
-    "allure:generate:mobile": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --results-dir reports/allure-results-mobile-live --report-dir reports/allure-report-mobile",
-    "allure:open": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --results-dir reports/allure-results --report-dir reports/allure-report --open",
-    "allure:open:mobile": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --results-dir reports/allure-results-mobile-live --report-dir reports/allure-report-mobile --open"
+    "allure:clean": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -LiteralPath 'reports/allure-results','reports/allure-report' -Recurse -Force -ErrorAction SilentlyContinue\"",
+    "allure:generate": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --open"
   },
   "devDependencies": {
     "allure-commandline": "^2.43.0"

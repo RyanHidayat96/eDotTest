@@ -282,18 +282,10 @@ Pytest writes Allure results to `reports/allure-results` by default:
 .\.venv\Scripts\python.exe -m pytest tests --alluredir reports/allure-results
 ```
 
-Generate and open the HTML report through the repository-local Allure CLI:
+Generate and open the shared web/mobile HTML report through the repository-local Allure CLI:
 
 ```powershell
 npm run allure:generate
-npm run allure:open
-```
-
-Generate the latest mobile live report:
-
-```powershell
-npm run allure:generate:mobile
-npm run allure:open:mobile
 ```
 
 The Allure binary comes from `allure-commandline` in `devDependencies`, same as a local Node-based automation project. No global Allure PATH is required.

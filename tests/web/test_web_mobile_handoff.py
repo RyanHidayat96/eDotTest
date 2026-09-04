@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from edot_qa.ai.test_data import generate_test_data
@@ -185,7 +187,7 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
         missing_mobile = [
             item
             for item in mobile_probe.missing_login_requirements()
-            if item not in {"EWORK_EMAIL", "EWORK_COMPANY_CODE"}
+            if item not in {"EWORK_EMAIL", "EWORK_COMPANY_CODE", "EWORK_PASSWORD"}
         ]
         if missing_mobile:
             pytest.skip(f"Missing mobile handoff login environment values: {', '.join(missing_mobile)}")
@@ -210,10 +212,7 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
     with allure_step("Prepare handoff company data", screenshot=False):
         generated_data = generate_test_data()
         registration = CompanyRegistrationData.from_generated_test_data(generated_data)
-        company_user = CompanyUserData.from_generated_test_data(
-            generated_data,
-            password=mobile_probe.ework_password or "",
-        )
+        company_user = CompanyUserData.from_generated_test_data(generated_data)
         attach_json("handoff-company-registration-data", registration.as_allure_payload())
         attach_json("handoff-company-user-data", company_user.as_allure_payload())
 
@@ -243,9 +242,13 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
                 company_user=company_user,
             )
             write_company_handoff(handoff, mobile_probe.company_handoff_path)
-            mobile_settings = load_mobile_settings(prefer_handoff=True)
+            mobile_settings = replace(
+                load_mobile_settings(prefer_handoff=True),
+                ework_password=company_user.password,
+            )
             assert mobile_settings.prefer_company_handoff is True
             assert mobile_settings.ework_email == company_user.username
+            assert mobile_settings.ework_password == company_user.password
             assert mobile_settings.ework_company_name == registration.company_name
             assert mobile_settings.ework_company_code == created_company_id
 

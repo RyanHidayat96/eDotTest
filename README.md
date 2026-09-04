@@ -177,7 +177,7 @@ EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID=id.edot.ework:id/btn_success_continue
 EWORK_CUSTOMER_SEARCH_FIELD_ID=
 ```
 
-Mobile credentials should come from the web-created company handoff only when the product has proven that the created company can log in to eWork. Default mobile runs keep explicit `.env` fallback identity first. Set `EWORK_PREFER_HANDOFF=true` only for the dedicated handoff proof; the password still comes from secure local environment variables.
+Mobile credentials should come from the web-created company handoff only when the product has proven that the created company can log in to eWork. Default mobile runs keep explicit `.env` fallback identity first. Set `EWORK_PREFER_HANDOFF=true` only for the dedicated handoff proof; that proof creates a Company User with a generated runtime password and uses it only for the matching eWork login.
 
 ## Web Execution
 
@@ -268,7 +268,7 @@ Direct Pytest forms:
 
 ## Web-to-Mobile Handoff
 
-When a web company is created, `edot_qa.handoff` can write non-secret runtime company data to `artifacts/handoff/web_company.json`, including company name, company email, captured Company ID/code, and the web-created Company User username. Mobile config normally reads this only when explicit mobile environment values are absent. In the dedicated handoff proof, `EWORK_PREFER_HANDOFF=true` makes the handoff company identity override fallback identity. The handoff flow creates a Company User under Manage > Company User > Add User, then logs in to eWork with that username and the local `EWORK_PASSWORD`. Passwords are never written to handoff files.
+When a web company is created, `edot_qa.handoff` can write non-secret runtime company data to `artifacts/handoff/web_company.json`, including company name, company email, captured Company ID/code, and the web-created Company User username. Mobile config normally reads this only when explicit mobile environment values are absent. In the dedicated handoff proof, `EWORK_PREFER_HANDOFF=true` makes the handoff company identity override fallback identity. The handoff flow creates a Company User under Manage > Company User > Add User, then logs in to eWork with that username and the same generated runtime password used when creating that user. Passwords are never written to handoff files.
 
 Run the dedicated live handoff proof:
 

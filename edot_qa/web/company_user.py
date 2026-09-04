@@ -44,7 +44,7 @@ class CompanyUserData(BaseModel):
         return digits
 
     @classmethod
-    def from_generated_test_data(cls, generated: GeneratedTestData, *, password: str) -> "CompanyUserData":
+    def from_generated_test_data(cls, generated: GeneratedTestData, *, password: str | None = None) -> "CompanyUserData":
         suffix = generated.run_id[-8:].lower()
         digits = _stable_digits(generated.run_id, length=9)
         return cls(
@@ -53,7 +53,7 @@ class CompanyUserData(BaseModel):
             employee_id=f"EMP{suffix.upper()}",
             email=f"qauser{suffix}@gmail.com",
             phone=f"812{digits}",
-            password=password,
+            password=password or generated_company_user_password(generated.run_id),
         )
 
     def as_allure_payload(self) -> dict[str, Any]:
@@ -71,3 +71,9 @@ def _stable_digits(value: str, *, length: int) -> str:
     digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
     digits = "".join(str(int(char, 16) % 10) for char in digest)
     return digits[:length].ljust(length, "0")
+
+
+def generated_company_user_password(run_id: str) -> str:
+    suffix = re.sub(r"[^A-Za-z0-9]+", "", run_id[-8:].upper())
+    digits = _stable_digits(run_id, length=4)
+    return f"Qa.{suffix}{digits}"

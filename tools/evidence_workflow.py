@@ -9,12 +9,10 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Iterable
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-DELIBERATE_FAILURE_ENV = "EDOT_DELIBERATE_FAILURE"
-DELIBERATE_FAILURE_MODE = "wrong_locator"
 EVIDENCE_DIR = ROOT_DIR / "evidence"
 ALLURE_RESULTS_DIR = ROOT_DIR / "reports" / "allure-results"
 ALLURE_REPORT_DIR = ROOT_DIR / "reports" / "allure-report"
@@ -73,11 +71,6 @@ class EvidenceFinding:
     reason: str
 
 
-def deliberate_failure_enabled(mode: str = DELIBERATE_FAILURE_MODE, env: Mapping[str, str] | None = None) -> bool:
-    source = os.environ if env is None else env
-    return source.get(DELIBERATE_FAILURE_ENV, "").strip().lower() == mode
-
-
 def build_deliberate_failure_plan() -> EvidencePlan:
     return EvidencePlan(
         name="deliberate-failure",
@@ -95,7 +88,7 @@ def build_deliberate_failure_plan() -> EvidencePlan:
                     _rel(DELIBERATE_RESULTS_DIR),
                     "-q",
                 ),
-                env=((DELIBERATE_FAILURE_ENV, DELIBERATE_FAILURE_MODE), ("ALLURE_SHOW_DEV_INPUTS", "false")),
+                env=(("ALLURE_SHOW_DEV_INPUTS", "false"),),
                 expected_failure=True,
             ),
             EvidenceCommand(
@@ -218,7 +211,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate required eDOT execution evidence.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("deliberate-failure", help="Run real web/mobile wrong-locator evidence and triage.")
+    subparsers.add_parser("deliberate-failure", help="Run real web/mobile deliberate failure evidence and triage.")
 
     args = parser.parse_args()
     if args.command == "deliberate-failure":

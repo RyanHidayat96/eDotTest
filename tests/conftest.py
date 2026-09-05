@@ -1,32 +1,9 @@
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from edot_qa.reporting.allure_metadata import apply_allure_metadata
 from edot_qa.reporting.allure_helpers import attach_page_evidence
-
-
-DELIBERATE_FAILURE_ENV = "EDOT_DELIBERATE_FAILURE"
-DELIBERATE_FAILURE_MODE = "wrong_locator"
-
-
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    deliberate_enabled = os.getenv(DELIBERATE_FAILURE_ENV, "").strip().lower() == DELIBERATE_FAILURE_MODE
-    if deliberate_enabled:
-        return
-
-    kept = []
-    deselected = []
-    for item in items:
-        if item.get_closest_marker("deliberate_failure"):
-            deselected.append(item)
-        else:
-            kept.append(item)
-    if deselected:
-        config.hook.pytest_deselected(items=deselected)
-        items[:] = kept
 
 
 @pytest.fixture(autouse=True)

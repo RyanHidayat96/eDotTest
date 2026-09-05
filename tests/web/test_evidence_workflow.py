@@ -5,29 +5,11 @@ from pathlib import Path
 
 from tools.generate_allure_report import TRIAGE_HISTORY_ID, _postprocess_results, _upsert_triage_result
 from tools.evidence_workflow import (
-    DELIBERATE_FAILURE_ENV,
-    DELIBERATE_FAILURE_MODE,
     build_deliberate_failure_plan,
-    deliberate_failure_enabled,
     render_findings,
     scan_evidence_dir,
     validate_generated_path,
 )
-
-
-def test_deliberate_failure_toggle_disabled_by_default(monkeypatch) -> None:
-    monkeypatch.delenv(DELIBERATE_FAILURE_ENV, raising=False)
-
-    assert deliberate_failure_enabled() is False
-
-
-def test_deliberate_failure_toggle_requires_wrong_locator(monkeypatch) -> None:
-    monkeypatch.setenv(DELIBERATE_FAILURE_ENV, "other")
-
-    assert deliberate_failure_enabled() is False
-
-    monkeypatch.setenv(DELIBERATE_FAILURE_ENV, DELIBERATE_FAILURE_MODE)
-    assert deliberate_failure_enabled() is True
 
 
 def test_deliberate_failure_plan_runs_real_web_and_mobile_failures() -> None:
@@ -36,7 +18,7 @@ def test_deliberate_failure_plan_runs_real_web_and_mobile_failures() -> None:
     commands = [" ".join(command.command) for command in plan.commands]
 
     assert deliberate_step.expected_failure is True
-    assert (DELIBERATE_FAILURE_ENV, DELIBERATE_FAILURE_MODE) in deliberate_step.env
+    assert deliberate_step.env == (("ALLURE_SHOW_DEV_INPUTS", "false"),)
     assert "tests/web/test_login.py::test_web_login_wrong_button_locator_records_real_failure" in " ".join(
         deliberate_step.command
     )

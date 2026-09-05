@@ -202,13 +202,13 @@ Web behavior covered:
 Direct Pytest form:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\web
+.\.venv\Scripts\python.exe -m pytest tests\web -m "not deliberate_failure"
 ```
 
 Portable form:
 
 ```bash
-python -m pytest tests/web
+python -m pytest tests/web -m "not deliberate_failure"
 ```
 
 ## Mobile Execution
@@ -235,13 +235,13 @@ npm run test:mobile:customer
 Direct Pytest form:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\mobile -q -rs
+.\.venv\Scripts\python.exe -m pytest tests\mobile -m "not deliberate_failure" -q -rs
 ```
 
 Portable form:
 
 ```bash
-python -m pytest tests/mobile -q -rs
+python -m pytest tests/mobile -m "not deliberate_failure" -q -rs
 ```
 
 Ordinary developer mobile runs skip external checks with an explicit reason when prerequisites are missing. Set `EDOT_LIVE=true` for a declared live/submission run; missing mobile selectors, Maestro, ADB, device, app, or credentials then fail the mandatory scenario instead of producing a misleading green skip.
@@ -263,7 +263,7 @@ npm run test:ai
 Direct Pytest forms:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests
+.\.venv\Scripts\python.exe -m pytest tests -m "not deliberate_failure"
 .\.venv\Scripts\python.exe -m pytest tests\ai
 ```
 
@@ -288,7 +288,7 @@ Implemented bonus scope:
 Pytest writes Allure results to `reports/allure-results` by default:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests --alluredir reports/allure-results
+.\.venv\Scripts\python.exe -m pytest tests -m "not deliberate_failure" --alluredir reports/allure-results
 ```
 
 Results are cumulative across different test commands. When the same test is rerun, `npm run allure:generate` keeps only the latest result for that test identity in the HTML report, so `test:web:login` followed by `test:web:company` shows both, while rerunning `test:web:login` replaces its previous run.
@@ -335,7 +335,14 @@ Triage verdicts are human-review proposals only. The script never changes tests,
 npm run evidence:deliberate
 ```
 
-This runs real deliberate failures with `EDOT_DELIBERATE_FAILURE=wrong_locator`: web opens the eSuite login page and points the login button assertion at a wrong locator; mobile opens the eWork login flow and points the password field at a wrong id. The command expects raw pytest to fail, writes triage to `reports/triage/triage-report.md`, then regenerates the shared Allure report. The deliberate tests remain red under `eDOT Evidence` because that failed status is the evidence triage needs. The command scans preserved evidence for secrets before finishing.
+Deliberate failures can be run separately:
+
+```powershell
+npm run test:web:deliberate
+npm run test:mobile:deliberate
+```
+
+Web opens the eSuite login page and points the login button assertion at a wrong locator. Mobile opens the eWork login flow and points the password field at a wrong id. `npm run evidence:deliberate` runs both deliberate checks, expects pytest to fail, writes triage to `reports/triage/triage-report.md`, then regenerates the shared Allure report. The deliberate tests remain red under `eDOT Evidence` because that failed status is the evidence triage needs. The command scans preserved evidence for secrets before finishing.
 
 ## Test Data Cleanup
 

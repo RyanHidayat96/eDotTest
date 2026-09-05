@@ -35,7 +35,7 @@ markers = [
     "requires_maestro: test requires Maestro CLI",
     "requires_mobile_app: test requires eWork SFA installed on the device",
     "requires_storage_state: test requires an existing Playwright storage_state file",
-    "deliberate_failure: real web/mobile wrong-locator evidence test enabled only by env flag",
+    "deliberate_failure: real web/mobile failure evidence test run only by deliberate scripts",
 ]
 pythonpath = ["."]
 testpaths = ["tests"]

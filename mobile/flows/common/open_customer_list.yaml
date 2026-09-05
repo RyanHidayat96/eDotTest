@@ -38,4 +38,4 @@ appId: ${EWORK_APP_ID}
     optional: true
     waitToSettleTimeoutMs: 1000
 - assertVisible: New Customer List
-- takeScreenshot: 00-open-new-customer-list-expected-customer-list-is-displayed
+- takeScreenshot: 00-click-new-customer-menu-from-home-expected-new-customer-list-page-is-displayed

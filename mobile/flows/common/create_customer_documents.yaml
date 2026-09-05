@@ -1,7 +1,6 @@
 appId: ${EWORK_APP_ID}
 ---
 - assertVisible: KTP *
-- takeScreenshot: 01-open-documents-page-expected-ktp-form-is-displayed
 - tapOn:
     id: ${EWORK_CUSTOMER_KTP_FIELD_ID}
 - inputText: ${EWORK_CUSTOMER_KTP_NUMBER}

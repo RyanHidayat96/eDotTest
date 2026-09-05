@@ -90,7 +90,7 @@ def find_created_customer_card(
     device: MobileDevice,
 ) -> ScrollSearchResult | dict[str, object]:
     with allure_step(
-        "Find created customer card from list bottom",
+        "Verify created customer card. Expected: name, address, and customer type match submitted data",
         data={
             "customer_name": customer.name,
             "customer_card_address": customer_card_address,
@@ -123,7 +123,6 @@ def find_created_customer_card(
             timeout_seconds=10,
         )
         attach_json("customer-card-locators-before-scroll", pre_scroll_locator_texts)
-        _attach_customer_list_screenshot("customer-card-before-scroll", settings, device)
         if customer_card_values_visible(
             pre_scroll_locator_texts,
             customer_name=customer.name,
@@ -138,17 +137,21 @@ def find_created_customer_card(
                 "skipped_scroll": True,
             }
             attach_json("customer-list-scroll-search", result)
-            _attach_customer_list_screenshot("customer-card-visible-before-scroll", settings, device)
+            _attach_customer_list_screenshot("Screenshot", settings, device)
             return result
 
-        scroll_result = scroll_list_to_end_and_find_texts(
-            expected_card_texts,
-            settings.adb_command,
-            device_id=settings.mobile_device_id or device.serial,
-            bottom_timeout_seconds=40,
-            search_timeout_seconds=40,
-            max_up_swipes=4,
-        )
+        try:
+            scroll_result = scroll_list_to_end_and_find_texts(
+                expected_card_texts,
+                settings.adb_command,
+                device_id=settings.mobile_device_id or device.serial,
+                bottom_timeout_seconds=40,
+                search_timeout_seconds=40,
+                max_up_swipes=4,
+            )
+        except Exception:
+            _attach_customer_list_screenshot("Failure screenshot", settings, device)
+            raise
         attach_json(
             "customer-list-scroll-search",
             {
@@ -159,7 +162,7 @@ def find_created_customer_card(
                 "skipped_scroll": False,
             },
         )
-        _attach_customer_list_screenshot("customer-card-after-scroll-search", settings, device)
+        _attach_customer_list_screenshot("Screenshot", settings, device)
         return scroll_result
 
 

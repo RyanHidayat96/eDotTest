@@ -61,8 +61,8 @@ def test_mobile_flow_screenshots_are_grouped_by_page():
         "create_customer.yaml": 0,
         "login.yaml": 3,
         "common/create_customer_basic.yaml": 3,
-        "common/create_customer_documents.yaml": 5,
-        "common/create_customer_locations.yaml": 3,
+        "common/create_customer_documents.yaml": 4,
+        "common/create_customer_locations.yaml": 2,
         "common/login.yaml": 0,
         "common/open_customer_list.yaml": 1,
     }
@@ -74,6 +74,9 @@ def test_mobile_flow_screenshots_are_grouped_by_page():
             )
     assert "outlet-name-entered" not in str(screenshots)
     assert "province-selected" not in str(screenshots)
+    assert screenshots["common/open_customer_list.yaml"] == [
+        "00-click-new-customer-menu-from-home-expected-new-customer-list-page-is-displayed"
+    ]
 
 
 def test_mobile_settings_do_not_take_locators_from_environment(monkeypatch):
@@ -188,6 +191,45 @@ def test_maestro_runner_collects_checkpoint_screenshots_from_test_output(monkeyp
         "Screenshot - Open sample page. Expected: Ready state is displayed",
         "Screenshot - Enter sample data. Expected: Form fields are filled",
         "Screenshot - Submit sample form. Expected: Confirmation is displayed",
+    ]
+
+
+def test_maestro_runner_orders_nested_flow_screenshots_by_yaml_sequence(monkeypatch, tmp_path):
+    attached_png: list[str] = []
+    screenshot_paths = [
+        "create_customer/common/create_customer_documents/takeScreenshot/"
+        "02-enter-ktp-document-information-expected-ktp-number-is-filled-and-attachment-preview-is-displayed.png",
+        "create_customer/common/create_customer_locations/takeScreenshot/"
+        "02-enter-customer-location-information-expected-current-location-address-and-location-dropdowns-are-filled.png",
+        "create_customer/common/open_customer_list/takeScreenshot/"
+        "00-click-new-customer-menu-from-home-expected-new-customer-list-page-is-displayed.png",
+        "create_customer/common/create_customer_basic/takeScreenshot/"
+        "01-open-new-customer-registration-expected-basic-customer-form-is-displayed.png",
+    ]
+    for relative_path in screenshot_paths:
+        screenshot = tmp_path / relative_path
+        screenshot.parent.mkdir(parents=True, exist_ok=True)
+        screenshot.write_bytes(b"png")
+
+    monkeypatch.setattr(mobile_maestro, "allure", None)
+    monkeypatch.setattr(mobile_maestro, "attach_png", lambda name, image: attached_png.append(name))
+
+    runner = MaestroRunner(_mobile_settings())
+    result = MaestroResult(
+        flow_path=ROOT_DIR / "mobile" / "flows" / "create_customer.yaml",
+        command=["maestro", "test", "create_customer.yaml"],
+        returncode=0,
+        stdout="",
+        stderr="",
+    )
+
+    runner.attach_result(result, screenshot_dir=tmp_path, flow_inputs={})
+
+    assert attached_png == [
+        "Screenshot - Click new customer menu from home. Expected: New customer list page is displayed",
+        "Screenshot - Open new customer registration. Expected: Basic customer form is displayed",
+        "Screenshot - Enter customer location information. Expected: Current location address and location dropdowns are filled",
+        "Screenshot - Enter KTP document information. Expected: KTP number is filled and attachment preview is displayed",
     ]
 
 

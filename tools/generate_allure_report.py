@@ -44,6 +44,7 @@ STEP_FAILURE_ATTACHMENT_NAMES = {
 MOBILE_DEBUG_ATTACHMENT_NAMES = {
     "ai-test-data-used",
     "customer-card-locators-before-scroll",
+    "customer-card-before-scroll",
     "customer-list-scroll-search",
     "maestro-command",
     "maestro-flow-yaml",
@@ -59,12 +60,14 @@ MOBILE_DEBUG_ATTACHMENT_NAMES = {
     "mobile-start-app",
 }
 MOBILE_SCREENSHOT_RENAMES = {
-    "customer-card-after-scroll-search": "Screenshot - After Scroll Search",
-    "customer-card-before-scroll": "Screenshot - Before Scroll",
-    "customer-card-visible-before-scroll": "Screenshot - Visible Before Scroll",
+    "customer-card-after-scroll-search": "Screenshot",
+    "customer-card-visible-before-scroll": "Screenshot",
     "maestro-device-screenshot": "Screenshot",
 }
 STEP_NAME_RENAMES = {
+    "Find created customer card from list bottom": (
+        "Verify created customer card. Expected: name, address, and customer type match submitted data"
+    ),
     "Run Maestro flow: create_customer.yaml": "Create eWork customer",
     "Run Maestro flow: login.yaml": "Login to eWork",
     "Run Maestro flow: create_customer_basic.yaml": "Complete Basic customer page",

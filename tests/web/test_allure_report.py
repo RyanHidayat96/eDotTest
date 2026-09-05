@@ -224,6 +224,45 @@ def test_allure_generator_keeps_mobile_checkpoint_steps_and_input_evidence(tmp_p
     assert [attachment["name"] for attachment in checkpoints[1]["attachments"]] == ["Inputs", "Screenshot"]
 
 
+def test_allure_generator_renames_mobile_card_validation_and_keeps_one_screenshot(tmp_path: Path) -> None:
+    results_dir = tmp_path / "results"
+    results_dir.mkdir()
+    result_path = results_dir / "mobile-card-result.json"
+    result_path.write_text(
+        json.dumps(
+            {
+                "name": "test_ework_create_customer_appears_with_correct_data",
+                "fullName": "tests.mobile.test_mobile_create_customer#test_ework_create_customer_appears_with_correct_data",
+                "status": "passed",
+                "steps": [
+                    {
+                        "name": "Find created customer card from list bottom",
+                        "status": "passed",
+                        "attachments": [
+                            {"name": "Expected card", "source": "expected.json", "type": "application/json"},
+                            {"name": "customer-card-before-scroll", "source": "before.png", "type": "image/png"},
+                            {"name": "customer-card-after-scroll-search", "source": "after.png", "type": "image/png"},
+                            {
+                                "name": "customer-list-scroll-search",
+                                "source": "scroll.json",
+                                "type": "application/json",
+                            },
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _postprocess_results(results_dir)
+
+    payload = json.loads(result_path.read_text(encoding="utf-8"))
+    [step] = payload["steps"]
+    assert step["name"] == "Verify created customer card. Expected: name, address, and customer type match submitted data"
+    assert [attachment["name"] for attachment in step["attachments"]] == ["Expected card", "Screenshot"]
+
+
 def test_allure_generator_removes_support_only_results_from_main_report(tmp_path: Path) -> None:
     results_dir = tmp_path / "results"
     results_dir.mkdir()

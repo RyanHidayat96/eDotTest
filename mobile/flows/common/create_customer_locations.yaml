@@ -1,7 +1,6 @@
 appId: ${EWORK_APP_ID}
 ---
 - assertVisible: Locations
-- takeScreenshot: 01-open-locations-page-expected-location-form-is-displayed
 - tapOn:
     id: ${EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID}
 - tapOn:

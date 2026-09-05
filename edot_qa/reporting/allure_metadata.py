@@ -153,7 +153,16 @@ def apply_metadata_to_result(result: dict[str, Any]) -> dict[str, Any]:
     markers = _label_values(result, "tag")
     metadata = metadata_for_node(identifier, markers)
 
-    labels = [label for label in result.get("labels", []) if label.get("name") not in CONTROLLED_LABELS]
+    labels = []
+    seen_labels: set[tuple[str | None, str | None]] = set()
+    for label in result.get("labels", []):
+        if label.get("name") in CONTROLLED_LABELS:
+            continue
+        key = (label.get("name"), label.get("value"))
+        if key in seen_labels:
+            continue
+        labels.append(label)
+        seen_labels.add(key)
     existing_tags = {label.get("value") for label in labels if label.get("name") == "tag"}
 
     labels.extend(

@@ -225,8 +225,9 @@ def _upsert_triage_result(results_dir: Path, triage_report_path: Path) -> bool:
         return False
 
     _remove_existing_triage_results(results_dir)
+    triage_markdown = triage_report_path.read_text(encoding="utf-8")
     attachment_source = f"{uuid.uuid4()}-attachment.txt"
-    shutil.copy2(triage_report_path, results_dir / attachment_source)
+    (results_dir / attachment_source).write_text(triage_markdown, encoding="utf-8")
     now = int(datetime.now(ZoneInfo("Asia/Jakarta")).timestamp() * 1000)
     payload = {
         "uuid": str(uuid.uuid4()),
@@ -234,6 +235,7 @@ def _upsert_triage_result(results_dir: Path, triage_report_path: Path) -> bool:
         "testCaseId": TRIAGE_HISTORY_ID,
         "fullName": TRIAGE_FULL_NAME,
         "name": TRIAGE_RESULT_NAME,
+        "description": triage_markdown,
         "status": "passed",
         "stage": "finished",
         "start": now,
@@ -310,6 +312,7 @@ def _attachment_sources(node: dict[str, Any]) -> list[str]:
 
 
 def _ensure_step_evidence(result: dict[str, Any], results_dir: Path) -> None:
+    result["attachments"] = _clean_attachments(result.get("attachments", []), results_dir)
     steps = result.setdefault("steps", [])
     result["steps"] = _compact_steps(steps, depth=0, results_dir=results_dir)
     steps = result["steps"]
@@ -399,6 +402,8 @@ def _clean_attachments(attachments: list[dict[str, Any]], results_dir: Path) -> 
             "step-failure-evidence-screenshot": "Failure screenshot",
             "failure-evidence-call-page": "Final failure page state",
             "failure-evidence-call-screenshot": "Final failure screenshot",
+            "failure-evidence-call page state": "Final failure page state",
+            "failure-evidence-call screenshot": "Final failure screenshot",
         }.get(name, name)
         cleaned.append(renamed)
     if input_records:

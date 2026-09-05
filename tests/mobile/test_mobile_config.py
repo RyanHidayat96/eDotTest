@@ -13,6 +13,7 @@ from edot_qa.mobile.maestro import MaestroResult, MaestroRunner
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FLOW_VARIABLE_PATTERN = re.compile(r"\$\{([A-Z0-9_]+)\}")
+SCREENSHOT_PATTERN = re.compile(r"takeScreenshot:\s+([^\s]+)")
 DYNAMIC_FLOW_VARIABLES = {
     "EWORK_APP_ID",
     "EWORK_COMPANY_CODE",
@@ -32,6 +33,44 @@ def test_versioned_ui_profile_matches_maestro_flow_contract():
         flow_variables.update(FLOW_VARIABLE_PATTERN.findall(flow_path.read_text(encoding="utf-8")))
 
     assert flow_variables == set(EWORK_FLOW_VARIABLES) | DYNAMIC_FLOW_VARIABLES
+
+
+def test_mobile_flow_screenshots_are_grouped_by_page():
+    flow_root = ROOT_DIR / "mobile" / "flows"
+    screenshots = {
+        str(path.relative_to(flow_root)).replace("\\", "/"): SCREENSHOT_PATTERN.findall(
+            path.read_text(encoding="utf-8")
+        )
+        for path in flow_root.rglob("*.yaml")
+    }
+
+    assert screenshots["login.yaml"] == [
+        "reports/maestro-screenshots/login/01-login-page-opened",
+        "reports/maestro-screenshots/login/03-dashboard-opened",
+    ]
+    assert screenshots["common/login.yaml"] == [
+        "reports/maestro-screenshots/login/02-login-fields-completed",
+    ]
+    assert screenshots["common/create_customer_basic.yaml"] == [
+        "reports/maestro-screenshots/create_customer_basic/01-registration-page-opened",
+        "reports/maestro-screenshots/create_customer_basic/02-basic-fields-completed",
+        "reports/maestro-screenshots/create_customer_basic/03-locations-page-opened",
+    ]
+    assert screenshots["common/create_customer_locations.yaml"] == [
+        "reports/maestro-screenshots/create_customer_locations/01-locations-page-opened",
+        "reports/maestro-screenshots/create_customer_locations/02-location-fields-completed",
+        "reports/maestro-screenshots/create_customer_locations/03-documents-page-opened",
+    ]
+    assert screenshots["common/create_customer_documents.yaml"] == [
+        "reports/maestro-screenshots/create_customer_documents/01-documents-page-opened",
+        "reports/maestro-screenshots/create_customer_documents/02-ktp-entered",
+        "reports/maestro-screenshots/create_customer_documents/03-ktp-photo-captured",
+        "reports/maestro-screenshots/create_customer_documents/04-signature-drawn",
+        "reports/maestro-screenshots/create_customer_documents/05-registration-success",
+        "reports/maestro-screenshots/create_customer_documents/06-customer-list-opened",
+    ]
+    assert "outlet-name-entered" not in str(screenshots)
+    assert "province-selected" not in str(screenshots)
 
 
 def test_mobile_settings_do_not_take_locators_from_environment(monkeypatch):

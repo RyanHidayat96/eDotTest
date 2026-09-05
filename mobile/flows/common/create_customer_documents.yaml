@@ -18,20 +18,19 @@ appId: ${EWORK_APP_ID}
 - assertVisible: ${EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT}
 - assertVisible:
     id: ${EWORK_CUSTOMER_SIGNATURE_VIEW_ID}
-- takeScreenshot: reports/maestro-screenshots/create_customer_documents/04-signature-page-opened
 # Signature canvas has no text input or semantic value; pointer stroke is required by the widget.
 - swipe:
     start: "20%, 70%"
     end: "80%, 70%"
     duration: 500
-- takeScreenshot: reports/maestro-screenshots/create_customer_documents/05-signature-drawn
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/04-signature-drawn
 - tapOn:
     id: ${EWORK_CUSTOMER_SAVE_BUTTON_ID}
 - tapOn:
     id: ${EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID}
 - assertVisible: ${EWORK_CUSTOMER_SUCCESS_TEXT}
-- takeScreenshot: reports/maestro-screenshots/create_customer_documents/06-registration-success
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/05-registration-success
 - tapOn:
     id: ${EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID}
 - assertVisible: New Customer List
-- takeScreenshot: reports/maestro-screenshots/create_customer_documents/07-customer-list-opened
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/06-customer-list-opened

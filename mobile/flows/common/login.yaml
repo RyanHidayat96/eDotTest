@@ -7,14 +7,12 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     id: ${EWORK_COMPANY_ID_FIELD_ID}
 - inputText: ${EWORK_COMPANY_CODE}
-- takeScreenshot: reports/maestro-screenshots/login/02-company-id-entered
 - tapOn:
     id: ${EWORK_USERNAME_FIELD_ID}
 - inputText: ${EWORK_EMAIL}
-- takeScreenshot: reports/maestro-screenshots/login/03-username-entered
 - tapOn:
     id: ${EWORK_PASSWORD_FIELD_ID}
 - inputText: ${EWORK_PASSWORD}
-- takeScreenshot: reports/maestro-screenshots/login/04-password-entered
+- takeScreenshot: reports/maestro-screenshots/login/02-login-fields-completed
 - tapOn:
     id: ${EWORK_LOGIN_BUTTON_ID}

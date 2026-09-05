@@ -31,4 +31,3 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     id: ${EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID}
 - assertVisible: New Customer List
-- takeScreenshot: 05-return-to-new-customer-list-expected-customer-list-is-displayed

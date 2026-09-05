@@ -64,9 +64,14 @@ MOBILE_SCREENSHOT_RENAMES = {
     "customer-card-visible-before-scroll": "Screenshot",
     "maestro-device-screenshot": "Screenshot",
 }
+MOBILE_CUSTOMER_RETURN_PAGE_STEP = "Return to new customer list. Expected: Customer list is displayed"
+MOBILE_CUSTOMER_CARD_VALIDATION_STEP = (
+    "Return to new customer list. Expected: created customer card matches submitted data"
+)
 STEP_NAME_RENAMES = {
-    "Find created customer card from list bottom": (
-        "Verify created customer card. Expected: name, address, and customer type match submitted data"
+    "Find created customer card from list bottom": MOBILE_CUSTOMER_CARD_VALIDATION_STEP,
+    "Verify created customer card. Expected: name, address, and customer type match submitted data": (
+        MOBILE_CUSTOMER_CARD_VALIDATION_STEP
     ),
     "Run Maestro flow: create_customer.yaml": "Create eWork customer",
     "Run Maestro flow: login.yaml": "Login to eWork",
@@ -536,10 +541,48 @@ def _compact_steps(
             results_dir=results_dir,
             drop_mobile_debug=drop_mobile_debug,
         )
+        if drop_mobile_debug:
+            _move_mobile_customer_card_evidence_into_return_step(step)
         if (depth > 0 or drop_mobile_debug) and _is_empty_passed_step(step):
             continue
         compacted.append(step)
+    if drop_mobile_debug:
+        compacted = _drop_redundant_mobile_customer_return_step(compacted)
     return compacted
+
+
+def _drop_redundant_mobile_customer_return_step(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    has_card_validation = any(step.get("name") == MOBILE_CUSTOMER_CARD_VALIDATION_STEP for step in steps)
+    if not has_card_validation:
+        return steps
+    return [step for step in steps if step.get("name") != MOBILE_CUSTOMER_RETURN_PAGE_STEP]
+
+
+def _move_mobile_customer_card_evidence_into_return_step(step: dict[str, Any]) -> None:
+    attachments = step.get("attachments", [])
+    expected_card = next((attachment for attachment in attachments if attachment.get("name") == "Expected card"), None)
+    card_screenshot = next((attachment for attachment in attachments if attachment.get("name") == "Screenshot"), None)
+    if expected_card is None or card_screenshot is None:
+        return
+
+    return_step = next(
+        (
+            child
+            for child in step.get("steps", [])
+            if child.get("name") in {MOBILE_CUSTOMER_RETURN_PAGE_STEP, MOBILE_CUSTOMER_CARD_VALIDATION_STEP}
+        ),
+        None,
+    )
+    if return_step is None:
+        return
+
+    return_step["name"] = MOBILE_CUSTOMER_CARD_VALIDATION_STEP
+    return_step["attachments"] = [expected_card, card_screenshot]
+    step["attachments"] = [
+        attachment
+        for attachment in attachments
+        if attachment is not expected_card and attachment is not card_screenshot
+    ]
 
 
 def _clean_attachments(

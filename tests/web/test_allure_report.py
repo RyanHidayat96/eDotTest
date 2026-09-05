@@ -236,6 +236,11 @@ def test_allure_generator_renames_mobile_card_validation_and_keeps_one_screensho
                 "status": "passed",
                 "steps": [
                     {
+                        "name": "Return to new customer list. Expected: Customer list is displayed",
+                        "status": "passed",
+                        "attachments": [{"name": "Screenshot", "source": "top-list.png", "type": "image/png"}],
+                    },
+                    {
                         "name": "Find created customer card from list bottom",
                         "status": "passed",
                         "attachments": [
@@ -259,8 +264,50 @@ def test_allure_generator_renames_mobile_card_validation_and_keeps_one_screensho
 
     payload = json.loads(result_path.read_text(encoding="utf-8"))
     [step] = payload["steps"]
-    assert step["name"] == "Verify created customer card. Expected: name, address, and customer type match submitted data"
+    assert step["name"] == "Return to new customer list. Expected: created customer card matches submitted data"
     assert [attachment["name"] for attachment in step["attachments"]] == ["Expected card", "Screenshot"]
+
+
+def test_allure_generator_moves_mobile_card_evidence_from_parent_into_return_step(tmp_path: Path) -> None:
+    results_dir = tmp_path / "results"
+    results_dir.mkdir()
+    result_path = results_dir / "mobile-parent-card-result.json"
+    result_path.write_text(
+        json.dumps(
+            {
+                "name": "test_ework_create_customer_appears_with_correct_data",
+                "fullName": "tests.mobile.test_mobile_create_customer#test_ework_create_customer_appears_with_correct_data",
+                "status": "passed",
+                "steps": [
+                    {
+                        "name": "Create customer and verify list card",
+                        "status": "passed",
+                        "attachments": [
+                            {"name": "Expected card", "source": "expected.json", "type": "application/json"},
+                            {"name": "Screenshot", "source": "matching-card.png", "type": "image/png"},
+                        ],
+                        "steps": [
+                            {
+                                "name": "Return to new customer list. Expected: Customer list is displayed",
+                                "status": "passed",
+                                "attachments": [{"name": "Screenshot", "source": "top-list.png", "type": "image/png"}],
+                            },
+                        ],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _postprocess_results(results_dir)
+
+    payload = json.loads(result_path.read_text(encoding="utf-8"))
+    parent_step = payload["steps"][0]
+    [return_step] = parent_step["steps"]
+    assert parent_step["attachments"] == []
+    assert return_step["name"] == "Return to new customer list. Expected: created customer card matches submitted data"
+    assert [attachment["source"] for attachment in return_step["attachments"]] == ["expected.json", "matching-card.png"]
 
 
 def test_allure_generator_removes_support_only_results_from_main_report(tmp_path: Path) -> None:

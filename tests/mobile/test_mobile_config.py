@@ -61,7 +61,7 @@ def test_mobile_flow_screenshots_are_grouped_by_page():
         "create_customer.yaml": 0,
         "login.yaml": 3,
         "common/create_customer_basic.yaml": 3,
-        "common/create_customer_documents.yaml": 4,
+        "common/create_customer_documents.yaml": 3,
         "common/create_customer_locations.yaml": 2,
         "common/login.yaml": 0,
         "common/open_customer_list.yaml": 1,
@@ -157,8 +157,14 @@ def test_maestro_command_writes_checkpoint_artifacts_to_its_test_output_dir(tmp_
         test_output_dir=output_dir,
     )
 
-    assert command[:4] == ["maestro", "test", "--test-output-dir", str(output_dir)]
+    assert command[:5] == ["maestro", "test", "--no-reinstall-driver", "--test-output-dir", str(output_dir)]
     assert Path(command[-1]).name == "create_customer.yaml"
+
+
+def test_maestro_command_skips_reinstalling_android_driver_by_default():
+    command = MaestroRunner(_mobile_settings()).build_command("login.yaml")
+
+    assert "--no-reinstall-driver" in command
 
 
 def test_maestro_runner_collects_checkpoint_screenshots_from_test_output(monkeypatch, tmp_path):

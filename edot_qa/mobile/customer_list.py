@@ -90,7 +90,7 @@ def find_created_customer_card(
     device: MobileDevice,
 ) -> ScrollSearchResult | dict[str, object]:
     with allure_step(
-        "Verify created customer card. Expected: name, address, and customer type match submitted data",
+        "Return to new customer list. Expected: created customer card matches submitted data",
         data={
             "customer_name": customer.name,
             "customer_card_address": customer_card_address,
@@ -101,6 +101,7 @@ def find_created_customer_card(
             "search_identity": "customer_name",
         },
         screenshot=False,
+        force=True,
     ):
         attach_json(
             "Expected card",

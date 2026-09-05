@@ -58,6 +58,9 @@ class MaestroRunner:
         if self.settings.mobile_device_id:
             command.extend(["--device", self.settings.mobile_device_id])
         command.append("test")
+        # Prevent repeated Android Maestro driver/server reinstalls. On MIUI,
+        # each reinstall can trigger "Install via USB" even when eWork is already installed.
+        command.append("--no-reinstall-driver")
         if test_output_dir is not None:
             command.extend(["--test-output-dir", str(test_output_dir)])
         if include_env_flags:

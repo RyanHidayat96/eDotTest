@@ -54,7 +54,7 @@ def test_company_registration_maps_ai_data_and_defaults():
     }
 
 
-def test_company_registration_allows_env_overrides(monkeypatch):
+def test_company_registration_uses_versioned_defaults_not_environment_overrides(monkeypatch):
     monkeypatch.setenv("ESUITE_COMPANY_INDUSTRY_TYPE", "Manufacturing")
     monkeypatch.setenv("ESUITE_COMPANY_TYPE", "Distributor")
     monkeypatch.setenv("ESUITE_COMPANY_LANGUAGE", "Indonesia")
@@ -86,10 +86,10 @@ def test_company_registration_allows_env_overrides(monkeypatch):
     registration = CompanyRegistrationData.from_generated_test_data(generated)
 
     assert registration.company_name == "PT Data QA ABC12345"
-    assert registration.industry_type == "Manufacturing"
-    assert registration.company_type == "Distributor"
-    assert registration.language == "Indonesia"
-    assert registration.location.city == "Jakarta Pusat"
+    assert registration.industry_type == "Retail"
+    assert registration.company_type == "Retailer"
+    assert registration.language == "English"
+    assert registration.location.city == "Jakarta Selatan"
 
 
 def test_company_phone_normalization_pads_short_landline_output():

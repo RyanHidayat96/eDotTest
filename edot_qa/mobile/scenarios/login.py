@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from edot_qa.mobile.config import MobileSettings
+from edot_qa.mobile.flow_profile import EWORK_FLOW_VARIABLES
 from edot_qa.mobile.maestro import MaestroResult
 from edot_qa.mobile.runtime import require_login_runtime, reset_app_data_for_login
 from edot_qa.mobile.scenarios.types import MaestroFlow
@@ -29,7 +30,7 @@ class MobileLoginScenario:
                 self.settings.ework_storage_state_path,
                 app_id=self.settings.ework_app_id,
                 device_id=context.device_id,
-                dashboard_text=self.settings.ework_dashboard_text,
+                dashboard_text=EWORK_FLOW_VARIABLES["EWORK_DASHBOARD_TEXT"],
             )
             attach_json("mobile-session-state", payload)
         return result

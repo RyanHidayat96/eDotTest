@@ -120,7 +120,7 @@ class GeminiGenerateContentProvider:
         except urllib.error.HTTPError as error:
             if error.code == 404:
                 raise GeminiModelNotFoundError(
-                    f"Gemini model not found: {model}. Check GEMINI_TEST_DATA_MODEL/GEMINI_TRIAGE_MODEL."
+                    f"Gemini model not found: {model}. Check GEMINI_TEST_DATA_MODEL."
                 ) from error
             raise RuntimeError(f"Gemini API request failed for model {model}: HTTP {error.code} {error.reason}") from error
         except (urllib.error.URLError, TimeoutError, OSError) as error:

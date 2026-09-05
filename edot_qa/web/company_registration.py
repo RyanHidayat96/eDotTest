@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import re
 from typing import Any
 
@@ -22,18 +21,6 @@ class LocationCascade(BaseModel):
     zone: str = Field(default="Senayan", min_length=2)
     postal_code: str = Field(default="12190", min_length=3)
 
-    @classmethod
-    def from_env(cls) -> "LocationCascade":
-        return cls(
-            country=os.getenv("ESUITE_COMPANY_COUNTRY", cls.model_fields["country"].default),
-            province=os.getenv("ESUITE_COMPANY_PROVINCE", cls.model_fields["province"].default),
-            city=os.getenv("ESUITE_COMPANY_CITY", cls.model_fields["city"].default),
-            district=os.getenv("ESUITE_COMPANY_DISTRICT", cls.model_fields["district"].default),
-            zone=os.getenv("ESUITE_COMPANY_ZONE", cls.model_fields["zone"].default),
-            postal_code=os.getenv("ESUITE_COMPANY_POSTAL_CODE", cls.model_fields["postal_code"].default),
-        )
-
-
 class CompanyRegistrationData(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -45,7 +32,7 @@ class CompanyRegistrationData(BaseModel):
     language: str = Field(default="English", min_length=2, max_length=60)
     street_address: str = Field(min_length=10, max_length=180)
     branch_name: str = Field(default="Main", min_length=2, max_length=60)
-    location: LocationCascade = Field(default_factory=LocationCascade.from_env)
+    location: LocationCascade = Field(default_factory=LocationCascade)
 
     @classmethod
     def from_generated_test_data(cls, generated: GeneratedTestData) -> "CompanyRegistrationData":
@@ -58,11 +45,11 @@ class CompanyRegistrationData(BaseModel):
             company_name=company_name,
             email=normalize_email_for_web(company.email, suffix),
             phone=normalize_phone_for_web(company.phone),
-            industry_type=os.getenv("ESUITE_COMPANY_INDUSTRY_TYPE", cls.model_fields["industry_type"].default),
-            company_type=os.getenv("ESUITE_COMPANY_TYPE", cls.model_fields["company_type"].default),
-            language=os.getenv("ESUITE_COMPANY_LANGUAGE", cls.model_fields["language"].default),
+            industry_type=cls.model_fields["industry_type"].default,
+            company_type=cls.model_fields["company_type"].default,
+            language=cls.model_fields["language"].default,
             street_address=normalize_street_address_for_web(company.street_address),
-            branch_name=os.getenv("ESUITE_BRANCH_NAME", cls.model_fields["branch_name"].default),
+            branch_name=cls.model_fields["branch_name"].default,
         )
 
     def as_allure_payload(self) -> dict[str, Any]:
@@ -132,4 +119,3 @@ def normalize_street_address_for_web(address: str) -> str:
     if len(normalized) < 10:
         normalized = f"{normalized} Jakarta".strip()
     return normalized[:80]
-

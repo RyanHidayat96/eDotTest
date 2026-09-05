@@ -59,10 +59,7 @@ class CompanyHandoff(BaseModel):
         return self.company_user_username or self.company_email
 
     def as_mobile_environment(self) -> dict[str, str]:
-        values = {
-            "EWORK_COMPANY_NAME": self.company_name,
-            "EWORK_EMAIL": self.mobile_username,
-        }
+        values = {"EWORK_EMAIL": self.mobile_username}
         if self.company_code:
             values["EWORK_COMPANY_CODE"] = self.company_code
         return values

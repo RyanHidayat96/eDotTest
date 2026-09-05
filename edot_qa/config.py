@@ -18,6 +18,9 @@ DEFAULT_ALLURE_RESULTS = ROOT_DIR / "reports" / "allure-results"
 DEFAULT_TRIAGE_REPORT = ROOT_DIR / "reports" / "triage" / "triage-report.md"
 DEFAULT_GEMINI_TEST_DATA_MODEL = "gemini-3.1-flash-lite"
 DEFAULT_GEMINI_TRIAGE_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_AI_TEST_DATA_MAX_ATTEMPTS = 2
+DEFAULT_AI_TEST_DATA_MAX_OUTPUT_TOKENS = 700
+DEFAULT_AI_TRIAGE_MAX_OUTPUT_TOKENS = 900
 
 
 def _load_dotenv() -> None:
@@ -37,14 +40,6 @@ def _int_from_env(name: str, default: int) -> int:
     if raw_value is None or raw_value == "":
         return default
     return int(raw_value)
-
-
-def _path_from_env(name: str, default: Path) -> Path:
-    raw_value = os.getenv(name)
-    if raw_value is None or raw_value == "":
-        return default
-    path = Path(raw_value)
-    return path if path.is_absolute() else ROOT_DIR / path
 
 
 @dataclass(frozen=True)
@@ -102,13 +97,13 @@ def load_settings() -> Settings:
         headless=_bool_from_env("HEADLESS", True),
         slow_mo_ms=_int_from_env("SLOW_MO_MS", 0),
         browser=os.getenv("BROWSER", "chromium"),
-        storage_state_path=_path_from_env("PLAYWRIGHT_STORAGE_STATE", DEFAULT_STORAGE_STATE),
-        allure_results_dir=_path_from_env("ALLURE_RESULTS_DIR", DEFAULT_ALLURE_RESULTS),
-        triage_report_path=_path_from_env("TRIAGE_REPORT_PATH", DEFAULT_TRIAGE_REPORT),
+        storage_state_path=DEFAULT_STORAGE_STATE,
+        allure_results_dir=DEFAULT_ALLURE_RESULTS,
+        triage_report_path=DEFAULT_TRIAGE_REPORT,
         gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
         gemini_test_data_model=os.getenv("GEMINI_TEST_DATA_MODEL", DEFAULT_GEMINI_TEST_DATA_MODEL),
-        gemini_triage_model=os.getenv("GEMINI_TRIAGE_MODEL", DEFAULT_GEMINI_TRIAGE_MODEL),
-        ai_test_data_max_attempts=_int_from_env("AI_TEST_DATA_MAX_ATTEMPTS", 2),
-        ai_test_data_max_output_tokens=_int_from_env("AI_TEST_DATA_MAX_OUTPUT_TOKENS", 700),
-        ai_triage_max_output_tokens=_int_from_env("AI_TRIAGE_MAX_OUTPUT_TOKENS", 900),
+        gemini_triage_model=DEFAULT_GEMINI_TRIAGE_MODEL,
+        ai_test_data_max_attempts=DEFAULT_AI_TEST_DATA_MAX_ATTEMPTS,
+        ai_test_data_max_output_tokens=DEFAULT_AI_TEST_DATA_MAX_OUTPUT_TOKENS,
+        ai_triage_max_output_tokens=DEFAULT_AI_TRIAGE_MAX_OUTPUT_TOKENS,
     )

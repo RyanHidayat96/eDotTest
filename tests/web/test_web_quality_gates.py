@@ -39,15 +39,33 @@ def test_no_raw_playwright_selectors_in_web_tests():
 
 
 def test_env_example_keeps_runtime_secrets_empty():
-    env_values = {}
-    for line in (ROOT_DIR / ".env.example").read_text(encoding="utf-8").splitlines():
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        env_values[key] = value
+    env_values = _env_template_values()
 
-    for key in ("ESUITE_EMAIL", "ESUITE_PASSWORD", "GEMINI_API_KEY"):
+    for key in ("ESUITE_EMAIL", "ESUITE_PASSWORD", "GEMINI_API_KEY", "EWORK_EMAIL", "EWORK_PASSWORD"):
         assert env_values[key] == ""
+
+
+def test_env_example_contains_only_runtime_configuration():
+    assert set(_env_template_values()) == {
+        "ESUITE_BASE_URL",
+        "ESUITE_EMAIL",
+        "ESUITE_PASSWORD",
+        "HEADLESS",
+        "SLOW_MO_MS",
+        "BROWSER",
+        "ALLURE_SHOW_DEV_INPUTS",
+        "GEMINI_API_KEY",
+        "GEMINI_TEST_DATA_MODEL",
+        "MAESTRO_CLI",
+        "ADB_COMMAND",
+        "MOBILE_DEVICE_ID",
+        "MOBILE_FLOW_TIMEOUT_SECONDS",
+        "EDOT_LIVE",
+        "EWORK_APP_ID",
+        "EWORK_EMAIL",
+        "EWORK_PASSWORD",
+        "EWORK_COMPANY_CODE",
+    }
 
 
 def test_no_tracked_runtime_or_tool_artifacts():
@@ -98,3 +116,13 @@ def _python_files(*roots: Path) -> list[Path]:
 def _calls(path: Path) -> list[ast.Call]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     return [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+
+
+def _env_template_values() -> dict[str, str]:
+    values = {}
+    for line in (ROOT_DIR / ".env.example").read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values

@@ -15,13 +15,7 @@ Default test-data model:
 GEMINI_TEST_DATA_MODEL=gemini-3.1-flash-lite
 ```
 
-Default triage model:
-
-```text
-GEMINI_TRIAGE_MODEL=gemini-3.1-flash-lite
-```
-
-The model is environment-configured so it can be changed without editing tests. `gemini-3.1-flash-lite` is used because the suite needs compact structured JSON generation, concise failure notes, low token cost, and practical runtime latency. Deterministic validation remains the source of control; model output is never trusted directly.
+The triage model and bounded AI limits are versioned defaults in `edot_qa.config`. `GEMINI_TEST_DATA_MODEL` remains a runtime override because test-data generation may use an available provider model with different account capabilities. `gemini-3.1-flash-lite` is used because the suite needs compact structured JSON generation, concise failure notes, low token cost, and practical runtime latency. Deterministic validation remains the source of control; model output is never trusted directly.
 
 ## Runtime Stages
 
@@ -80,19 +74,14 @@ The Gemini request also sends a JSON response schema derived from `business_test
 
 ## Test Data Retry And Fallback
 
-Token and retry controls:
-
-```text
-AI_TEST_DATA_MAX_ATTEMPTS=2
-AI_TEST_DATA_MAX_OUTPUT_TOKENS=700
-```
+Code-owned limits: two model attempts and 700 output tokens. These bounds are not `.env` switches, so a local configuration cannot silently change test behavior.
 
 Fallback behavior:
 
 - Missing `GEMINI_API_KEY`: use deterministic Faker fallback with reason `missing_api_key`.
 - HTTP 404 model error: stop retrying and use fallback with reason `model_not_found`.
 - Other Gemini request failure: stop retrying and use fallback with reason `api_request_failed`.
-- Malformed JSON or schema-invalid output: retry up to `AI_TEST_DATA_MAX_ATTEMPTS`.
+- Malformed JSON or schema-invalid output: retry up to the code-owned attempt limit.
 - Still invalid after all attempts: use fallback with reason `invalid_model_output_after_<attempts>_attempts`.
 
 Fallback provider:
@@ -153,11 +142,7 @@ For unresolved assertion failures, Gemini may return a strict JSON proposal. Pyd
 
 ## Triage Fallback
 
-Token control:
-
-```text
-AI_TRIAGE_MAX_OUTPUT_TOKENS=900
-```
+The code-owned triage output limit is 900 tokens.
 
 Fallback behavior:
 

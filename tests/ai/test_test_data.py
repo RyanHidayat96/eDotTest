@@ -15,7 +15,7 @@ from edot_qa.ai.test_data import (
     generate_test_data,
     gemini_response_schema,
 )
-from edot_qa.config import load_settings
+from edot_qa.config import DEFAULT_AI_TEST_DATA_MAX_ATTEMPTS, load_settings
 
 
 pytestmark = pytest.mark.ai
@@ -95,17 +95,16 @@ def test_invalid_model_output_retries_then_uses_valid_payload(monkeypatch):
     assert generated.data.company.legal_name == VALID_PAYLOAD["company"]["legal_name"]
 
 
-def test_invalid_model_output_falls_back_after_attempt_limit(monkeypatch):
+def test_invalid_model_output_falls_back_after_code_owned_attempt_limit(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-only-placeholder")
-    monkeypatch.setenv("AI_TEST_DATA_MAX_ATTEMPTS", "2")
     provider = FakeModelProvider(["{}", "{}"])
     generated = TestDataGenerator(settings=load_settings(), model_provider=provider).generate(
         "fallback-run",
         attach_to_allure=False,
     )
 
-    assert provider.calls == 2
-    assert generated.source == "faker_fallback:invalid_model_output_after_2_attempts"
+    assert provider.calls == DEFAULT_AI_TEST_DATA_MAX_ATTEMPTS
+    assert generated.source == f"faker_fallback:invalid_model_output_after_{DEFAULT_AI_TEST_DATA_MAX_ATTEMPTS}_attempts"
     assert generated.data.company.legal_name.startswith(("PT ", "CV "))
 
 

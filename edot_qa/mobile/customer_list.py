@@ -4,6 +4,7 @@ from pathlib import Path
 
 from edot_qa.mobile.config import MobileSettings
 from edot_qa.mobile.customer import MobileCustomerData
+from edot_qa.mobile.flow_profile import EWORK_FLOW_VARIABLES
 from edot_qa.mobile.device import (
     MobileDevice,
     ScrollSearchResult,
@@ -19,6 +20,7 @@ CUSTOMER_CARD_ADDRESS_MARKER = "__EWORK_CUSTOMER_CARD_ADDRESS__="
 CUSTOMER_CARD_NAME_ID = "id.edot.ework:id/tv_name"
 CUSTOMER_CARD_ADDRESS_ID = "id.edot.ework:id/tv_address"
 CUSTOMER_CARD_TYPE_ID = "id.edot.ework:id/tv_first_customer_group"
+CUSTOMER_CARD_TYPE_TEXT = EWORK_FLOW_VARIABLES["EWORK_CUSTOMER_TYPE_OPTION_TEXT"]
 CUSTOMER_CARD_RESOURCE_IDS = [
     CUSTOMER_CARD_NAME_ID,
     CUSTOMER_CARD_ADDRESS_ID,
@@ -94,7 +96,7 @@ def find_created_customer_card(
         data={
             "customer_name": customer.name,
             "customer_card_address": customer_card_address,
-            "customer_type": settings.ework_customer_type_option_text,
+            "customer_type": CUSTOMER_CARD_TYPE_TEXT,
             "bottom_timeout_seconds": 40,
             "search_timeout_seconds": 40,
             "max_up_swipes": 4,
@@ -105,7 +107,7 @@ def find_created_customer_card(
         expected_card_texts = [
             customer.name,
             customer_card_address,
-            settings.ework_customer_type_option_text or "",
+            CUSTOMER_CARD_TYPE_TEXT,
         ]
         pre_scroll_locator_texts = visible_texts_by_resource_id(
             CUSTOMER_CARD_RESOURCE_IDS,
@@ -119,7 +121,7 @@ def find_created_customer_card(
             pre_scroll_locator_texts,
             customer_name=customer.name,
             customer_address=customer_card_address,
-            customer_type=settings.ework_customer_type_option_text or "",
+            customer_type=CUSTOMER_CARD_TYPE_TEXT,
         ):
             result = {
                 "reached_end": False,

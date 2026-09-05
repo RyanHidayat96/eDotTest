@@ -140,7 +140,7 @@ def redact_payload(value: Any) -> Any:
 
 
 def show_dev_inputs_in_reports() -> bool:
-    return os.getenv("ALLURE_SHOW_DEV_INPUTS", "true").strip().lower() in TRUE_VALUES
+    return os.getenv("ALLURE_SHOW_DEV_INPUTS", "false").strip().lower() in TRUE_VALUES
 
 
 def _record_input(title: str, data: Any) -> None:

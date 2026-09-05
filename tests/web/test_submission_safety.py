@@ -37,7 +37,7 @@ def write_baseline(root: Path) -> None:
                 "ESUITE_PASSWORD=",
                 "GEMINI_API_KEY=",
                 "GEMINI_TEST_DATA_MODEL=gemini-3.1-flash-lite",
-                "EWORK_PASSWORD_FIELD_ID=id.edot.ework:id/tv_password",
+                "EWORK_APP_ID=id.edot.ework",
             ]
         ),
         encoding="utf-8",

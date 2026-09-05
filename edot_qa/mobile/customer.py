@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from edot_qa.ai.test_data import GeneratedTestData, generate_test_data
-from edot_qa.reporting.allure_helpers import allure_step, attach_json
+from edot_qa.reporting.allure_helpers import allure_step
 
 
 MOBILE_PHONE_RE = re.compile(r"^\+62\d{8,13}$")
@@ -94,9 +94,7 @@ class MobileCustomerData:
 
 def generate_mobile_customer_data(run_id: str | None = None) -> MobileCustomerData:
     with allure_step("Generate mobile customer data", data={"run_id": run_id or "<auto>"}, screenshot=False):
-        customer = MobileCustomerData.from_generated_test_data(generate_test_data(run_id=run_id))
-        attach_json("mobile-customer-data", customer.as_allure_payload())
-        return customer
+        return MobileCustomerData.from_generated_test_data(generate_test_data(run_id=run_id, attach_to_allure=False))
 
 
 def _fake_ktp_number(seed: str) -> str:

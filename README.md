@@ -210,11 +210,11 @@ Run the dedicated live handoff proof:
 npm run test:handoff
 ```
 
-## Bonus Features
+## Cross-Platform Evidence
 
-Implemented bonus scope:
+Implemented cross-platform scope:
 
-- Genuine web-to-mobile handoff: `npm run test:handoff` creates a company through eSuite web, verifies Tier 2 web detail, creates a Company User for that company, writes only non-secret handoff data, then attempts eWork login using that created Company User identity. Treat this bonus as proven only when the live run passes.
+- Genuine web-to-mobile handoff: `npm run test:handoff` creates a company through eSuite web, verifies Tier 2 web detail, creates a Company User for that company, writes only non-secret handoff data, then attempts eWork login using that created Company User identity. Treat this path as proven only when the live run passes.
 
 ## Allure Reporting
 
@@ -236,7 +236,7 @@ npm run allure:generate
 
 The Allure binary comes from `allure-commandline` in `devDependencies`, same as a local Node-based automation project. No global Allure PATH is required.
 
-Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Reports are intentionally lean: page-level web steps show one input summary only when fields are entered, login input evidence is visible for the local dev report when `ALLURE_SHOW_DEV_INPUTS=true`, successful UI screenshots are captured at page-open/page-change milestones such as login, wizard pages, submit success, manage/detail pages, and mobile list validation, failures attach full-page evidence, and Maestro steps attach input summaries, redacted commands/logs, flow YAML, result JSON, device screenshots, and supported output artifacts.
+Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Reports are intentionally lean: page-level web steps show one input summary only when fields are entered, login input evidence is visible for the local dev report when `ALLURE_SHOW_DEV_INPUTS=true`, successful UI screenshots are captured at page-open/page-change milestones such as login, wizard pages, submit success, manage/detail pages, and mobile list validation. Mobile flow steps show only submitted input values and screenshots; command/log/YAML diagnostics are attached only when a Maestro flow fails.
 
 If `reports/triage/triage-report.md` exists, `npm run allure:generate` attaches it into the same shared Allure report as an Evidence item. Deliberate wrong-locator evidence stays failed in Allure by design so triage can read the real failure status, stack trace, screenshots, and Maestro output.
 

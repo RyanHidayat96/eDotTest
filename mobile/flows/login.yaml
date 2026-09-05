@@ -7,5 +7,7 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     text: Allow once
     optional: true
+- takeScreenshot: reports/maestro-screenshots/login/01-login-page-opened
 - runFlow: common/login.yaml
 - assertVisible: ${EWORK_DASHBOARD_TEXT}
+- takeScreenshot: reports/maestro-screenshots/login/05-dashboard-opened

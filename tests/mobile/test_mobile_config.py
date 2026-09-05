@@ -4,9 +4,11 @@ import re
 from pathlib import Path
 
 from edot_qa.mobile import config as mobile_config
+from edot_qa.mobile import maestro as mobile_maestro
 from edot_qa.mobile import runtime as mobile_runtime
 from edot_qa.mobile.device import MobileDevice
 from edot_qa.mobile.flow_profile import EWORK_FLOW_VARIABLES
+from edot_qa.mobile.maestro import MaestroResult, MaestroRunner
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -101,3 +103,63 @@ def test_customer_runtime_launches_ework_before_customer_flow(monkeypatch):
         ("force-stop:id.edot.ework", "adb", "device-1", 10),
         ("launch:id.edot.ework", "adb", "device-1", 10),
     ]
+
+
+def test_passed_maestro_result_attaches_only_screenshots(monkeypatch, tmp_path):
+    attached_json: list[str] = []
+    attached_png: list[str] = []
+    screenshot = tmp_path / "01-login-page-opened.png"
+    screenshot.write_bytes(b"png")
+    monkeypatch.setattr(mobile_maestro, "attach_json", lambda name, payload, **kwargs: attached_json.append(name))
+    monkeypatch.setattr(mobile_maestro, "attach_png", lambda name, image: attached_png.append(name))
+
+    runner = MaestroRunner(_mobile_settings())
+    result = MaestroResult(
+        flow_path=Path("login.yaml"),
+        command=["maestro", "test", "login.yaml"],
+        returncode=0,
+        stdout="debug output",
+        stderr="",
+    )
+
+    runner.attach_result(result, screenshot_dir=tmp_path)
+
+    assert attached_json == []
+    assert attached_png == ["Screenshot - Login Page Opened"]
+
+
+def test_failed_maestro_result_keeps_single_diagnostic_attachment(monkeypatch, tmp_path):
+    attached_json: list[str] = []
+    attached_png: list[str] = []
+    monkeypatch.setattr(mobile_maestro, "attach_json", lambda name, payload, **kwargs: attached_json.append(name))
+    monkeypatch.setattr(mobile_maestro, "attach_png", lambda name, image: attached_png.append(name))
+    monkeypatch.setattr(mobile_maestro, "capture_device_screenshot", lambda *args, **kwargs: b"png")
+
+    runner = MaestroRunner(_mobile_settings())
+    result = MaestroResult(
+        flow_path=Path("login.yaml"),
+        command=["maestro", "test", "login.yaml"],
+        returncode=1,
+        stdout="debug output",
+        stderr="wrong locator",
+    )
+
+    runner.attach_result(result, screenshot_dir=tmp_path)
+
+    assert attached_json == ["Failure diagnostics"]
+    assert attached_png == ["Screenshot", "Failure screenshot"]
+
+
+def _mobile_settings() -> mobile_config.MobileSettings:
+    return mobile_config.MobileSettings(
+        maestro_cli="maestro",
+        adb_command="adb",
+        mobile_device_id=None,
+        mobile_flow_timeout_seconds=300,
+        edot_live=True,
+        prefer_company_handoff=False,
+        ework_app_id="id.edot.ework",
+        ework_email=None,
+        ework_password=None,
+        ework_company_code=None,
+    )

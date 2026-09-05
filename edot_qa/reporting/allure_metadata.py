@@ -39,9 +39,24 @@ ADDITIONAL_TEST_CASE_TAGS = {
     },
 }
 
+DISPLAY_TITLES = {
+    "tests/web/test_login.py::test_esuite_login_shows_dashboard_greeting": "eSuite Login Shows Dashboard Greeting",
+    "tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data": (
+        "Create Company Through Three Step Wizard"
+    ),
+    "tests/web/test_web_mobile_handoff.py::test_web_created_company_handoff_drives_mobile_login": (
+        "Web Created Company Logs In to eWork"
+    ),
+    "tests/mobile/test_mobile_login.py::test_ework_login_displays_dashboard": "eWork Login Shows Dashboard",
+    "tests/mobile/test_mobile_create_customer.py::test_ework_create_customer_appears_with_correct_data": (
+        "Create Customer and Verify List Card"
+    ),
+}
+
 
 @dataclass(frozen=True)
 class AllureMetadata:
+    title: str
     parent_suite: str
     suite: str
     sub_suite: str
@@ -107,6 +122,7 @@ def metadata_for_node(node_id: str, marker_names: Iterable[str] = ()) -> AllureM
     case_tags = set(ADDITIONAL_TEST_CASE_TAGS.get(node_key, set())) | ({case_id} if case_id else set())
     tags = tuple(sorted(set(metadata.tags) | markers | {"edot"} | case_tags))
     return AllureMetadata(
+        title=DISPLAY_TITLES.get(node_key, metadata.title),
         parent_suite=metadata.parent_suite,
         suite=metadata.suite,
         sub_suite=metadata.sub_suite,
@@ -134,6 +150,7 @@ def apply_allure_metadata(item: Any) -> AllureMetadata:
     _call_dynamic("story", metadata.story)
     _call_dynamic("severity", metadata.severity)
     _call_dynamic("owner", metadata.owner)
+    _call_dynamic("title", metadata.title)
 
     for tag in metadata.tags:
         _call_dynamic("tag", tag)
@@ -152,6 +169,7 @@ def apply_metadata_to_result(result: dict[str, Any]) -> dict[str, Any]:
 
     markers = _label_values(result, "tag")
     metadata = metadata_for_node(identifier, markers)
+    result["name"] = metadata.title
 
     labels = []
     seen_labels: set[tuple[str | None, str | None]] = set()
@@ -342,6 +360,7 @@ def _ai_metadata(file_name: str, test_name: str) -> AllureMetadata:
 
 def _metadata(
     *,
+    title: str | None = None,
     parent_suite: str,
     suite: str,
     sub_suite: str,
@@ -352,6 +371,7 @@ def _metadata(
     tags: set[str],
 ) -> AllureMetadata:
     return AllureMetadata(
+        title=title or story,
         parent_suite=parent_suite,
         suite=suite,
         sub_suite=sub_suite,

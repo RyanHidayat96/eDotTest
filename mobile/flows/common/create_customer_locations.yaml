@@ -1,11 +1,13 @@
 appId: ${EWORK_APP_ID}
 ---
 - assertVisible: Locations
+- takeScreenshot: reports/maestro-screenshots/create_customer_locations/01-locations-page-opened
 - tapOn:
     id: ${EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID}
 - tapOn:
     text: ${EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT}
 - assertVisible: ${EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT}
+- takeScreenshot: reports/maestro-screenshots/create_customer_locations/02-address-type-selected
 - tapOn:
     id: ${EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID}
 - scrollUntilVisible:
@@ -20,11 +22,13 @@ appId: ${EWORK_APP_ID}
 - evalScript: ${output.customerAddress = maestro.copiedText.trim()}
 - assertTrue: ${output.customerAddress.length > 0 && !output.customerAddress.includes('Choose') && !output.customerAddress.includes('Input')}
 - evalScript: ${console.log('__EWORK_CUSTOMER_CARD_ADDRESS__=' + output.customerAddress)}
+- takeScreenshot: reports/maestro-screenshots/create_customer_locations/03-current-location-address-filled
 - tapOn:
     text: ${EWORK_CUSTOMER_PROVINCE_FIELD_TEXT}
 - tapOn:
     text: ${EWORK_CUSTOMER_PROVINCE_OPTION_TEXT}
 - assertVisible: ${EWORK_CUSTOMER_PROVINCE_OPTION_TEXT}
+- takeScreenshot: reports/maestro-screenshots/create_customer_locations/04-province-selected
 - scrollUntilVisible:
     element:
       text: ${EWORK_CUSTOMER_CITY_FIELD_TEXT}
@@ -35,6 +39,7 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     text: ${EWORK_CUSTOMER_CITY_OPTION_TEXT}
 - assertVisible: ${EWORK_CUSTOMER_CITY_OPTION_TEXT}
+- takeScreenshot: reports/maestro-screenshots/create_customer_locations/05-city-selected
 - scrollUntilVisible:
     element:
       text: ${EWORK_CUSTOMER_DISTRICT_FIELD_TEXT}
@@ -45,6 +50,7 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     text: ${EWORK_CUSTOMER_DISTRICT_OPTION_TEXT}
 - assertVisible: ${EWORK_CUSTOMER_DISTRICT_OPTION_TEXT}
+- takeScreenshot: reports/maestro-screenshots/create_customer_locations/06-district-selected
 - scrollUntilVisible:
     element:
       text: ${EWORK_CUSTOMER_SUBDISTRICT_FIELD_TEXT}
@@ -55,6 +61,7 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     text: ${EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT}
 - assertVisible: ${EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT}
+- takeScreenshot: reports/maestro-screenshots/create_customer_locations/07-sub-district-selected
 - runFlow:
     when:
       visible: ${EWORK_CUSTOMER_POSTAL_CODE_FIELD_TEXT}
@@ -64,8 +71,10 @@ appId: ${EWORK_APP_ID}
       - tapOn:
           text: ${EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT}
 - assertVisible: ${EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT}
+- takeScreenshot: reports/maestro-screenshots/create_customer_locations/08-postal-code-selected
 # The app may advance to Documents after the final location choice; otherwise Continue is the only exposed stable text.
 - tapOn:
     text: Continue
     optional: true
 - assertVisible: KTP *
+- takeScreenshot: reports/maestro-screenshots/create_customer_locations/09-documents-page-opened

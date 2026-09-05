@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 
 from edot_qa.config import ROOT_DIR, load_settings
 from edot_qa.mobile.config import load_mobile_settings
-from edot_qa.reporting.allure_metadata import apply_metadata_to_result
+from edot_qa.reporting.allure_metadata import EXPLICIT_TEST_CASE_IDS, apply_metadata_to_result, split_node_identifier
 from edot_qa.reporting.allure_helpers import redact_payload
 
 
@@ -40,6 +40,29 @@ STEP_FAILURE_ATTACHMENT_NAMES = {
     "step-failure-evidence-screenshot",
     "Failure page state",
     "Failure screenshot",
+}
+MOBILE_DEBUG_ATTACHMENT_NAMES = {
+    "ai-test-data-used",
+    "customer-card-locators-before-scroll",
+    "customer-list-scroll-search",
+    "maestro-command",
+    "maestro-flow-yaml",
+    "maestro-result",
+    "maestro-stderr",
+    "maestro-stdout",
+    "mobile-customer-address-mapping",
+    "mobile-customer-data",
+    "mobile-device",
+    "mobile-login-reset",
+    "mobile-runtime-settings",
+    "mobile-session-state",
+    "mobile-start-app",
+}
+MOBILE_SCREENSHOT_RENAMES = {
+    "customer-card-after-scroll-search": "Screenshot - After Scroll Search",
+    "customer-card-before-scroll": "Screenshot - Before Scroll",
+    "customer-card-visible-before-scroll": "Screenshot - Visible Before Scroll",
+    "maestro-device-screenshot": "Screenshot",
 }
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(line_buffering=True)
@@ -71,6 +94,9 @@ def main() -> int:
     removed = _deduplicate_latest_results(results_dir)
     if removed:
         print(f"[Allure Generate] Removed {removed} older duplicate result file(s).")
+    removed_non_reportable = _remove_non_reportable_results(results_dir)
+    if removed_non_reportable:
+        print(f"[Allure Generate] Removed {removed_non_reportable} support-only result file(s).")
     processed = _postprocess_results(results_dir)
     print(f"[Allure Generate] Enriched {processed} result file(s).")
     if not args.no_triage and _upsert_triage_result(results_dir, triage_report_path):
@@ -192,6 +218,11 @@ def _deduplicate_latest_results(results_dir: Path) -> int:
     removed = 0
     for result_path in old_results:
         try:
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+            _unlink_result_attachments(payload, results_dir)
+        except (OSError, json.JSONDecodeError):
+            pass
+        try:
             result_path.unlink()
             removed += 1
         except OSError as error:
@@ -199,12 +230,78 @@ def _deduplicate_latest_results(results_dir: Path) -> int:
     return removed
 
 
+def _remove_non_reportable_results(results_dir: Path) -> int:
+    removed = 0
+    for result_path in sorted(results_dir.glob("*-result.json")):
+        try:
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"[Allure Generate] Skipped report-scope check for {result_path.name}: {error}")
+            continue
+
+        if _is_reportable_result(payload):
+            continue
+
+        _unlink_result_attachments(payload, results_dir)
+        try:
+            result_path.unlink()
+            removed += 1
+        except OSError as error:
+            print(f"[Allure Generate] Could not remove support-only result {result_path.name}: {error}")
+    return removed
+
+
+def _is_reportable_result(payload: dict[str, Any]) -> bool:
+    if payload.get("historyId") == TRIAGE_HISTORY_ID or payload.get("fullName") == TRIAGE_FULL_NAME:
+        return True
+
+    full_name = str(payload.get("fullName") or "")
+    if full_name and _result_node_key(full_name) in EXPLICIT_TEST_CASE_IDS:
+        return True
+
+    tags = _result_tags(payload)
+    if "deliberate_failure" in tags or "evidence" in tags or "ai" in tags:
+        return True
+
+    return False
+
+
+def _result_node_key(identifier: str) -> str:
+    path, test_name = split_node_identifier(identifier)
+    clean_path = path.replace("\\", "/")
+    return f"{clean_path}::{test_name}"
+
+
+def _result_tags(payload: dict[str, Any]) -> set[str]:
+    return {
+        str(label.get("value"))
+        for label in payload.get("labels", [])
+        if label.get("name") == "tag" and label.get("value")
+    }
+
+
 def _result_identity(payload: dict[str, Any]) -> str | None:
-    for key in ("historyId", "fullName", "name"):
+    full_name = payload.get("fullName")
+    if isinstance(full_name, str) and full_name.strip():
+        return f"fullName:{full_name.strip()}|parameters:{_parameters_identity(payload)}"
+
+    for key in ("historyId", "name"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
             return f"{key}:{value.strip()}"
     return None
+
+
+def _parameters_identity(payload: dict[str, Any]) -> str:
+    parameters = []
+    for parameter in payload.get("parameters", []):
+        name = parameter.get("name")
+        if name == "test_case_id":
+            continue
+        parameters.append({"name": name, "value": parameter.get("value")})
+    if not parameters:
+        return ""
+    return json.dumps(parameters, sort_keys=True, separators=(",", ":"))
 
 
 def _result_timestamp(payload: dict[str, Any], result_path: Path) -> int:
@@ -225,6 +322,7 @@ def _postprocess_results(results_dir: Path) -> int:
     for result_path in sorted(results_dir.glob("*-result.json")):
         try:
             payload = json.loads(result_path.read_text(encoding="utf-8"))
+            _promote_nested_failure_status(payload)
             payload = apply_metadata_to_result(payload)
             _ensure_step_evidence(payload, results_dir)
             result_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -232,6 +330,29 @@ def _postprocess_results(results_dir: Path) -> int:
         except (OSError, json.JSONDecodeError) as error:
             print(f"[Allure Generate] Skipped {result_path.name}: {error}")
     return count
+
+
+def _promote_nested_failure_status(result: dict[str, Any]) -> None:
+    child_status = _first_child_failure_status(result.get("steps", []))
+    if _status(result.get("status")) == "passed" and child_status in {"failed", "broken"}:
+        result["status"] = child_status
+        result.setdefault(
+            "statusDetails",
+            {"message": f"Nested step reported {child_status}; keeping report status consistent."},
+        )
+
+
+def _first_child_failure_status(steps: list[dict[str, Any]]) -> str | None:
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        status = _status(step.get("status"))
+        if status in {"failed", "broken"}:
+            return status
+        nested_status = _first_child_failure_status(step.get("steps", []))
+        if nested_status is not None:
+            return nested_status
+    return None
 
 
 def _upsert_triage_result(results_dir: Path, triage_report_path: Path) -> bool:
@@ -327,12 +448,14 @@ def _attachment_sources(node: dict[str, Any]) -> list[str]:
 
 def _ensure_step_evidence(result: dict[str, Any], results_dir: Path) -> None:
     steps = result.setdefault("steps", [])
+    mobile_result = _is_mobile_result(result)
     result["attachments"] = _clean_attachments(
         result.get("attachments", []),
         results_dir,
         drop_final_failure=_has_step_failure_evidence(steps),
+        drop_mobile_debug=mobile_result,
     )
-    result["steps"] = _compact_steps(steps, depth=0, results_dir=results_dir)
+    result["steps"] = _compact_steps(steps, depth=0, results_dir=results_dir, drop_mobile_debug=mobile_result)
     steps = result["steps"]
     if not steps:
         summary = {
@@ -381,12 +504,27 @@ def _attach_summary(result: dict[str, Any], step: dict[str, Any], results_dir: P
     )
 
 
-def _compact_steps(steps: list[dict[str, Any]], *, depth: int, results_dir: Path) -> list[dict[str, Any]]:
+def _compact_steps(
+    steps: list[dict[str, Any]],
+    *,
+    depth: int,
+    results_dir: Path,
+    drop_mobile_debug: bool,
+) -> list[dict[str, Any]]:
     compacted = []
     for step in steps:
-        step["attachments"] = _clean_attachments(step.get("attachments", []), results_dir)
-        step["steps"] = _compact_steps(step.get("steps", []), depth=depth + 1, results_dir=results_dir)
-        if depth > 0 and _is_empty_passed_step(step):
+        step["attachments"] = _clean_attachments(
+            step.get("attachments", []),
+            results_dir,
+            drop_mobile_debug=drop_mobile_debug,
+        )
+        step["steps"] = _compact_steps(
+            step.get("steps", []),
+            depth=depth + 1,
+            results_dir=results_dir,
+            drop_mobile_debug=drop_mobile_debug,
+        )
+        if (depth > 0 or drop_mobile_debug) and _is_empty_passed_step(step):
             continue
         compacted.append(step)
     return compacted
@@ -397,12 +535,15 @@ def _clean_attachments(
     results_dir: Path,
     *,
     drop_final_failure: bool = False,
+    drop_mobile_debug: bool = False,
 ) -> list[dict[str, Any]]:
     cleaned = []
     input_records = []
     for attachment in attachments:
         name = str(attachment.get("name", ""))
         if drop_final_failure and name in FINAL_FAILURE_ATTACHMENT_NAMES:
+            continue
+        if drop_mobile_debug and name in MOBILE_DEBUG_ATTACHMENT_NAMES:
             continue
         if name in {
             "step-runtime-info",
@@ -428,6 +569,7 @@ def _clean_attachments(
             "failure-evidence-call-screenshot": "Final failure screenshot",
             "failure-evidence-call page state": "Final failure page state",
             "failure-evidence-call screenshot": "Final failure screenshot",
+            **MOBILE_SCREENSHOT_RENAMES,
         }.get(name, name)
         cleaned.append(renamed)
     if input_records:
@@ -480,6 +622,13 @@ def _combine_input_records(records: list[dict[str, Any]]) -> Any:
 
 def _is_empty_passed_step(step: dict[str, Any]) -> bool:
     return _status(step.get("status")) == "passed" and not step.get("attachments") and not step.get("steps")
+
+
+def _is_mobile_result(result: dict[str, Any]) -> bool:
+    full_name = str(result.get("fullName") or "")
+    if "tests.mobile." in full_name or "tests/mobile/" in full_name:
+        return True
+    return any(label.get("name") == "tag" and label.get("value") == "mobile" for label in result.get("labels", []))
 
 
 def _labels_by_name(labels: list[dict[str, Any]]) -> dict[str, Any]:

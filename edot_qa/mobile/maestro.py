@@ -9,15 +9,14 @@ from edot_qa.mobile.config import MobileSettings
 from edot_qa.mobile.device import capture_device_screenshot, command_available
 from edot_qa.reporting.allure_helpers import (
     allure_step,
-    attach_file,
     attach_json,
     attach_png,
-    attach_text,
     show_dev_inputs_in_reports,
 )
 
 
 SENSITIVE_MAESTRO_KEYS = {"EWORK_EMAIL", "EWORK_PASSWORD", "EWORK_COMPANY_CODE"}
+MAX_FAILURE_OUTPUT_CHARS = 4_000
 
 
 @dataclass(frozen=True)
@@ -81,6 +80,7 @@ class MaestroRunner:
             raise FileNotFoundError(f"Maestro flow not found: {flow_path}")
 
         self.settings.ensure_runtime_dirs()
+        screenshot_dir = self._prepare_screenshot_dir(flow_path)
         maestro_variables = self.settings.maestro_variables(extra_env)
         command = self.build_command(flow_path, include_env_flags=True, extra_env=extra_env)
         redacted_command = redact_command(command, maestro_variables)
@@ -101,8 +101,6 @@ class MaestroRunner:
             )
             if flow_inputs:
                 attach_json("Inputs", flow_inputs, redact=False)
-            attach_json("maestro-command", {"command": redacted_command, "flow": str(flow_path)})
-            attach_file("maestro-flow-yaml", flow_path)
 
             try:
                 completed = subprocess.run(
@@ -128,30 +126,58 @@ class MaestroRunner:
                     stdout=redact_sensitive_text(_timeout_output(error.stdout), maestro_variables),
                     stderr=f"Maestro flow timed out after {timeout_seconds}s: {flow_path.name}",
                 )
-            self.attach_result(result)
-            self.attach_device_screenshot()
+            self.attach_result(result, screenshot_dir=screenshot_dir)
             return result
 
-    def attach_result(self, result: MaestroResult) -> None:
-        attach_text("maestro-stdout", result.stdout)
-        attach_text("maestro-stderr", result.stderr)
+    def attach_result(self, result: MaestroResult, *, screenshot_dir: Path) -> None:
+        screenshots_attached = self.attach_flow_screenshots(screenshot_dir)
+        if not screenshots_attached:
+            self.attach_device_screenshot("Screenshot")
+
+        if result.passed:
+            return
+
         attach_json(
-            "maestro-result",
+            "Failure diagnostics",
             {
                 "flow": str(result.flow_path),
                 "returncode": result.returncode,
-                "passed": result.passed,
+                "command": result.command,
+                "stdout_tail": _tail(result.stdout),
+                "stderr_tail": _tail(result.stderr),
             },
+            redact=False,
         )
+        self.attach_device_screenshot("Failure screenshot")
 
-    def attach_device_screenshot(self) -> None:
+    def attach_flow_screenshots(self, screenshot_dir: Path) -> int:
+        screenshots = sorted(screenshot_dir.glob("*.png"))
+        for screenshot in screenshots:
+            try:
+                attach_png(_screenshot_label(screenshot), screenshot.read_bytes())
+            except OSError:
+                continue
+        return len(screenshots)
+
+    def attach_device_screenshot(self, name: str) -> None:
         image = capture_device_screenshot(
             self.settings.adb_command,
             device_id=self.settings.mobile_device_id,
             timeout_seconds=5,
         )
         if image:
-            attach_png("maestro-device-screenshot", image)
+            attach_png(name, image)
+
+    @staticmethod
+    def _prepare_screenshot_dir(flow_path: Path) -> Path:
+        screenshot_dir = ROOT_DIR / "reports" / "maestro-screenshots" / flow_path.stem
+        screenshot_dir.mkdir(parents=True, exist_ok=True)
+        for screenshot in screenshot_dir.glob("*.png"):
+            try:
+                screenshot.unlink()
+            except OSError:
+                continue
+        return screenshot_dir
 
 
 def assert_maestro_passed(result: MaestroResult) -> MaestroResult:
@@ -254,3 +280,14 @@ def _timeout_output(output: str | bytes | None) -> str:
     if isinstance(output, bytes):
         return output.decode("utf-8", errors="replace")
     return output
+
+
+def _screenshot_label(path: Path) -> str:
+    words = path.stem.split("-", 1)[-1].replace("-", " ").split()
+    return "Screenshot - " + " ".join(word.upper() if word in {"ktp", "id"} else word.title() for word in words)
+
+
+def _tail(value: str) -> str:
+    if len(value) <= MAX_FAILURE_OUTPUT_CHARS:
+        return value
+    return value[-MAX_FAILURE_OUTPUT_CHARS:]

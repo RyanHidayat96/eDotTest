@@ -13,3 +13,4 @@ appId: ${EWORK_APP_ID}
 - assertVisible:
     id: id.edot.ework:id/tv_first_customer_group
     text: ${EWORK_CUSTOMER_TYPE_OPTION_TEXT}
+- takeScreenshot: reports/maestro-screenshots/validate_customer_list_card/01-customer-card-validated

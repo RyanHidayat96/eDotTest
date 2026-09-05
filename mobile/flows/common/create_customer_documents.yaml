@@ -1,30 +1,37 @@
 appId: ${EWORK_APP_ID}
 ---
 - assertVisible: KTP *
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/01-documents-page-opened
 - tapOn:
     id: ${EWORK_CUSTOMER_KTP_FIELD_ID}
 - inputText: ${EWORK_CUSTOMER_KTP_NUMBER}
 - hideKeyboard
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/02-ktp-entered
 - tapOn:
     id: ${EWORK_CUSTOMER_UPLOAD_BUTTON_ID}
 - tapOn:
     id: ${EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID}
 - assertVisible: Preview
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/03-ktp-photo-captured
 - tapOn:
     id: ${EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID}
 - assertVisible: ${EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT}
 - assertVisible:
     id: ${EWORK_CUSTOMER_SIGNATURE_VIEW_ID}
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/04-signature-page-opened
 # Signature canvas has no text input or semantic value; pointer stroke is required by the widget.
 - swipe:
     start: "20%, 70%"
     end: "80%, 70%"
     duration: 500
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/05-signature-drawn
 - tapOn:
     id: ${EWORK_CUSTOMER_SAVE_BUTTON_ID}
 - tapOn:
     id: ${EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID}
 - assertVisible: ${EWORK_CUSTOMER_SUCCESS_TEXT}
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/06-registration-success
 - tapOn:
     id: ${EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID}
 - assertVisible: New Customer List
+- takeScreenshot: reports/maestro-screenshots/create_customer_documents/07-customer-list-opened

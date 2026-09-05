@@ -4,11 +4,11 @@
   "private": true,
   "description": "Convenience scripts for the eDOT QA automation take-home project.",
   "scripts": {
-    "test:web": ".venv\\Scripts\\python.exe -m pytest tests/web -m \"not deliberate_failure\" -q",
+    "test:web": ".venv\\Scripts\\python.exe -m pytest tests/web/test_login.py::test_esuite_login_shows_dashboard_greeting tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data -q",
     "test:web:login": ".venv\\Scripts\\python.exe -m pytest tests/web/test_login.py::test_esuite_login_shows_dashboard_greeting -q",
     "test:web:deliberate": ".venv\\Scripts\\python.exe -m pytest tests/web/test_login.py::test_web_login_wrong_button_locator_records_real_failure -q",
     "test:web:company": ".venv\\Scripts\\python.exe -m pytest tests/web/test_create_company.py -q",
-    "test:mobile": ".venv\\Scripts\\python.exe -m pytest tests/mobile -m \"not deliberate_failure\" -q -rs",
+    "test:mobile": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_login.py::test_ework_login_displays_dashboard tests/mobile/test_mobile_create_customer.py::test_ework_create_customer_appears_with_correct_data -q -rs",
     "test:mobile:login": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_login.py::test_ework_login_displays_dashboard -q -rs",
     "test:mobile:deliberate": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_login.py::test_mobile_login_wrong_password_locator_records_real_failure -q -rs",
     "test:mobile:customer": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_create_customer.py::test_ework_create_customer_appears_with_correct_data -q -rs",

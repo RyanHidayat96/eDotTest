@@ -1,110 +1,75 @@
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-.venv*/
-venv/
-env/
-ENV/
-*.egg-info/
-.eggs/
-build/
-dist/
-.tox/
-.nox/
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.pyre/
-.hypothesis/
-.coverage
-.coverage.*
-coverage.xml
-htmlcov/
-pip-wheel-metadata/
-
-# Secrets and local runtime configuration
+# Local configuration and secrets
 .env
 .env.*
 !.env.example
-*.pem
 *.key
+*.pem
 *.p12
+*.pfx
 *.crt
+.npmrc
+.pypirc
+.netrc
+id_rsa
+id_ed25519
 
-# Playwright, reports, and runtime artifacts
-test-results/
-playwright-report/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Node tooling used for the local Allure CLI wrapper
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test, report, and runtime artifacts
+artifacts/
+reports/
 allure-results/
 allure-report/
-reports/allure-results*/
-reports/allure-report*/
-reports/triage/
-reports/
-evidence/web-allure/
-evidence/deliberate-allure/
-evidence/triage/
-evidence/*.zip
-artifacts/
+playwright-report/
+test-results/
 maestro-output/
-.maestro/
 .allure/
+.maestro/
 .playwright/
-trace.zip
-*.trace.zip
-*.webm
-*.mp4
-*.m4v
-*.mov
-*.har
-*.zip
-*.png.tmp
-screenshots/
-videos/
 
-# Generated spreadsheet lock/temp files
-~$*.xls
-~$*.xlsx
-~$*.xlsm
+# Generated evidence files; keep only the explanation
+evidence/*
+!evidence/README.md
 
-# Logs, caches, and temporary files
-node_modules/
-*.log
-*.out
-*.err
+# Temporary files
+.tmp/
+tmp/
+temp/
 *.tmp
 *.temp
+*.log
 *.bak
 *.orig
 *.rej
-*.pid
-*.prof
-*.sqlite
-*.sqlite3
-*.db
-tmp/
-temp/
-.tmp/
-.cache/
-
-# Local AI/editor/tool artifacts
-.agents/
-.codex/
-.claude/
-.cursor/
-.continue/
-.aider*
-*.prompt.log
-*.ai.log
-
-# Local OS/editor noise
-.DS_Store
-Thumbs.db
-desktop.ini
-.idea/
-.vscode/
 *.swp
 *.swo
 
-tests.zip
-CODEX_EDOT_QA_V4_FINAL_REMEDIATION.md
+# OS and editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+.idea/
+.vscode/
+.cursor/
+.continue/

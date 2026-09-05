@@ -33,12 +33,16 @@ def run_maestro_flow(maestro_runner: MaestroRunner):
         *,
         timeout_seconds: int | None = None,
         extra_env: dict[str, str] | None = None,
+        step_title: str | None = None,
+        expected: str | None = None,
     ) -> MaestroResult:
         return assert_maestro_passed(
             maestro_runner.run_flow(
                 flow,
                 timeout_seconds=timeout_seconds or maestro_runner.settings.mobile_flow_timeout_seconds,
                 extra_env=extra_env,
+                step_title=step_title,
+                expected=expected,
             )
         )
 

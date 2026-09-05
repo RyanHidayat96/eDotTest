@@ -19,7 +19,11 @@ class MobileLoginScenario:
     def run(self) -> MaestroResult:
         context = require_login_runtime(self.settings)
         reset_app_data_for_login(context)
-        result = self.run_flow("login.yaml")
+        result = self.run_flow(
+            "login.yaml",
+            step_title="Login to eWork",
+            expected="Dashboard is displayed",
+        )
 
         with allure_step(
             "Store eWork mobile session state",

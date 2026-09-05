@@ -37,6 +37,7 @@ def test_versioned_ui_profile_matches_maestro_flow_contract():
 
 def test_mobile_flow_screenshots_are_grouped_by_page():
     flow_root = ROOT_DIR / "mobile" / "flows"
+    flow_files = {str(path.relative_to(flow_root)).replace("\\", "/") for path in flow_root.rglob("*.yaml")}
     screenshots = {
         str(path.relative_to(flow_root)).replace("\\", "/"): SCREENSHOT_PATTERN.findall(
             path.read_text(encoding="utf-8")
@@ -44,30 +45,40 @@ def test_mobile_flow_screenshots_are_grouped_by_page():
         for path in flow_root.rglob("*.yaml")
     }
 
+    assert flow_files == {
+        "login.yaml",
+        "validate_customer_list_card.yaml",
+        "common/create_customer_basic.yaml",
+        "common/create_customer_documents.yaml",
+        "common/create_customer_locations.yaml",
+        "common/login.yaml",
+        "common/open_customer_list.yaml",
+    }
     assert screenshots["login.yaml"] == [
-        "reports/maestro-screenshots/login/01-login-page-opened",
-        "reports/maestro-screenshots/login/03-dashboard-opened",
+        "reports/maestro-screenshots/login/01-open-ework-app-expected-login-page-is-displayed",
+        "reports/maestro-screenshots/login/02-enter-ework-login-credentials-expected-company-id-username-and-password-fields-are-filled",
+        "reports/maestro-screenshots/login/03-submit-ework-login-expected-dashboard-is-displayed",
     ]
-    assert screenshots["common/login.yaml"] == [
-        "reports/maestro-screenshots/login/02-login-fields-completed",
-    ]
+    assert screenshots["common/login.yaml"] == []
     assert screenshots["common/create_customer_basic.yaml"] == [
-        "reports/maestro-screenshots/create_customer_basic/01-registration-page-opened",
-        "reports/maestro-screenshots/create_customer_basic/02-basic-fields-completed",
-        "reports/maestro-screenshots/create_customer_basic/03-locations-page-opened",
+        "reports/maestro-screenshots/create_customer_basic/01-open-new-customer-registration-expected-basic-customer-form-is-displayed",
+        "reports/maestro-screenshots/create_customer_basic/02-enter-basic-customer-information-expected-outlet-contact-channel-and-customer-type-are-filled",
+        "reports/maestro-screenshots/create_customer_basic/03-continue-to-locations-page-expected-locations-form-is-displayed",
     ]
     assert screenshots["common/create_customer_locations.yaml"] == [
-        "reports/maestro-screenshots/create_customer_locations/01-locations-page-opened",
-        "reports/maestro-screenshots/create_customer_locations/02-location-fields-completed",
-        "reports/maestro-screenshots/create_customer_locations/03-documents-page-opened",
+        "reports/maestro-screenshots/create_customer_locations/01-open-locations-page-expected-location-form-is-displayed",
+        "reports/maestro-screenshots/create_customer_locations/02-enter-customer-location-information-expected-current-location-address-and-location-dropdowns-are-filled",
+        "reports/maestro-screenshots/create_customer_locations/03-continue-to-documents-page-expected-ktp-document-form-is-displayed",
     ]
     assert screenshots["common/create_customer_documents.yaml"] == [
-        "reports/maestro-screenshots/create_customer_documents/01-documents-page-opened",
-        "reports/maestro-screenshots/create_customer_documents/02-ktp-entered",
-        "reports/maestro-screenshots/create_customer_documents/03-ktp-photo-captured",
-        "reports/maestro-screenshots/create_customer_documents/04-signature-drawn",
-        "reports/maestro-screenshots/create_customer_documents/05-registration-success",
-        "reports/maestro-screenshots/create_customer_documents/06-customer-list-opened",
+        "reports/maestro-screenshots/create_customer_documents/01-open-documents-page-expected-ktp-form-is-displayed",
+        "reports/maestro-screenshots/create_customer_documents/02-enter-ktp-document-information-expected-ktp-number-is-filled-and-attachment-preview-is-displayed",
+        "reports/maestro-screenshots/create_customer_documents/03-open-signature-page-expected-signature-canvas-is-displayed",
+        "reports/maestro-screenshots/create_customer_documents/04-sign-and-submit-customer-registration-expected-success-message-is-displayed",
+        "reports/maestro-screenshots/create_customer_documents/05-open-new-customer-list-expected-new-customer-list-page-is-displayed",
+    ]
+    assert screenshots["validate_customer_list_card.yaml"] == [
+        "reports/maestro-screenshots/validate_customer_list_card/01-verify-created-customer-card-expected-name-address-and-customer-type-match-submitted-data",
     ]
     assert "outlet-name-entered" not in str(screenshots)
     assert "province-selected" not in str(screenshots)
@@ -147,8 +158,9 @@ def test_customer_runtime_launches_ework_before_customer_flow(monkeypatch):
 def test_passed_maestro_result_attaches_only_screenshots(monkeypatch, tmp_path):
     attached_json: list[str] = []
     attached_png: list[str] = []
-    screenshot = tmp_path / "01-login-page-opened.png"
+    screenshot = tmp_path / "01-open-ework-app-expected-login-page-is-displayed.png"
     screenshot.write_bytes(b"png")
+    monkeypatch.setattr(mobile_maestro, "allure", None)
     monkeypatch.setattr(mobile_maestro, "attach_json", lambda name, payload, **kwargs: attached_json.append(name))
     monkeypatch.setattr(mobile_maestro, "attach_png", lambda name, image: attached_png.append(name))
 
@@ -161,15 +173,46 @@ def test_passed_maestro_result_attaches_only_screenshots(monkeypatch, tmp_path):
         stderr="",
     )
 
-    runner.attach_result(result, screenshot_dir=tmp_path)
+    runner.attach_result(result, screenshot_dir=tmp_path, flow_inputs={})
 
     assert attached_json == []
-    assert attached_png == ["Screenshot - Login Page Opened"]
+    assert attached_png == ["Screenshot - Open eWork app. Expected: Login page is displayed"]
+
+
+def test_maestro_result_attaches_inputs_to_matching_screenshot_step(monkeypatch, tmp_path):
+    attached_json: list[tuple[str, object]] = []
+    attached_png: list[str] = []
+    screenshot = tmp_path / "02-enter-ework-login-credentials-expected-company-id-username-and-password-fields-are-filled.png"
+    screenshot.write_bytes(b"png")
+    monkeypatch.setattr(mobile_maestro, "allure", None)
+    monkeypatch.setattr(
+        mobile_maestro,
+        "attach_json",
+        lambda name, payload, **kwargs: attached_json.append((name, payload)),
+    )
+    monkeypatch.setattr(mobile_maestro, "attach_png", lambda name, image: attached_png.append(name))
+
+    runner = MaestroRunner(_mobile_settings())
+    result = MaestroResult(
+        flow_path=Path("login.yaml"),
+        command=["maestro", "test", "login.yaml"],
+        returncode=0,
+        stdout="",
+        stderr="",
+    )
+    flow_inputs = {"fields": {"Username": "qa.user", "Password": "it.QA2025"}}
+
+    runner.attach_result(result, screenshot_dir=tmp_path, flow_inputs=flow_inputs)
+
+    expected_step = "Enter eWork login credentials. Expected: Company ID, username, and password fields are filled"
+    assert attached_json == [(f"Inputs - {expected_step}", flow_inputs)]
+    assert attached_png == [f"Screenshot - {expected_step}"]
 
 
 def test_failed_maestro_result_keeps_single_diagnostic_attachment(monkeypatch, tmp_path):
     attached_json: list[str] = []
     attached_png: list[str] = []
+    monkeypatch.setattr(mobile_maestro, "allure", None)
     monkeypatch.setattr(mobile_maestro, "attach_json", lambda name, payload, **kwargs: attached_json.append(name))
     monkeypatch.setattr(mobile_maestro, "attach_png", lambda name, image: attached_png.append(name))
     monkeypatch.setattr(mobile_maestro, "capture_device_screenshot", lambda *args, **kwargs: b"png")
@@ -183,10 +226,10 @@ def test_failed_maestro_result_keeps_single_diagnostic_attachment(monkeypatch, t
         stderr="wrong locator",
     )
 
-    runner.attach_result(result, screenshot_dir=tmp_path)
+    runner.attach_result(result, screenshot_dir=tmp_path, flow_inputs={})
 
     assert attached_json == ["Failure diagnostics"]
-    assert attached_png == ["Screenshot", "Failure screenshot"]
+    assert attached_png == ["Failure screenshot"]
 
 
 def _mobile_settings() -> mobile_config.MobileSettings:

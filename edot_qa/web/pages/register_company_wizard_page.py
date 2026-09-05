@@ -117,18 +117,33 @@ class RegisterCompanyWizardPage(BasePage):
 
     def complete_three_step_registration(self, data: CompanyRegistrationData) -> None:
         with allure_step("Complete Register Company three step wizard", page=self.page):
-            with allure_step("Register Company page 1 - Company details", page=self.page, screenshot=True, force=True):
+            with allure_step(
+                "Complete Company Details page. Expected: required company fields are filled",
+                page=self.page,
+                screenshot=True,
+                force=True,
+            ):
                 self.fill_required_step_one(data)
                 self.expect_next_enabled()
-            with allure_step("Register Company page 2 - Company settings", page=self.page, screenshot=True, force=True):
+            with allure_step(
+                "Continue to Company Settings page. Expected: step 2 can continue",
+                page=self.page,
+                screenshot=True,
+                force=True,
+            ):
                 self.next_button.click()
                 self.assert_step_can_continue(step_name="Register Company step 2")
-            with allure_step("Register Company page 3 - Branch details", page=self.page, screenshot=True, force=True):
+            with allure_step(
+                "Complete Branch Details page. Expected: branch fields are filled",
+                page=self.page,
+                screenshot=True,
+                force=True,
+            ):
                 self.next_button.click()
                 self.fill_required_step_three(data)
                 self.expect_submit_enabled()
             with allure_step(
-                "Submit Register Company wizard",
+                "Submit Register Company wizard. Expected: success notification is displayed",
                 page=self.page,
                 data={"company_name": data.company_name},
                 screenshot=False,

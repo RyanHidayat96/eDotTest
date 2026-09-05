@@ -170,7 +170,7 @@ def test_allure_generator_keeps_mobile_report_lean(tmp_path: Path) -> None:
     payload = json.loads(result_path.read_text(encoding="utf-8"))
     flow_attachments = [attachment["name"] for attachment in payload["steps"][0]["attachments"]]
     assert flow_attachments == ["Inputs", "Screenshot"]
-    assert [step["name"] for step in payload["steps"]] == ["Run Maestro flow: create_customer_basic.yaml"]
+    assert [step["name"] for step in payload["steps"]] == ["Complete Basic customer page"]
 
 
 def test_allure_generator_removes_support_only_results_from_main_report(tmp_path: Path) -> None:

@@ -20,10 +20,25 @@ class MobileCreateCustomerScenario:
 
         customer = generate_mobile_customer_data()
         customer_env = customer.as_maestro_env()
-        self.run_flow("common/create_customer_basic.yaml", extra_env=customer_env)
-        location_result = self.run_flow("common/create_customer_locations.yaml", extra_env=customer_env)
+        self.run_flow(
+            "common/create_customer_basic.yaml",
+            extra_env=customer_env,
+            step_title="Complete Basic customer page",
+            expected="Locations form is displayed",
+        )
+        location_result = self.run_flow(
+            "common/create_customer_locations.yaml",
+            extra_env=customer_env,
+            step_title="Complete Location page",
+            expected="KTP document form is displayed",
+        )
         customer_card_address = customer_card_address_from_maestro_result(location_result)
-        self.run_flow("common/create_customer_documents.yaml", extra_env=customer_env)
+        self.run_flow(
+            "common/create_customer_documents.yaml",
+            extra_env=customer_env,
+            step_title="Complete Documents page",
+            expected="New Customer List page is displayed",
+        )
 
         find_created_customer_card(
             customer,
@@ -37,5 +52,7 @@ class MobileCreateCustomerScenario:
                 **customer_env,
                 "EWORK_CUSTOMER_CARD_ADDRESS": customer_card_address,
             },
+            step_title="Verify created customer card",
+            expected="Name, address, and customer type match the submitted customer",
         )
         return customer

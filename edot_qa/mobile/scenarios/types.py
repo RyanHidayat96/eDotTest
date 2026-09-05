@@ -13,6 +13,7 @@ class MaestroFlow(Protocol):
         *,
         timeout_seconds: int | None = None,
         extra_env: dict[str, str] | None = None,
+        step_title: str | None = None,
+        expected: str | None = None,
     ) -> MaestroResult:
         """Run a Maestro flow through the Pytest fixture wrapper."""
-

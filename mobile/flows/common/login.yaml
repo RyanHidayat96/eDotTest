@@ -1,9 +1,7 @@
 appId: ${EWORK_APP_ID}
 ---
-- extendedWaitUntil:
-    visible:
-      text: ${EWORK_LOGIN_SCREEN_TEXT}
-    timeout: 30000
+- assertVisible:
+    text: ${EWORK_LOGIN_SCREEN_TEXT}
 - tapOn:
     id: ${EWORK_COMPANY_ID_FIELD_ID}
 - inputText: ${EWORK_COMPANY_CODE}
@@ -13,6 +11,3 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     id: ${EWORK_PASSWORD_FIELD_ID}
 - inputText: ${EWORK_PASSWORD}
-- takeScreenshot: reports/maestro-screenshots/login/02-login-fields-completed
-- tapOn:
-    id: ${EWORK_LOGIN_BUTTON_ID}

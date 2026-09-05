@@ -64,6 +64,13 @@ MOBILE_SCREENSHOT_RENAMES = {
     "customer-card-visible-before-scroll": "Screenshot - Visible Before Scroll",
     "maestro-device-screenshot": "Screenshot",
 }
+STEP_NAME_RENAMES = {
+    "Run Maestro flow: login.yaml": "Login to eWork",
+    "Run Maestro flow: create_customer_basic.yaml": "Complete Basic customer page",
+    "Run Maestro flow: create_customer_locations.yaml": "Complete Location page",
+    "Run Maestro flow: create_customer_documents.yaml": "Complete Documents page",
+    "Run Maestro flow: validate_customer_list_card.yaml": "Verify created customer card",
+}
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(line_buffering=True)
 
@@ -513,6 +520,8 @@ def _compact_steps(
 ) -> list[dict[str, Any]]:
     compacted = []
     for step in steps:
+        if step.get("name") in STEP_NAME_RENAMES:
+            step["name"] = STEP_NAME_RENAMES[str(step["name"])]
         step["attachments"] = _clean_attachments(
             step.get("attachments", []),
             results_dir,

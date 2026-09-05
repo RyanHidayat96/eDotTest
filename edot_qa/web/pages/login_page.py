@@ -19,7 +19,7 @@ DELIBERATE_WRONG_LOGIN_BUTTON_ACTION = re.compile(r"^edot deliberate missing log
 class LoginPage(BasePage):
     def open(self) -> None:
         with allure_step(
-            "Open eSuite login page",
+            "Open eSuite login page. Expected: login page is displayed",
             page=self.page,
             data={"base_url": self.settings.esuite_base_url},
             screenshot=True,
@@ -81,13 +81,17 @@ class LoginPage(BasePage):
         )
 
     def choose_email_or_username(self) -> None:
-        with allure_step("Choose email or username login method", page=self.page, screenshot=True):
+        with allure_step(
+            "Choose email or username login method. Expected: email or username field is displayed",
+            page=self.page,
+            screenshot=True,
+        ):
             self.use_email_or_username_button.click()
 
     def submit_email(self, email: str) -> None:
         visible_email = email if show_dev_inputs_in_reports() else "<redacted>"
         with allure_step(
-            "Input eSuite email or username",
+            "Enter eSuite email or username. Expected: email or username field is filled",
             page=self.page,
             force=True,
         ):
@@ -99,7 +103,7 @@ class LoginPage(BasePage):
     def submit_password(self, password: str) -> None:
         visible_password = password if show_dev_inputs_in_reports() else "<redacted>"
         with allure_step(
-            "Input eSuite password",
+            "Enter eSuite password. Expected: password field is filled",
             page=self.page,
             force=True,
         ):
@@ -115,7 +119,7 @@ class LoginPage(BasePage):
             return urlparse(url).netloc == expected_host
 
         with allure_step(
-            "Wait for redirect back to eSuite",
+            "Submit eSuite login. Expected: user is redirected back to eSuite",
             page=self.page,
             data={"expected_host": expected_host},
             screenshot=True,
@@ -140,7 +144,12 @@ class LoginPage(BasePage):
             expect(wrong_button).to_be_visible(timeout=1_000)
 
     def login(self, email: str, password: str) -> None:
-        with allure_step("Login to eSuite", page=self.page, data={"email": email, "password": password}, screenshot=False):
+        with allure_step(
+            "Login to eSuite. Expected: dashboard session is created",
+            page=self.page,
+            data={"email": email, "password": password},
+            screenshot=False,
+        ):
             self.open()
             self.choose_email_or_username()
             self.submit_email(email)

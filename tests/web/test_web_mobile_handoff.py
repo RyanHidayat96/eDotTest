@@ -236,7 +236,14 @@ def test_web_created_company_handoff_drives_mobile_login(settings, authenticated
             assert mobile_settings.ework_company_code == created_company_id
 
         reset_app_data_for_login(MobileRuntimeContext(settings=mobile_settings, device=device))
-        assert_maestro_passed(MaestroRunner(mobile_settings).run_flow("login.yaml"))
+        maestro_runner = MaestroRunner(mobile_settings)
+        assert_maestro_passed(
+            maestro_runner.run_flow(
+                "login.yaml",
+                step_title="Submit eWork login for web-created Company User",
+                expected="Dashboard is displayed",
+            )
+        )
     except Exception as error:
         primary_error = error
         raise

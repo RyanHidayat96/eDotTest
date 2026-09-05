@@ -34,6 +34,8 @@ def test_mobile_login_wrong_password_locator_records_real_failure(
             "login.yaml",
             timeout_seconds=min(60, mobile_settings.mobile_flow_timeout_seconds),
             extra_env=mobile_settings.deliberate_wrong_password_field_override(),
+            step_title="Deliberate mobile failure: log in with wrong password field locator",
+            expected="Wrong password field locator fails and produces evidence for triage",
         )
         if result.passed:
             raise AssertionError("Deliberate mobile wrong password field locator unexpectedly passed.")

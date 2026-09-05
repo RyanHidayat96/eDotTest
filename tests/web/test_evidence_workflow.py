@@ -1,27 +1,17 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from tools.generate_allure_report import TRIAGE_HISTORY_ID, _upsert_triage_result
 from tools.evidence_workflow import (
     DELIBERATE_FAILURE_ENV,
     DELIBERATE_FAILURE_MODE,
     build_deliberate_failure_plan,
-    build_full_web_plan,
     render_findings,
     scan_evidence_dir,
     validate_generated_path,
 )
-
-
-def test_full_web_plan_runs_required_web_scenarios_before_report() -> None:
-    plan = build_full_web_plan()
-    commands = [" ".join(command.command) for command in plan.commands]
-
-    assert plan.commands[0].continue_after_failure is True
-    assert "tests/web/test_login.py" in commands[0]
-    assert "tests/web/test_create_company.py" in commands[0]
-    assert "tools/generate_allure_report.py" in commands[1]
-    assert "reports/allure-report" in commands[1]
 
 
 def test_deliberate_failure_plan_sets_shared_expected_failure() -> None:
@@ -39,14 +29,13 @@ def test_deliberate_failure_plan_sets_shared_expected_failure() -> None:
 
 
 def test_evidence_generated_paths_are_limited_to_reports_or_evidence() -> None:
-    plans = [build_full_web_plan(), build_deliberate_failure_plan()]
+    plans = [build_deliberate_failure_plan()]
     messages = []
     for plan in plans:
         for path in plan.clean_paths:
             validate_generated_path(path)
             messages.append(f"{plan.name}:{path.as_posix()}")
 
-    assert any("reports/allure-report" in message for message in messages)
     assert any("reports/triage" in message for message in messages)
 
 
@@ -76,3 +65,18 @@ def test_evidence_scan_allows_missing_empty_evidence_dir(tmp_path: Path) -> None
     findings = scan_evidence_dir(tmp_path / "evidence", root=tmp_path, secret_values=[])
 
     assert findings == []
+
+
+def test_allure_generator_attaches_triage_as_inline_text(tmp_path: Path) -> None:
+    results_dir = tmp_path / "results"
+    results_dir.mkdir()
+    triage_report = tmp_path / "triage-report.md"
+    triage_report.write_text("# Triage\n\nHuman-review proposal.", encoding="utf-8")
+
+    assert _upsert_triage_result(results_dir, triage_report) is True
+
+    payload = json.loads(next(results_dir.glob("*-result.json")).read_text(encoding="utf-8"))
+    attachment = payload["steps"][0]["attachments"][0]
+    assert payload["historyId"] == TRIAGE_HISTORY_ID
+    assert attachment["type"] == "text/plain"
+    assert (results_dir / attachment["source"]).read_text(encoding="utf-8") == "# Triage\n\nHuman-review proposal."

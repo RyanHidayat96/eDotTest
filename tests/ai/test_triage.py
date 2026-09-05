@@ -128,6 +128,54 @@ def test_assertion_failure_without_script_evidence_is_product_bug_proposal(tmp_p
     assert report.verdicts[0].verdict == PRODUCT_BUG
     assert report.verdicts[0].matched_rule.startswith("5.")
     assert "human-review proposal" in report.markdown
+    assert "Allure detail: AssertionError" in report.markdown
+
+
+def test_failed_business_cleanup_assertion_is_product_bug_not_setup_precondition(tmp_path):
+    _write_result(
+        tmp_path,
+        "business-cleanup",
+        "failed",
+        message="AssertionError: Deleted record 'Runtime QA 123' is still visible in list results",
+        steps=[
+            {
+                "name": "Cleanup created runtime data",
+                "status": "failed",
+                "steps": [
+                    {
+                        "name": "Verify deleted runtime data is absent from list",
+                        "status": "failed",
+                    }
+                ],
+            }
+        ],
+    )
+
+    report = triage_allure_results(tmp_path, tmp_path / "triage.md", use_ai=False)
+
+    assert report.verdicts[0].verdict == PRODUCT_BUG
+    assert report.verdicts[0].matched_rule.startswith("5.")
+    assert "Assertion reached after deterministic checks" in report.markdown
+
+
+def test_failed_business_flow_assertion_is_product_bug_not_generic_step_precondition(tmp_path):
+    _write_result(
+        tmp_path,
+        "business-flow",
+        "failed",
+        message="AssertionError: Created record 'Runtime QA 456' was not visible in persisted list results",
+        steps=[
+            {
+                "name": "Create runtime record and validate list",
+                "status": "failed",
+            }
+        ],
+    )
+
+    report = triage_allure_results(tmp_path, tmp_path / "triage.md", use_ai=False)
+
+    assert report.verdicts[0].verdict == PRODUCT_BUG
+    assert report.verdicts[0].matched_rule.startswith("5.")
 
 
 def test_pytest_metadata_labels_do_not_override_product_assertion(tmp_path):

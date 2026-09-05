@@ -54,6 +54,15 @@ PRECONDITION_PATTERNS = (
     "maestro cli",
     "adb-visible",
 )
+SETUP_STEP_PATTERNS = (
+    *PRECONDITION_PATTERNS,
+    "setup",
+    "prerequisite",
+    "launch app",
+    "reset app",
+    "storage state",
+    "authenticated storage",
+)
 EXPECTED_VALUE_PATTERNS = (
     "expected value is wrong",
     "expected value invalid",
@@ -96,7 +105,6 @@ DANGEROUS_AI_NOTE_PATTERNS = (
     "auto close",
     "auto-close",
 )
-
 
 @dataclass(frozen=True)
 class AllureStep:
@@ -309,6 +317,7 @@ def classify_failure(failure: AllureFailure, previous_outcomes: Iterable[str] = 
     if looks_like_assertion:
         evidence.append("Assertion reached after deterministic checks found no locator, precondition, or expected-value defect.")
         evidence.append("No pass/fail mix found in available Allure results; verdict remains human-review proposal.")
+        evidence.append(_short_text_evidence(failure))
         return TriageVerdict(
             failure=failure,
             verdict=PRODUCT_BUG,
@@ -647,8 +656,8 @@ def _has_failed_setup_step(failure: AllureFailure) -> bool:
     for step in failure.steps:
         if step.status not in FAILURE_STATUSES:
             continue
-        name = step.name.lower()
-        if not _contains_any(name, ("assert", "verify", "expect")):
+        text = f"{step.name}\n{step.message or ''}".lower()
+        if _contains_any(text, SETUP_STEP_PATTERNS):
             return True
     return False
 

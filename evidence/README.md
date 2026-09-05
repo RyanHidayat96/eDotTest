@@ -8,4 +8,4 @@ Generated evidence belongs in the shared Allure output after the final execution
 - Deliberate failure is intentionally red only at raw pytest time; `allure:generate` marks it as expected evidence.
 
 Do not place `.env`, storage state, cookies, API keys, passwords, or raw secret headers here.
-Evidence commands run a secret scan automatically before finishing.
+The evidence command runs a secret scan automatically before finishing.

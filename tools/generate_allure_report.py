@@ -284,7 +284,7 @@ def _upsert_triage_result(results_dir: Path, triage_report_path: Path) -> bool:
         return False
 
     _remove_existing_triage_results(results_dir)
-    attachment_source = f"{uuid.uuid4()}-attachment.md"
+    attachment_source = f"{uuid.uuid4()}-attachment.txt"
     shutil.copy2(triage_report_path, results_dir / attachment_source)
     now = int(datetime.now(ZoneInfo("Asia/Jakarta")).timestamp() * 1000)
     payload = {
@@ -320,7 +320,7 @@ def _upsert_triage_result(results_dir: Path, triage_report_path: Path) -> bool:
                     {
                         "name": "AI failure triage report",
                         "source": attachment_source,
-                        "type": "text/markdown",
+                        "type": "text/plain",
                     }
                 ],
                 "steps": [],

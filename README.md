@@ -329,25 +329,13 @@ Pass prior safe result history when checking flaky evidence across cleaned runs:
 
 Triage verdicts are human-review proposals only. The script never changes tests, weakens assertions, edits expected values, files bugs, or closes bugs.
 
-## Evidence Commands
-
-Final web evidence command:
-
-```powershell
-npm run evidence:web
-```
-
-This cleans `reports/allure-results` and `reports/allure-report`, runs the required web login/company scenarios, generates the shared Allure HTML report in `reports/allure-report`, then scans preserved evidence for secrets.
-
-Deliberate-failure evidence command:
+## Deliberate Failure Evidence
 
 ```powershell
 npm run evidence:deliberate
 ```
 
-This runs only the wrong-locator evidence test with `EDOT_DELIBERATE_FAILURE=wrong_locator`, expects that raw pytest test to fail, writes triage to `reports/triage/triage-report.md`, then regenerates the shared Allure report. In the HTML report the deliberate failure appears under `eDOT Evidence` with an expected-failure note instead of making normal web/mobile suites red.
-
-Both evidence commands scan preserved evidence for secrets before finishing.
+This runs only the wrong-locator evidence test with `EDOT_DELIBERATE_FAILURE=wrong_locator`, expects that raw pytest test to fail, writes triage to `reports/triage/triage-report.md`, then regenerates the shared Allure report. In the HTML report the deliberate failure appears under `eDOT Evidence` with an expected-failure note instead of making normal web/mobile suites red. The command scans preserved evidence for secrets before finishing.
 
 ## Test Data Cleanup
 

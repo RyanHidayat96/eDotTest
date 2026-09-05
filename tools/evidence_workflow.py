@@ -16,10 +16,10 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 DELIBERATE_FAILURE_ENV = "EDOT_DELIBERATE_FAILURE"
 DELIBERATE_FAILURE_MODE = "wrong_locator"
 EVIDENCE_DIR = ROOT_DIR / "evidence"
-WEB_RESULTS_DIR = ROOT_DIR / "reports" / "allure-results"
-WEB_REPORT_DIR = ROOT_DIR / "reports" / "allure-report"
-DELIBERATE_RESULTS_DIR = WEB_RESULTS_DIR
-DELIBERATE_REPORT_DIR = WEB_REPORT_DIR
+ALLURE_RESULTS_DIR = ROOT_DIR / "reports" / "allure-results"
+ALLURE_REPORT_DIR = ROOT_DIR / "reports" / "allure-report"
+DELIBERATE_RESULTS_DIR = ALLURE_RESULTS_DIR
+DELIBERATE_REPORT_DIR = ALLURE_REPORT_DIR
 DELIBERATE_TRIAGE_REPORT = ROOT_DIR / "reports" / "triage" / "triage-report.md"
 
 SENSITIVE_KEY_RE = re.compile(
@@ -76,41 +76,6 @@ class EvidenceFinding:
 def deliberate_failure_enabled(mode: str = DELIBERATE_FAILURE_MODE, env: Mapping[str, str] | None = None) -> bool:
     source = os.environ if env is None else env
     return source.get(DELIBERATE_FAILURE_ENV, "").strip().lower() == mode
-
-
-def build_full_web_plan() -> EvidencePlan:
-    return EvidencePlan(
-        name="full-web",
-        clean_paths=(WEB_RESULTS_DIR, WEB_REPORT_DIR),
-        commands=(
-            EvidenceCommand(
-                name="run full required web scenarios",
-                command=(
-                    _python(),
-                    "-m",
-                    "pytest",
-                    "tests/web/test_login.py",
-                    "tests/web/test_create_company.py",
-                    "--alluredir",
-                    _rel(WEB_RESULTS_DIR),
-                    "--clean-alluredir",
-                ),
-                env=(("ALLURE_SHOW_DEV_INPUTS", "false"),),
-                continue_after_failure=True,
-            ),
-            EvidenceCommand(
-                name="generate shared Allure report",
-                command=(
-                    _python(),
-                    "tools/generate_allure_report.py",
-                    "--results-dir",
-                    _rel(WEB_RESULTS_DIR),
-                    "--report-dir",
-                    _rel(WEB_REPORT_DIR),
-                ),
-            ),
-        ),
-    )
 
 
 def build_deliberate_failure_plan() -> EvidencePlan:
@@ -252,12 +217,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate required eDOT execution evidence.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("full-web", help="Run full web scenarios and preserve Allure evidence.")
     subparsers.add_parser("deliberate-failure", help="Run isolated wrong-locator evidence and triage.")
 
     args = parser.parse_args()
-    if args.command == "full-web":
-        return run_plan(build_full_web_plan())
     if args.command == "deliberate-failure":
         return run_plan(build_deliberate_failure_plan())
     raise AssertionError(args.command)
@@ -342,7 +304,7 @@ def _write_evidence_readme() -> None:
                 "- Deliberate failure is intentionally red only at raw pytest time; `allure:generate` marks it as expected evidence.",
                 "",
                 "Do not place `.env`, storage state, cookies, API keys, passwords, or raw secret headers here.",
-                "Evidence commands run a secret scan automatically before finishing.",
+                "The evidence command runs a secret scan automatically before finishing.",
                 "",
             ]
         ),

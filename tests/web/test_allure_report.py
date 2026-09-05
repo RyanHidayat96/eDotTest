@@ -23,7 +23,7 @@ def test_allure_generator_attaches_triage_as_inline_text(tmp_path: Path) -> None
     payload = json.loads(next(results_dir.glob("*-result.json")).read_text(encoding="utf-8"))
     attachment = payload["steps"][0]["attachments"][0]
     assert payload["historyId"] == TRIAGE_HISTORY_ID
-    assert payload["description"] == "# Triage\n\nHuman-review proposal."
+    assert payload["description"].startswith("AI-assisted failure triage summary.")
     assert attachment["type"] == "text/plain"
     assert (results_dir / attachment["source"]).read_text(encoding="utf-8") == "# Triage\n\nHuman-review proposal."
 

@@ -385,7 +385,10 @@ def _upsert_triage_result(results_dir: Path, triage_report_path: Path) -> bool:
         "testCaseId": TRIAGE_HISTORY_ID,
         "fullName": TRIAGE_FULL_NAME,
         "name": TRIAGE_RESULT_NAME,
-        "description": triage_markdown,
+        "description": (
+            "AI-assisted failure triage summary. Open the attachment for the verdict matrix, "
+            "evidence, and recommended actions."
+        ),
         "status": "passed",
         "stage": "finished",
         "start": now,

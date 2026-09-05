@@ -33,6 +33,10 @@ LOCATOR_PATTERNS = (
     "element(s) not found",
     "waiting for get_by_",
     "more than one element",
+    "wrong locator",
+    "wrong button locator",
+    "wrong password field locator",
+    "deliberate missing",
 )
 PRECONDITION_PATTERNS = (
     "precondition",
@@ -105,6 +109,16 @@ DANGEROUS_AI_NOTE_PATTERNS = (
     "auto close",
     "auto-close",
 )
+VERDICT_ACTIONS = {
+    SCRIPT_ENVIRONMENT_DEFECT: "Fix or review automation, locator, device, data, or environment before raising a product defect.",
+    PRODUCT_BUG: "Reproduce once manually with the captured evidence, then raise a product defect if behavior is confirmed.",
+    FLAKY: "Compare recent history, rerun once, and inspect timing, data ordering, or environment instability.",
+}
+VERDICT_CAUSES = {
+    SCRIPT_ENVIRONMENT_DEFECT: "Automation or execution dependency failed before product behavior can be trusted.",
+    PRODUCT_BUG: "Application behavior differs from the tested business expectation.",
+    FLAKY: "Same scenario has both passing and failing history.",
+}
 
 @dataclass(frozen=True)
 class AllureStep:
@@ -376,11 +390,12 @@ def render_markdown(
     lines = [
         "# eDOT AI Failure Triage Report",
         "",
-        f"Allure results: `{results_dir}`",
+        "## Executive Summary",
         "",
-        "Guardrails: human-review proposal only; no assertion changes; no swallowed failures; no expected-to-actual edits; no bug filing or closing.",
-        "",
-        "Decision order: 1 exception/assertion, 2 locator uniqueness, 3 preconditions, 4 expected value, 5 reproducibility.",
+        f"- Allure results: `{results_dir}`",
+        "- Scope: failed and broken Allure results only.",
+        "- Guardrails: human-review proposal only; no assertion changes; no swallowed failures; no expected-to-actual edits; no bug filing or closing.",
+        "- Decision order: 1 exception/assertion, 2 locator uniqueness, 3 preconditions, 4 expected value, 5 reproducibility.",
         "",
     ]
     if history_dirs_tuple:
@@ -398,30 +413,50 @@ def render_markdown(
     counts = Counter(verdict.verdict for verdict in rendered)
     lines.extend(
         [
-            "## Summary",
+            "## Verdict Summary",
             "",
-            f"- {SCRIPT_ENVIRONMENT_DEFECT}: {counts[SCRIPT_ENVIRONMENT_DEFECT]}",
-            f"- {PRODUCT_BUG}: {counts[PRODUCT_BUG]}",
-            f"- {FLAKY}: {counts[FLAKY]}",
+            "| Verdict | Count |",
+            "| --- | ---: |",
+            f"| {SCRIPT_ENVIRONMENT_DEFECT} | {counts[SCRIPT_ENVIRONMENT_DEFECT]} |",
+            f"| {PRODUCT_BUG} | {counts[PRODUCT_BUG]} |",
+            f"| {FLAKY} | {counts[FLAKY]} |",
             "",
-            "## Failures",
+            "## Failure Matrix",
+            "",
+            "| # | Test | Status | Verdict | Likely Cause | Recommended Action |",
+            "| ---: | --- | --- | --- | --- | --- |",
+        ]
+    )
+    for index, verdict in enumerate(rendered, start=1):
+        failure = verdict.failure
+        lines.append(
+            "| "
+            f"{index} | {_display_failure_name(failure)} | {failure.status} | {verdict.verdict} | "
+            f"{_likely_cause(verdict)} | {_recommended_action(verdict)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Detailed Findings",
             "",
         ]
     )
     for index, verdict in enumerate(rendered, start=1):
         failure = verdict.failure
+        evidence = _report_evidence(verdict)
         lines.extend(
             [
-                f"### {index}. {failure.name}",
+                f"### {index}. {_display_failure_name(failure)}",
                 "",
                 f"- Verdict: {verdict.verdict}",
                 f"- Matched rule: {verdict.matched_rule}",
                 f"- Status: {failure.status}",
-                f"- Source: `{failure.source_path}`",
+                f"- Likely cause: {_likely_cause(verdict)}",
+                f"- Recommended action: {_recommended_action(verdict)}",
                 "- Evidence:",
             ]
         )
-        lines.extend(f"  - {item}" for item in verdict.evidence)
+        lines.extend(f"  - {item}" for item in evidence)
         if verdict.ai_note:
             lines.extend(["- AI proposal:", *[f"  - {line}" for line in verdict.ai_note.splitlines() if line.strip()]])
         lines.append("")
@@ -471,10 +506,8 @@ def _add_ai_notes(
                 model=settings.gemini_triage_model,
                 max_output_tokens=settings.ai_triage_max_output_tokens,
             )
-        except RuntimeError as error:
-            updated.append(
-                replace(verdict, evidence=verdict.evidence + (f"AI note unavailable: {error}",))
-            )
+        except RuntimeError:
+            updated.append(verdict)
             continue
 
         try:
@@ -672,7 +705,71 @@ def _failed_step_evidence(failure: AllureFailure) -> tuple[str, ...]:
 
 def _short_text_evidence(failure: AllureFailure) -> str:
     text = failure.message or failure.trace or "No Allure status message or trace present."
-    return f"Allure detail: {_compact_text(text, 280)}"
+    return f"Allure detail: {_compact_text(_sanitize_evidence_text(text), 280)}"
+
+
+def _sanitize_evidence_text(value: str) -> str:
+    sanitized = re.sub(r"[A-Za-z]:\\[^\s]+", "<local-path>", value)
+    sanitized = re.sub(r"/(?:Users|home)/[^\s]+", "<local-path>", sanitized)
+    return sanitized
+
+
+def _display_failure_name(failure: AllureFailure) -> str:
+    name = failure.name.strip() or failure.full_name.strip() or "Unnamed failure"
+    if "_" not in name and not name.startswith("test"):
+        return name
+    clean = name.removeprefix("test_")
+    clean = re.sub(r"_records_real_failure$", "", clean)
+    return _humanize_identifier(clean)
+
+
+def _humanize_identifier(value: str) -> str:
+    words = re.split(r"[_\s]+", value)
+    return " ".join(_humanize_word(word, index=index) for index, word in enumerate(words) if word)
+
+
+def _humanize_word(word: str, *, index: int) -> str:
+    lowered = word.lower()
+    replacements = {
+        "ai": "AI",
+        "api": "API",
+        "adb": "ADB",
+        "id": "ID",
+        "ktp": "KTP",
+        "qa": "QA",
+        "url": "URL",
+        "ework": "eWork",
+        "esuite": "eSuite",
+    }
+    if lowered in replacements:
+        return replacements[lowered]
+    return lowered.capitalize() if index == 0 else lowered
+
+
+def _likely_cause(verdict: TriageVerdict) -> str:
+    lower_rule = verdict.matched_rule.lower()
+    if "locator" in lower_rule:
+        return "Locator did not resolve to the intended unique UI element."
+    if "precondition" in lower_rule:
+        return "Required setup, credential, device, app, or prior state is missing or unstable."
+    if "expected value" in lower_rule:
+        return "Expected test data appears invalid or stale."
+    if verdict.ai_note:
+        return _compact_text(verdict.ai_note, 160)
+    return VERDICT_CAUSES.get(verdict.verdict, "Failure needs human review.")
+
+
+def _recommended_action(verdict: TriageVerdict) -> str:
+    return VERDICT_ACTIONS.get(verdict.verdict, "Review evidence and decide owner.")
+
+
+def _report_evidence(verdict: TriageVerdict, *, limit: int = 5) -> tuple[str, ...]:
+    cleaned = []
+    for item in verdict.evidence:
+        if item.startswith("AI proposal verdict:"):
+            continue
+        cleaned.append(_compact_text(item, 260))
+    return tuple(_dedupe(cleaned)[:limit])
 
 
 def _sanitize_ai_note(note: str) -> str | None:

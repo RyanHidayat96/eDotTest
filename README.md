@@ -2,15 +2,14 @@
 
 Clean Python + Pytest automation project for the eDOT QA Automation Engineer V4 assignment.
 
-Repository link: https://github.com/RyanHidayat96/TestEdot
-
 ## Scope
 
-- Manual test case workbook: `test_cases/eDOT_QA_Automation_Test_Cases.xlsx`
+- Manual test case workbook deliverable: `test_cases/eDOT_QA_Automation_Test_Cases.xlsx`
 - Web automation: eSuite at `https://esuite.edot.id` using Playwright, Pytest, Page Object Model, and Allure.
 - Mobile automation: eWork SFA using Maestro YAML flows wrapped by Pytest so web and mobile share Allure output.
 - AI test data: optional Gemini model call with deterministic Faker fallback.
 - AI failure triage: deterministic Allure parser first, optional schema-constrained Gemini proposal second, Markdown output.
+- AI usage documentation: `AI_USAGE.md`.
 
 ## Project Structure
 
@@ -25,9 +24,10 @@ edot_qa/
   web/                 eSuite page objects, registration model, scenarios, storage state helpers
     scenarios/         Thin business flows for login and company registration
 mobile/flows/          Maestro entry flows and reusable runFlow sub-flows
-test_cases/            Final manual test case workbook
+test_cases/            Final manual test case workbook deliverable
 tests/                 Pytest suites for web, mobile, AI, quality gates
 tools/                 Safety checker, Allure report generator, and triage CLI
+AI_USAGE.md            AI test-data and triage usage documentation
 ```
 
 ## Prerequisites
@@ -112,6 +112,25 @@ EWORK_COMPANY_CODE=
 The eSuite company-registration defaults live in `edot_qa/web/company_registration.py`; eWork locator IDs, fixed labels, and selected options live in `edot_qa/mobile/flow_profile.py`; runtime artifact paths live in their owning config modules. Change those values through reviewed source changes, not `.env` edits.
 
 Mobile credentials normally come from explicit local `.env` values. The dedicated `test:handoff` path requests web-to-mobile handoff directly in code, creates a Company User with a generated runtime password, and uses that identity only for its matching eWork login.
+
+## NPM Script Reference
+
+All repository shortcuts are defined in `package.json`.
+
+| Command | Purpose |
+| --- | --- |
+| `npm run test:web` | Run live web login and live web company registration scenarios. |
+| `npm run test:web:login` | Run only the live eSuite login scenario. |
+| `npm run test:web:company` | Run only the live eSuite company registration, Tier 2 detail validation, and cleanup scenario. |
+| `npm run test:web:deliberate` | Run the deliberate web wrong-locator failure for triage evidence. |
+| `npm run test:mobile` | Run live eWork login and live customer creation scenarios. |
+| `npm run test:mobile:login` | Run only the live eWork login scenario. |
+| `npm run test:mobile:customer` | Run only the live eWork customer creation and list-card validation scenario. |
+| `npm run test:mobile:deliberate` | Run the deliberate mobile wrong-locator failure for triage evidence. |
+| `npm run test:ai` | Run AI test-data and failure-triage unit checks only. |
+| `npm run test:handoff` | Run the live web-created company and Company User handoff into eWork login. |
+| `npm run triage` | Build `reports/triage/triage-report.md` from failed or broken Allure results. |
+| `npm run allure:generate` | Generate and open the shared Allure HTML report. |
 
 ## Web Execution
 
@@ -242,7 +261,13 @@ If `reports/triage/triage-report.md` exists, `npm run allure:generate` attaches 
 
 ## AI Failure Triage
 
-Create a deterministic triage report from Allure results:
+Create a triage report from failed or broken Allure results:
+
+```powershell
+npm run triage
+```
+
+Direct deterministic form:
 
 ```powershell
 .\.venv\Scripts\python.exe tools\triage_allure_failures.py --results-dir reports\allure-results --output reports\triage\triage-report.md --no-ai
@@ -261,6 +286,8 @@ Pass prior safe result history when checking flaky evidence across cleaned runs:
 ```
 
 Triage verdicts are human-review proposals only. The script never changes tests, weakens assertions, edits expected values, files bugs, or closes bugs.
+
+The generated Markdown uses an executive summary, verdict-count summary, failure matrix, and detailed findings. Each failed or broken result gets a verdict, likely cause, evidence, and recommended human-review action. Local machine paths are sanitized before being written to the report. `npm run allure:generate` attaches this Markdown to the shared Allure report while keeping the Allure description short.
 
 ## Deliberate Failure Evidence
 

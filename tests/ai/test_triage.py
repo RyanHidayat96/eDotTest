@@ -85,6 +85,26 @@ def test_missing_playwright_test_id_is_locator_defect_not_precondition(tmp_path)
     assert report.verdicts[0].matched_rule.startswith("2.")
 
 
+def test_deliberate_wrong_locator_name_overrides_noisy_mobile_io_log(tmp_path):
+    _write_result(
+        tmp_path,
+        "Mobile Wrong Password Field Locator",
+        "failed",
+        message=(
+            "AssertionError: Maestro flow failed with exit code 1: login.yaml "
+            "ERROR Unable to write to stream C:\\project\\artifacts\\maestro\\login\\logs\\maestro.log"
+        ),
+    )
+
+    report = triage_allure_results(tmp_path, tmp_path / "triage.md", use_ai=False)
+
+    assert report.verdicts[0].verdict == SCRIPT_ENVIRONMENT_DEFECT
+    assert report.verdicts[0].matched_rule.startswith("2.")
+    assert "Locator did not resolve to the intended unique UI element." in report.markdown
+    assert "C:\\project" not in report.markdown
+    assert "<local-path>" in report.markdown
+
+
 def test_failed_precondition_is_script_environment_defect(tmp_path):
     _write_result(
         tmp_path,
@@ -424,6 +444,23 @@ def test_report_handles_no_failures(tmp_path):
 
     assert report.verdicts == ()
     assert "No failed or broken Allure test results found." in report.markdown
+
+
+def test_report_uses_professional_summary_matrix_and_human_readable_names(tmp_path):
+    _write_result(
+        tmp_path,
+        "test_web_login_wrong_button_locator_records_real_failure",
+        "failed",
+        message='AssertionError: waiting for get_by_role("button", name="missing")',
+    )
+
+    report = triage_allure_results(tmp_path, tmp_path / "triage.md", use_ai=False)
+
+    assert "## Executive Summary" in report.markdown
+    assert "## Failure Matrix" in report.markdown
+    assert "| # | Test | Status | Verdict | Likely Cause | Recommended Action |" in report.markdown
+    assert "Web login wrong button locator" in report.markdown
+    assert "test_web_login_wrong_button_locator_records_real_failure" not in report.markdown
 
 
 def test_prompt_contains_assignment_guardrails(tmp_path):

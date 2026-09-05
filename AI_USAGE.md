@@ -147,7 +147,7 @@ The code-owned triage output limit is 900 tokens.
 Fallback behavior:
 
 - Missing `GEMINI_API_KEY`: triage writes deterministic Markdown only.
-- Gemini request failure: deterministic verdict remains; evidence records that the AI proposal was unavailable.
+- Gemini request failure: deterministic verdict remains; provider/network noise is not exposed in the final triage Markdown.
 - Malformed JSON, unsupported enum, empty fields, extra fields, or unsafe proposal: proposal is rejected and deterministic verdict remains.
 - Hard script/environment and flaky classifications are not sent to AI.
 

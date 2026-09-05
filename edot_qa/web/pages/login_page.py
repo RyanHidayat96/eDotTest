@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urlparse
 
-from playwright.sync_api import Locator, TimeoutError
+from playwright.sync_api import Locator, TimeoutError, expect
 
 from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_page_evidence, show_dev_inputs_in_reports
 from edot_qa.web.base_page import BasePage
@@ -13,6 +13,7 @@ EMAIL_OR_USERNAME = re.compile(r"use email or username", re.I)
 EMAIL_FIELD = re.compile(r"(email|e-mail|username|user name)", re.I)
 PASSWORD_FIELD = re.compile(r"(password|kata sandi)", re.I)
 SUBMIT_ACTION = re.compile(r"^(continue|next|submit|login|log in|sign in|masuk|lanjut)$", re.I)
+DELIBERATE_WRONG_LOGIN_BUTTON_ACTION = re.compile(r"^edot deliberate missing login button$", re.I)
 
 
 class LoginPage(BasePage):
@@ -127,6 +128,16 @@ class LoginPage(BasePage):
                     f"Expected redirect back to {expected_host}; current host is {current_host}"
                 ) from None
             self.page.wait_for_load_state("domcontentloaded")
+
+    def expect_deliberate_wrong_login_button_locator(self) -> None:
+        with allure_step(
+            "Deliberate web failure: wrong login button locator",
+            page=self.page,
+            data={"wrong_locator": "role=button[name='edot deliberate missing login button']"},
+            screenshot=True,
+        ):
+            wrong_button = self.page.get_by_role("button", name=DELIBERATE_WRONG_LOGIN_BUTTON_ACTION)
+            expect(wrong_button).to_be_visible(timeout=1_000)
 
     def login(self, email: str, password: str) -> None:
         with allure_step("Login to eSuite", page=self.page, data={"email": email, "password": password}, screenshot=False):

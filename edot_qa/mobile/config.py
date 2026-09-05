@@ -17,6 +17,7 @@ except ModuleNotFoundError:
 DEFAULT_MAESTRO_FLOW_DIR = ROOT_DIR / "mobile" / "flows"
 DEFAULT_MAESTRO_OUTPUT_DIR = ROOT_DIR / "artifacts" / "maestro"
 DEFAULT_EWORK_STORAGE_STATE = ROOT_DIR / "artifacts" / "auth" / "ework_session_state.json"
+DELIBERATE_WRONG_PASSWORD_FIELD_ID = "id.edot.ework:id/edot_deliberate_missing_password"
 
 
 @dataclass(frozen=True)
@@ -228,6 +229,9 @@ class MobileSettings:
         env = os.environ.copy()
         env.update(self.maestro_variables(extra_values))
         return env
+
+    def deliberate_wrong_password_field_override(self) -> dict[str, str]:
+        return {"EWORK_PASSWORD_FIELD_ID": DELIBERATE_WRONG_PASSWORD_FIELD_ID}
 
     def maestro_variables(self, extra_values: dict[str, str] | None = None) -> dict[str, str]:
         optional_values = {

@@ -75,7 +75,7 @@ def test_missing_playwright_test_id_is_locator_defect_not_precondition(tmp_path)
         message=(
             "AssertionError: Locator expected to be visible "
             "Error: element(s) not found "
-            "waiting for get_by_test_id(\"edot-deliberate-missing-submit\")"
+            "waiting for get_by_role(\"button\", name=\"edot deliberate missing login button\")"
         ),
     )
 

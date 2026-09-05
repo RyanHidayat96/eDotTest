@@ -84,12 +84,13 @@ def build_deliberate_failure_plan() -> EvidencePlan:
         clean_paths=(DELIBERATE_TRIAGE_REPORT.parent,),
         commands=(
             EvidenceCommand(
-                name="run deliberate wrong-locator evidence",
+                name="run real web and mobile deliberate wrong-locator evidence",
                 command=(
                     _python(),
                     "-m",
                     "pytest",
-                    "tests/web/test_deliberate_failure_evidence.py::test_deliberate_wrong_locator_failure_records_real_allure_failure",
+                    "tests/web/test_login.py::test_web_login_wrong_button_locator_records_real_failure",
+                    "tests/mobile/test_mobile_login.py::test_mobile_login_wrong_password_locator_records_real_failure",
                     "--alluredir",
                     _rel(DELIBERATE_RESULTS_DIR),
                     "-q",
@@ -109,7 +110,7 @@ def build_deliberate_failure_plan() -> EvidencePlan:
                 ),
             ),
             EvidenceCommand(
-                name="generate shared Allure report with expected deliberate note",
+                name="generate shared Allure report",
                 command=(
                     _python(),
                     "tools/generate_allure_report.py",
@@ -217,7 +218,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate required eDOT execution evidence.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("deliberate-failure", help="Run isolated wrong-locator evidence and triage.")
+    subparsers.add_parser("deliberate-failure", help="Run real web/mobile wrong-locator evidence and triage.")
 
     args = parser.parse_args()
     if args.command == "deliberate-failure":
@@ -283,7 +284,8 @@ def _deliberate_failure_result_exists(results_dir: Path) -> bool:
         }
         if payload.get("status") in {"failed", "broken"} and (
             "deliberate_failure" in tags
-            or "deliberate_wrong_locator" in text
+            or "wrong_button_locator" in text
+            or "wrong_password_locator" in text
         ):
             return True
     return False
@@ -301,7 +303,7 @@ def _write_evidence_readme() -> None:
                 "- `reports/allure-results/`: shared raw web, mobile, and evidence results.",
                 "- `reports/allure-report/`: shared Allure HTML report.",
                 "- `reports/triage/triage-report.md`: human-review triage proposal attached by `allure:generate`.",
-                "- Deliberate failure is intentionally red only at raw pytest time; `allure:generate` marks it as expected evidence.",
+                "- Deliberate failure stays failed in Allure so triage can read the real failure.",
                 "",
                 "Do not place `.env`, storage state, cookies, API keys, passwords, or raw secret headers here.",
                 "The evidence command runs a secret scan automatically before finishing.",

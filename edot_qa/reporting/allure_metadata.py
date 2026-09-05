@@ -59,7 +59,9 @@ def metadata_for_node(node_id: str, marker_names: Iterable[str] = ()) -> AllureM
     file_name = Path(path).name
     markers = {marker for marker in marker_names if marker not in IGNORED_MARKERS}
 
-    if file_name == "test_web_mobile_handoff.py" or "e2e" in markers:
+    if "deliberate_failure" in markers:
+        metadata = _deliberate_metadata(path, test_name)
+    elif file_name == "test_web_mobile_handoff.py" or "e2e" in markers:
         metadata = _metadata(
             parent_suite="eDOT Cross Platform",
             suite="E2E",
@@ -226,17 +228,6 @@ def _web_metadata(file_name: str, test_name: str) -> AllureMetadata:
             severity="normal",
             tags={"web", "test-data"},
         )
-    if file_name == "test_deliberate_failure_evidence.py":
-        return _metadata(
-            parent_suite="eDOT Evidence",
-            suite="Evidence",
-            sub_suite="Deliberate Failure",
-            epic="Evidence",
-            feature="Failure Evidence",
-            story="Intentional Wrong Locator" if "wrong_locator" in test_name else _humanize_test_name(test_name),
-            severity="normal",
-            tags={"evidence"},
-        )
     return _metadata(
         parent_suite="eSuite Web",
         suite="Web",
@@ -282,6 +273,37 @@ def _mobile_metadata(file_name: str, test_name: str) -> AllureMetadata:
         story=_humanize_test_name(test_name),
         severity="normal",
         tags={"mobile", "runtime-guardrails"},
+    )
+
+
+def _deliberate_metadata(path: str, test_name: str) -> AllureMetadata:
+    if "/mobile/" in path:
+        story = (
+            "Mobile Wrong Password Field Locator"
+            if "wrong_password_locator" in test_name
+            else _humanize_test_name(test_name)
+        )
+        tags = {"evidence", "mobile"}
+    elif "/web/" in path:
+        story = (
+            "Web Wrong Login Button Locator"
+            if "wrong_button_locator" in test_name
+            else _humanize_test_name(test_name)
+        )
+        tags = {"evidence", "web"}
+    else:
+        story = _humanize_test_name(test_name)
+        tags = {"evidence"}
+
+    return _metadata(
+        parent_suite="eDOT Evidence",
+        suite="Evidence",
+        sub_suite="Deliberate Failure",
+        epic="Evidence",
+        feature="Failure Evidence",
+        story=story,
+        severity="normal",
+        tags=tags,
     )
 
 

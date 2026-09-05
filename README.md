@@ -305,7 +305,7 @@ The Allure binary comes from `allure-commandline` in `devDependencies`, same as 
 
 Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Reports are intentionally lean: page-level web steps show one input summary only when fields are entered, login input evidence is visible for the local dev report when `ALLURE_SHOW_DEV_INPUTS=true`, successful UI screenshots are captured at page-open/page-change milestones such as login, wizard pages, submit success, manage/detail pages, and mobile list validation, failures attach full-page evidence, and Maestro steps attach input summaries, redacted commands/logs, flow YAML, result JSON, device screenshots, and supported output artifacts.
 
-If `reports/triage/triage-report.md` exists, `npm run allure:generate` attaches it into the same shared Allure report as an Evidence item. Deliberate wrong-locator evidence is intentionally failed only during raw pytest execution; the generator marks it as expected evidence with a note so normal web/mobile report status is not made red.
+If `reports/triage/triage-report.md` exists, `npm run allure:generate` attaches it into the same shared Allure report as an Evidence item. Deliberate wrong-locator evidence stays failed in Allure by design so triage can read the real failure status, stack trace, screenshots, and Maestro output.
 
 ## AI Failure Triage
 
@@ -335,7 +335,7 @@ Triage verdicts are human-review proposals only. The script never changes tests,
 npm run evidence:deliberate
 ```
 
-This runs only the wrong-locator evidence test with `EDOT_DELIBERATE_FAILURE=wrong_locator`, expects that raw pytest test to fail, writes triage to `reports/triage/triage-report.md`, then regenerates the shared Allure report. In the HTML report the deliberate failure appears under `eDOT Evidence` with an expected-failure note instead of making normal web/mobile suites red. The command scans preserved evidence for secrets before finishing.
+This runs real deliberate failures with `EDOT_DELIBERATE_FAILURE=wrong_locator`: web opens the eSuite login page and points the login button assertion at a wrong locator; mobile opens the eWork login flow and points the password field at a wrong id. The command expects raw pytest to fail, writes triage to `reports/triage/triage-report.md`, then regenerates the shared Allure report. The deliberate tests remain red under `eDOT Evidence` because that failed status is the evidence triage needs. The command scans preserved evidence for secrets before finishing.
 
 ## Test Data Cleanup
 

@@ -27,22 +27,6 @@ DEFAULT_TRIAGE_REPORT = ROOT_DIR / "reports" / "triage" / "triage-report.md"
 TRIAGE_HISTORY_ID = "edot-evidence-ai-failure-triage-report"
 TRIAGE_FULL_NAME = "tools.triage_allure_failures#triage_report"
 TRIAGE_RESULT_NAME = "AI failure triage report"
-DELIBERATE_RESULT_NAME = "Expected deliberate failure - wrong locator evidence"
-DELIBERATE_NOTE = (
-    "Expected deliberate failure: this test intentionally uses a missing locator to prove "
-    "Allure failure screenshots and triage evidence. It is shown as expected evidence so "
-    "normal web/mobile report status is not made red."
-)
-CONTROLLED_LABEL_NAMES = {
-    "parentSuite",
-    "suite",
-    "subSuite",
-    "epic",
-    "feature",
-    "story",
-    "severity",
-    "owner",
-}
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(line_buffering=True)
 
@@ -228,55 +212,12 @@ def _postprocess_results(results_dir: Path) -> int:
         try:
             payload = json.loads(result_path.read_text(encoding="utf-8"))
             payload = apply_metadata_to_result(payload)
-            _mark_deliberate_failure_expected(payload, results_dir)
             _ensure_step_evidence(payload, results_dir)
             result_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             count += 1
         except (OSError, json.JSONDecodeError) as error:
             print(f"[Allure Generate] Skipped {result_path.name}: {error}")
     return count
-
-
-def _mark_deliberate_failure_expected(result: dict[str, Any], results_dir: Path) -> bool:
-    if not _is_deliberate_failure_result(result):
-        return False
-
-    result["name"] = DELIBERATE_RESULT_NAME
-    _set_expected_failure_labels(result)
-    _add_parameter_once(result, "expected_failure", "true")
-
-    original_status = _status(result.get("status"))
-    if original_status in {"failed", "broken"}:
-        original_details = result.get("statusDetails") if isinstance(result.get("statusDetails"), dict) else {}
-        original_message = str(original_details.get("message") or "").strip()
-        result["status"] = "skipped"
-        result["statusDetails"] = {
-            "message": f"{DELIBERATE_NOTE} Original status: {original_status}.",
-            "trace": original_details.get("trace") or original_message,
-        }
-
-    _remove_step_by_name(result, "Expected deliberate failure note")
-    note_source = f"{uuid.uuid4()}-attachment.txt"
-    (results_dir / note_source).write_text(DELIBERATE_NOTE, encoding="utf-8")
-    result.setdefault("steps", []).insert(
-        0,
-        {
-            "name": "Expected deliberate failure note",
-            "status": "passed",
-            "stage": "finished",
-            "start": result.get("start"),
-            "stop": result.get("start") or result.get("stop"),
-            "attachments": [
-                {
-                    "name": "Expected deliberate failure note",
-                    "source": note_source,
-                    "type": "text/plain",
-                }
-            ],
-            "steps": [],
-        },
-    )
-    return True
 
 
 def _upsert_triage_result(results_dir: Path, triage_report_path: Path) -> bool:
@@ -366,48 +307,6 @@ def _attachment_sources(node: dict[str, Any]) -> list[str]:
         if isinstance(step, dict):
             sources.extend(_attachment_sources(step))
     return sources
-
-
-def _is_deliberate_failure_result(result: dict[str, Any]) -> bool:
-    tags = {
-        str(label.get("value")).lower()
-        for label in result.get("labels", [])
-        if label.get("name") == "tag" and label.get("value")
-    }
-    text = " ".join(str(result.get(key) or "") for key in ("fullName", "name")).lower()
-    return "deliberate_failure" in tags or "deliberate_wrong_locator" in text
-
-
-def _set_expected_failure_labels(result: dict[str, Any]) -> None:
-    labels = [label for label in result.get("labels", []) if label.get("name") not in CONTROLLED_LABEL_NAMES]
-    existing_tags = {label.get("value") for label in labels if label.get("name") == "tag"}
-    labels.extend(
-        [
-            {"name": "parentSuite", "value": "eDOT Evidence"},
-            {"name": "suite", "value": "Evidence"},
-            {"name": "subSuite", "value": "Deliberate Failure"},
-            {"name": "epic", "value": "Evidence"},
-            {"name": "feature", "value": "Failure Evidence"},
-            {"name": "story", "value": "Intentional Wrong Locator"},
-            {"name": "severity", "value": "normal"},
-            {"name": "owner", "value": "qa-automation"},
-        ]
-    )
-    for tag in ("deliberate_failure", "expected_failure", "evidence"):
-        if tag not in existing_tags:
-            labels.append({"name": "tag", "value": tag})
-            existing_tags.add(tag)
-    result["labels"] = labels
-
-
-def _add_parameter_once(result: dict[str, Any], name: str, value: str) -> None:
-    parameters = result.setdefault("parameters", [])
-    if not any(parameter.get("name") == name for parameter in parameters):
-        parameters.append({"name": name, "value": value})
-
-
-def _remove_step_by_name(result: dict[str, Any], name: str) -> None:
-    result["steps"] = [step for step in result.get("steps", []) if step.get("name") != name]
 
 
 def _ensure_step_evidence(result: dict[str, Any], results_dir: Path) -> None:

@@ -3,25 +3,46 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tools.generate_allure_report import TRIAGE_HISTORY_ID, _upsert_triage_result
+from tools.generate_allure_report import TRIAGE_HISTORY_ID, _postprocess_results, _upsert_triage_result
 from tools.evidence_workflow import (
     DELIBERATE_FAILURE_ENV,
     DELIBERATE_FAILURE_MODE,
     build_deliberate_failure_plan,
+    deliberate_failure_enabled,
     render_findings,
     scan_evidence_dir,
     validate_generated_path,
 )
 
 
-def test_deliberate_failure_plan_sets_shared_expected_failure() -> None:
+def test_deliberate_failure_toggle_disabled_by_default(monkeypatch) -> None:
+    monkeypatch.delenv(DELIBERATE_FAILURE_ENV, raising=False)
+
+    assert deliberate_failure_enabled() is False
+
+
+def test_deliberate_failure_toggle_requires_wrong_locator(monkeypatch) -> None:
+    monkeypatch.setenv(DELIBERATE_FAILURE_ENV, "other")
+
+    assert deliberate_failure_enabled() is False
+
+    monkeypatch.setenv(DELIBERATE_FAILURE_ENV, DELIBERATE_FAILURE_MODE)
+    assert deliberate_failure_enabled() is True
+
+
+def test_deliberate_failure_plan_runs_real_web_and_mobile_failures() -> None:
     plan = build_deliberate_failure_plan()
     deliberate_step = plan.commands[0]
     commands = [" ".join(command.command) for command in plan.commands]
 
     assert deliberate_step.expected_failure is True
     assert (DELIBERATE_FAILURE_ENV, DELIBERATE_FAILURE_MODE) in deliberate_step.env
-    assert "test_deliberate_failure_evidence.py" in " ".join(deliberate_step.command)
+    assert "tests/web/test_login.py::test_web_login_wrong_button_locator_records_real_failure" in " ".join(
+        deliberate_step.command
+    )
+    assert "tests/mobile/test_mobile_login.py::test_mobile_login_wrong_password_locator_records_real_failure" in " ".join(
+        deliberate_step.command
+    )
     assert "--clean-alluredir" not in " ".join(deliberate_step.command)
     assert "reports/allure-results" in commands[0]
     assert "reports/triage/triage-report.md" in commands[1]
@@ -80,3 +101,29 @@ def test_allure_generator_attaches_triage_as_inline_text(tmp_path: Path) -> None
     assert payload["historyId"] == TRIAGE_HISTORY_ID
     assert attachment["type"] == "text/plain"
     assert (results_dir / attachment["source"]).read_text(encoding="utf-8") == "# Triage\n\nHuman-review proposal."
+
+
+def test_allure_generator_keeps_deliberate_failure_red(tmp_path: Path) -> None:
+    results_dir = tmp_path / "results"
+    results_dir.mkdir()
+    result_path = results_dir / "deliberate-result.json"
+    result_path.write_text(
+        json.dumps(
+            {
+                "name": "test_web_login_wrong_button_locator_records_real_failure",
+                "fullName": "tests.web.test_login#test_web_login_wrong_button_locator_records_real_failure",
+                "status": "failed",
+                "statusDetails": {"message": "AssertionError: wrong locator"},
+                "labels": [{"name": "tag", "value": "deliberate_failure"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _postprocess_results(results_dir)
+
+    payload = json.loads(result_path.read_text(encoding="utf-8"))
+    labels = {label["name"]: label["value"] for label in payload["labels"] if label["name"] != "tag"}
+    assert payload["status"] == "failed"
+    assert labels["parentSuite"] == "eDOT Evidence"
+    assert labels["subSuite"] == "Deliberate Failure"

@@ -297,6 +297,8 @@ Pytest writes Allure results to `reports/allure-results` by default:
 .\.venv\Scripts\python.exe -m pytest tests --alluredir reports/allure-results
 ```
 
+Results are cumulative across different test commands. When the same test is rerun, `npm run allure:generate` keeps only the latest result for that test identity in the HTML report, so `test:web:login` followed by `test:web:company` shows both, while rerunning `test:web:login` replaces its previous run.
+
 Generate and open the shared web/mobile HTML report through the repository-local Allure CLI:
 
 ```powershell

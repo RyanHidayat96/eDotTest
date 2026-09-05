@@ -12,7 +12,7 @@ from edot_qa.web.pages.company_detail_page import (
     CompanyDetailPage,
     _detail_values_match,
 )
-from tools.generate_allure_report import _ensure_step_evidence
+from tools.generate_allure_report import _deduplicate_latest_results, _ensure_step_evidence
 
 
 def test_settings_default_to_assignment_target(monkeypatch):
@@ -128,6 +128,58 @@ def test_allure_report_generator_prunes_noisy_step_attachments(tmp_path):
     payload = json.loads((tmp_path / attachment["source"]).read_text(encoding="utf-8"))
     assert payload == {"fields": {"Email": "qa@example.test"}}
     assert result["steps"][0]["steps"] == []
+
+
+def test_allure_report_generator_keeps_latest_result_per_test(tmp_path):
+    old_company = tmp_path / "old-company-result.json"
+    new_company = tmp_path / "new-company-result.json"
+    login = tmp_path / "login-result.json"
+    old_company.write_text(
+        json.dumps(
+            {
+                "historyId": "company-test",
+                "fullName": "tests.web.test_create_company#test_create_company",
+                "name": "test_create_company",
+                "status": "failed",
+                "start": 100,
+                "stop": 150,
+            }
+        ),
+        encoding="utf-8",
+    )
+    new_company.write_text(
+        json.dumps(
+            {
+                "historyId": "company-test",
+                "fullName": "tests.web.test_create_company#test_create_company",
+                "name": "test_create_company",
+                "status": "passed",
+                "start": 200,
+                "stop": 250,
+            }
+        ),
+        encoding="utf-8",
+    )
+    login.write_text(
+        json.dumps(
+            {
+                "historyId": "login-test",
+                "fullName": "tests.web.test_login#test_login",
+                "name": "test_login",
+                "status": "passed",
+                "start": 120,
+                "stop": 170,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    removed = _deduplicate_latest_results(tmp_path)
+
+    assert removed == 1
+    assert not old_company.exists()
+    assert new_company.exists()
+    assert login.exists()
 
 
 def test_company_detail_empty_name_reloads_five_times_before_error(monkeypatch):

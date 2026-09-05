@@ -44,6 +44,9 @@ def main() -> int:
     _write_environment(results_dir)
     _write_executor(results_dir)
     _copy_categories(categories_path, results_dir)
+    removed = _deduplicate_latest_results(results_dir)
+    if removed:
+        print(f"[Allure Generate] Removed {removed} older duplicate result file(s).")
     processed = _postprocess_results(results_dir)
     print(f"[Allure Generate] Enriched {processed} result file(s).")
 
@@ -132,6 +135,65 @@ def _copy_categories(categories_path: Path, results_dir: Path) -> None:
         print("[Allure Generate] Copied categories.json.")
 
 
+def _deduplicate_latest_results(results_dir: Path) -> int:
+    latest_by_test: dict[str, tuple[Path, int]] = {}
+    old_results: list[Path] = []
+
+    for result_path in sorted(results_dir.glob("*-result.json")):
+        try:
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"[Allure Generate] Skipped duplicate check for {result_path.name}: {error}")
+            continue
+
+        identity = _result_identity(payload)
+        if not identity:
+            continue
+
+        timestamp = _result_timestamp(payload, result_path)
+        current = latest_by_test.get(identity)
+        if current is None:
+            latest_by_test[identity] = (result_path, timestamp)
+            continue
+
+        current_path, current_timestamp = current
+        if timestamp >= current_timestamp:
+            old_results.append(current_path)
+            latest_by_test[identity] = (result_path, timestamp)
+        else:
+            old_results.append(result_path)
+
+    removed = 0
+    for result_path in old_results:
+        try:
+            result_path.unlink()
+            removed += 1
+        except OSError as error:
+            print(f"[Allure Generate] Could not remove older result {result_path.name}: {error}")
+    return removed
+
+
+def _result_identity(payload: dict[str, Any]) -> str | None:
+    for key in ("historyId", "fullName", "name"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return f"{key}:{value.strip()}"
+    return None
+
+
+def _result_timestamp(payload: dict[str, Any], result_path: Path) -> int:
+    for key in ("stop", "start"):
+        value = payload.get(key)
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+    try:
+        return result_path.stat().st_mtime_ns // 1_000_000
+    except OSError:
+        return 0
+
+
 def _postprocess_results(results_dir: Path) -> int:
     count = 0
     for result_path in sorted(results_dir.glob("*-result.json")):
@@ -213,7 +275,13 @@ def _clean_attachments(attachments: list[dict[str, Any]], results_dir: Path) -> 
     input_records = []
     for attachment in attachments:
         name = str(attachment.get("name", ""))
-        if name in {"step-runtime-info", "step-result", "step-evidence-page", "step-evidence-screenshot"}:
+        if name in {
+            "step-runtime-info",
+            "step-result",
+            "step-evidence-page",
+            "step-evidence-screenshot",
+            "company-manage-search-not-used",
+        }:
             continue
         if name in {"step-input", "Input"} or name.startswith("Input - "):
             input_records.append(

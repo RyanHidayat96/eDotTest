@@ -20,6 +20,7 @@ MAX_ARRAY_ITEMS = 25
 _STEP_DEPTH: ContextVar[int] = ContextVar("_STEP_DEPTH", default=0)
 _STEP_INPUTS: ContextVar[list[dict[str, Any]] | None] = ContextVar("_STEP_INPUTS", default=None)
 TRUE_VALUES = {"1", "true", "yes", "y", "on"}
+SCREENSHOT_RETRY_DELAYS_MS = (150, 350)
 
 
 def attach_text(name: str, text: str) -> None:
@@ -129,10 +130,37 @@ def attach_page_evidence(
     )
     if not screenshot:
         return
+    image, error = _capture_page_screenshot(page, full_page=full_page)
+    if image is not None:
+        attach_png(f"{name} screenshot", image)
+        return
+    attach_text(f"{name} screenshot error", str(error))
+
+
+def _capture_page_screenshot(page: Any, *, full_page: bool) -> tuple[bytes | None, Exception | None]:
+    screenshot_attempts = [
+        {"full_page": full_page, "timeout": 10_000},
+        {"full_page": False, "timeout": 15_000, "animations": "disabled", "caret": "hide"},
+    ]
+    last_error: Exception | None = None
+    for delay_ms in (0, *SCREENSHOT_RETRY_DELAYS_MS):
+        if delay_ms:
+            _page_wait(page, delay_ms)
+        for options in screenshot_attempts:
+            try:
+                return page.screenshot(**options), None
+            except Exception as error:
+                last_error = error
+    return None, last_error
+
+
+def _page_wait(page: Any, delay_ms: int) -> None:
     try:
-        attach_png(f"{name} screenshot", page.screenshot(full_page=full_page, timeout=5_000))
-    except Exception as error:
-        attach_text(f"{name} screenshot error", str(error))
+        wait_for_timeout = getattr(page, "wait_for_timeout", None)
+        if callable(wait_for_timeout):
+            wait_for_timeout(delay_ms)
+    except Exception:
+        return
 
 
 def redact_payload(value: Any) -> Any:

@@ -27,6 +27,20 @@ DEFAULT_TRIAGE_REPORT = ROOT_DIR / "reports" / "triage" / "triage-report.md"
 TRIAGE_HISTORY_ID = "edot-evidence-ai-failure-triage-report"
 TRIAGE_FULL_NAME = "tools.triage_allure_failures#triage_report"
 TRIAGE_RESULT_NAME = "AI failure triage report"
+FINAL_FAILURE_ATTACHMENT_NAMES = {
+    "failure-evidence-call-page",
+    "failure-evidence-call-screenshot",
+    "failure-evidence-call page state",
+    "failure-evidence-call screenshot",
+    "Final failure page state",
+    "Final failure screenshot",
+}
+STEP_FAILURE_ATTACHMENT_NAMES = {
+    "step-failure-evidence-page",
+    "step-failure-evidence-screenshot",
+    "Failure page state",
+    "Failure screenshot",
+}
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(line_buffering=True)
 
@@ -312,8 +326,12 @@ def _attachment_sources(node: dict[str, Any]) -> list[str]:
 
 
 def _ensure_step_evidence(result: dict[str, Any], results_dir: Path) -> None:
-    result["attachments"] = _clean_attachments(result.get("attachments", []), results_dir)
     steps = result.setdefault("steps", [])
+    result["attachments"] = _clean_attachments(
+        result.get("attachments", []),
+        results_dir,
+        drop_final_failure=_has_step_failure_evidence(steps),
+    )
     result["steps"] = _compact_steps(steps, depth=0, results_dir=results_dir)
     steps = result["steps"]
     if not steps:
@@ -374,11 +392,18 @@ def _compact_steps(steps: list[dict[str, Any]], *, depth: int, results_dir: Path
     return compacted
 
 
-def _clean_attachments(attachments: list[dict[str, Any]], results_dir: Path) -> list[dict[str, Any]]:
+def _clean_attachments(
+    attachments: list[dict[str, Any]],
+    results_dir: Path,
+    *,
+    drop_final_failure: bool = False,
+) -> list[dict[str, Any]]:
     cleaned = []
     input_records = []
     for attachment in attachments:
         name = str(attachment.get("name", ""))
+        if drop_final_failure and name in FINAL_FAILURE_ATTACHMENT_NAMES:
+            continue
         if name in {
             "step-runtime-info",
             "step-result",
@@ -414,6 +439,18 @@ def _clean_attachments(attachments: list[dict[str, Any]], results_dir: Path) -> 
         )
         cleaned.insert(0, {"name": "Inputs", "source": source, "type": "application/json"})
     return cleaned
+
+
+def _has_step_failure_evidence(steps: list[dict[str, Any]]) -> bool:
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        attachment_names = {str(attachment.get("name", "")) for attachment in step.get("attachments", [])}
+        if attachment_names & STEP_FAILURE_ATTACHMENT_NAMES:
+            return True
+        if _has_step_failure_evidence(step.get("steps", [])):
+            return True
+    return False
 
 
 def _read_json_attachment(results_dir: Path, attachment: dict[str, Any]) -> Any:

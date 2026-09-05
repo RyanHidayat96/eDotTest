@@ -48,7 +48,7 @@ def test_allure_generator_keeps_deliberate_failure_red(tmp_path: Path) -> None:
     assert labels["subSuite"] == "Deliberate Failure"
 
 
-def test_allure_generator_cleans_duplicate_tags_and_failure_attachment_names(tmp_path: Path) -> None:
+def test_allure_generator_cleans_duplicate_tags_and_drops_redundant_final_failure(tmp_path: Path) -> None:
     results_dir = tmp_path / "results"
     results_dir.mkdir()
     result_path = results_dir / "failure-result.json"
@@ -62,6 +62,16 @@ def test_allure_generator_cleans_duplicate_tags_and_failure_attachment_names(tmp
                 "attachments": [
                     {"name": "failure-evidence-call page state", "source": "page.json", "type": "application/json"},
                     {"name": "failure-evidence-call screenshot", "source": "screen.png", "type": "image/png"},
+                ],
+                "steps": [
+                    {
+                        "name": "Failed page step",
+                        "status": "failed",
+                        "attachments": [
+                            {"name": "Failure page state", "source": "step-page.json", "type": "application/json"},
+                            {"name": "Failure screenshot", "source": "step-screen.png", "type": "image/png"},
+                        ],
+                    }
                 ],
                 "labels": [
                     {"name": "tag", "value": "web"},
@@ -79,6 +89,8 @@ def test_allure_generator_cleans_duplicate_tags_and_failure_attachment_names(tmp
     payload = json.loads(result_path.read_text(encoding="utf-8"))
     tags = [label["value"] for label in payload["labels"] if label["name"] == "tag"]
     attachments = [attachment["name"] for attachment in payload["attachments"]]
+    step_attachments = [attachment["name"] for attachment in payload["steps"][0]["attachments"]]
     assert tags.count("web") == 1
     assert tags.count("deliberate_failure") == 1
-    assert attachments == ["Final failure page state", "Final failure screenshot"]
+    assert attachments == []
+    assert step_attachments == ["Failure page state", "Failure screenshot"]

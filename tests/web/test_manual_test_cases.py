@@ -22,7 +22,17 @@ HEADERS = [
     "Assertion Tier",
     "Status",
 ]
-EXPECTED_IDS = ["WEB-TC-001", "WEB-TC-002", "WEB-TC-003", "WEB-TC-004", "WEB-TC-005", "MOB-TC-001", "MOB-TC-002"]
+EXPECTED_IDS = [
+    "WEB-TC-001",
+    "WEB-TC-002",
+    "WEB-TC-003",
+    "WEB-TC-004",
+    "WEB-TC-006",
+    "MOB-TC-001",
+    "MOB-TC-002",
+    "E2E-WEB-MOBILE-001",
+    "WEB-TC-005",
+]
 
 
 def test_manual_csv_has_required_columns_cases_and_blank_status() -> None:
@@ -33,28 +43,56 @@ def test_manual_csv_has_required_columns_cases_and_blank_status() -> None:
     assert all(row["Status"] == "" for row in rows)
 
 
-def test_manual_company_create_detail_and_delete_share_same_runtime_values() -> None:
+def test_manual_company_create_detail_and_delete_share_same_fixed_values() -> None:
     cases = {row["Test Case ID"]: row for row in _csv_rows()}
     create_data = cases["WEB-TC-003"]["Test Data (exact values)"]
     detail_data = cases["WEB-TC-004"]["Test Data (exact values)"]
     delete_data = cases["WEB-TC-005"]["Test Data (exact values)"]
 
     for expected in (
-        "Company Name=PT Ritel QA ${RUN_ID}",
-        "Email=qa.company.${RUN_ID}@example.test",
-        "Phone=81234567890",
-        "Industry Type=Retail",
-        "Company Type=Retailer",
-        "Street Address=Jalan Sudirman No 10",
-        "Postal Code=12190",
+        "Company Name: PT Ritel Nusantara Manual QA",
+        "Email: qa.ritel.nusantara@example.test",
+        "Phone: 81234567890",
+        "Industry Type: Retail",
+        "Company Type: Retailer",
+        "Street Address: Jalan Jenderal Sudirman Kav. 52-53",
+        "Postal Code: 12190",
     ):
         assert expected in create_data
         assert expected in detail_data
 
-    assert "Company Name=PT Ritel QA ${RUN_ID}" in delete_data
-    assert "Company ID=<captured non-secret runtime value>" in delete_data
-    assert "qa.company+${RUN_ID}@example.test" not in detail_data
-    assert "qa${RUN_ID}@qa.test" not in create_data
+    assert "Company Name: PT Ritel Nusantara Manual QA" in delete_data
+    assert "Company ID: Company ID recorded in WEB-TC-004" in delete_data
+
+
+def test_manual_cases_are_human_readable_and_automation_agnostic() -> None:
+    rows = _csv_rows()
+    combined = "\n".join(value for row in rows for value in row.values())
+    forbidden_fragments = (
+        "${",
+        "<secure",
+        "<captured",
+        "ESUITE_",
+        "EWORK_",
+        "storage_state",
+        "Allure",
+        "runtime generated",
+        "deterministic fallback",
+    )
+
+    for fragment in forbidden_fragments:
+        assert fragment.casefold() not in combined.casefold()
+
+    for row in rows:
+        steps = row["Test Steps"].splitlines()
+        assert len(steps) >= 2
+        assert ";" not in row["Test Steps"]
+        assert [int(re.match(r"^(\d+)\.\s", step).group(1)) for step in steps] == list(
+            range(1, len(steps) + 1)
+        )
+        assert all(line.startswith("- ") for line in row["Precondition"].splitlines())
+        assert all(line.startswith("- ") for line in row["Expected Result"].splitlines())
+        assert "\n" in row["Test Data (exact values)"]
 
 
 def test_manual_step_one_validation_is_not_mislabeled_as_negative() -> None:
@@ -74,15 +112,28 @@ def test_manual_mobile_customer_case_matches_real_list_card_validation() -> None
     combined_lower = combined.lower()
 
     assert "Use my current location" in combined
-    assert "Current Location Address=<captured from app address field>" in combined
-    assert "KTP=<16 digit runtime value>" in combined
-    assert "Attachment=camera capture" in combined
-    assert "Signature=drawn" in combined
-    assert "card name equals submitted outlet name" in combined_lower
-    assert "card address equals the address captured from the app" in combined_lower
-    assert "card customer type equals submitted customer type" in combined_lower
+    assert "Address: Complete value displayed after Use my current location" in combined
+    assert "KTP: 3175070101909999" in combined
+    assert "Attachment: New photo captured by the device camera" in combined
+    assert "Signature: One continuous handwritten stroke" in combined
+    assert "customer card named toko sentosa manual qa" in combined_lower
+    assert "card address exactly matches the complete address value" in combined_lower
+    assert "card customer type is semi grosir" in combined_lower
     assert "Search or open created customer" not in combined
     assert "customer list/detail" not in combined
+
+
+def test_manual_company_user_and_handoff_use_the_same_mobile_identity() -> None:
+    cases = {row["Test Case ID"]: row for row in _csv_rows()}
+    company_user = cases["WEB-TC-006"]
+    mobile_login = cases["MOB-TC-001"]
+    handoff = cases["E2E-WEB-MOBILE-001"]
+
+    assert "Username: qausermanual" in company_user["Test Data (exact values)"]
+    assert "Username: qausermanual" in mobile_login["Test Data (exact values)"]
+    assert "Company ID recorded in WEB-TC-004" in mobile_login["Test Data (exact values)"]
+    assert "Username: qauserhandoff" in handoff["Test Data (exact values)"]
+    assert "No fallback company identity is used" in handoff["Expected Result"]
 
 
 def test_manual_cases_do_not_store_secret_values() -> None:
@@ -99,18 +150,41 @@ def test_manual_cases_do_not_store_secret_values() -> None:
 def test_manual_xlsx_matches_csv_headers_row_count_and_metadata() -> None:
     csv_rows = _csv_rows()
     workbook_rows = _xlsx_rows("xl/worksheets/sheet1.xml")
-    metadata_text = "\n".join(value for row in _xlsx_rows("xl/worksheets/sheet2.xml") for value in row)
+    overview_text = "\n".join(value for row in _xlsx_rows("xl/worksheets/sheet2.xml") for value in row)
 
     assert workbook_rows[0] == HEADERS
     assert len(workbook_rows) == len(csv_rows) + 1
     assert [row[0] for row in workbook_rows[1:]] == EXPECTED_IDS
-    assert "https://github.com/RyanHidayat96/TestEdot" in metadata_text
+    assert workbook_rows[1:] == [[row[header] for header in HEADERS] for row in csv_rows]
+    assert "https://github.com/RyanHidayat96/TestEdot" in overview_text
+
+
+def test_manual_xlsx_has_professional_navigation_and_readable_multiline_rows() -> None:
+    with zipfile.ZipFile(XLSX_PATH) as workbook:
+        test_cases_xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        styles_xml = workbook.read("xl/styles.xml").decode("utf-8")
+        overview_relationships = workbook.read("xl/worksheets/_rels/sheet2.xml.rels").decode("utf-8")
+
+    assert 'showGridLines="0"' in test_cases_xml
+    assert 'state="frozen"' in test_cases_xml
+    assert f'<autoFilter ref="A1:H{len(EXPECTED_IDS) + 1}"/>' in test_cases_xml
+    assert '<dataValidations count="1">' in test_cases_xml
+    assert '<rowBreaks count="2" manualBreakCount="2"><brk id="5"' in test_cases_xml
+    assert '<brk id="9" max="16383" man="1"/>' in test_cases_xml
+    assert 'wrapText="1"' in styles_xml
+    assert 'Target="https://github.com/RyanHidayat96/TestEdot"' in overview_relationships
+
+    namespace = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    root = ET.fromstring(test_cases_xml)
+    heights = [float(row.attrib["ht"]) for row in root.findall(".//main:sheetData/main:row", namespace)]
+    assert max(heights[1:]) >= 300
 
 
 def test_automated_requirement_flows_are_traceable_to_manual_ids() -> None:
     cases = {
         "tests/web/test_login.py::test_esuite_login_shows_dashboard_greeting": "WEB-TC-001",
         "tests/web/test_create_company.py::test_create_company_three_step_wizard_with_ai_data": "WEB-TC-003",
+        "tests/web/test_web_mobile_handoff.py::test_web_created_company_handoff_drives_mobile_login": "E2E-WEB-MOBILE-001",
         "tests/mobile/test_mobile_login.py::test_ework_login_displays_dashboard": "MOB-TC-001",
         "tests/mobile/test_mobile_create_customer.py::test_ework_create_customer_appears_with_correct_data": "MOB-TC-002",
     }

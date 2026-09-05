@@ -409,7 +409,6 @@ def _clean_attachments(
             "step-result",
             "step-evidence-page",
             "step-evidence-screenshot",
-            "company-manage-search-not-used",
         }:
             continue
         if name in {"step-input", "Input"} or name.startswith("Input - "):

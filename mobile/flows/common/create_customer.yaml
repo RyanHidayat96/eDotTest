@@ -1,5 +1,0 @@
-appId: ${EWORK_APP_ID}
----
-- runFlow: create_customer_basic.yaml
-- runFlow: create_customer_locations.yaml
-- runFlow: create_customer_documents.yaml

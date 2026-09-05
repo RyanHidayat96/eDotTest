@@ -15,7 +15,6 @@ except ModuleNotFoundError:
 
 
 DEFAULT_MAESTRO_FLOW_DIR = ROOT_DIR / "mobile" / "flows"
-DEFAULT_MAESTRO_OUTPUT_DIR = ROOT_DIR / "artifacts" / "maestro"
 DEFAULT_EWORK_STORAGE_STATE = ROOT_DIR / "artifacts" / "auth" / "ework_session_state.json"
 DELIBERATE_WRONG_PASSWORD_FIELD_ID = "id.edot.ework:id/edot_deliberate_missing_password"
 
@@ -53,7 +52,6 @@ class MobileSettings:
     ework_customer_address_type_field_id: str | None
     ework_customer_address_type_option_text: str | None
     ework_customer_current_location_button_id: str | None
-    ework_customer_location_apply_button_id: str | None
     ework_customer_province_field_text: str | None
     ework_customer_province_option_text: str | None
     ework_customer_city_field_text: str | None
@@ -75,9 +73,7 @@ class MobileSettings:
     ework_customer_save_confirm_button_id: str | None
     ework_customer_success_text: str | None
     ework_customer_success_continue_button_id: str | None
-    ework_customer_search_field_id: str | None
     maestro_flow_dir: Path
-    maestro_output_dir: Path
     allure_results_dir: Path
     company_handoff_path: Path
     ework_storage_state_path: Path
@@ -159,7 +155,6 @@ class MobileSettings:
         return missing
 
     def ensure_runtime_dirs(self) -> None:
-        self.maestro_output_dir.mkdir(parents=True, exist_ok=True)
         self.allure_results_dir.mkdir(parents=True, exist_ok=True)
 
     def as_safe_dict(self) -> dict[str, str]:
@@ -195,7 +190,6 @@ class MobileSettings:
             "EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID": self.ework_customer_address_type_field_id or "<missing>",
             "EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT": self.ework_customer_address_type_option_text or "<missing>",
             "EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID": self.ework_customer_current_location_button_id or "<missing>",
-            "EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID": self.ework_customer_location_apply_button_id or "<missing>",
             "EWORK_CUSTOMER_PROVINCE_FIELD_TEXT": self.ework_customer_province_field_text or "<missing>",
             "EWORK_CUSTOMER_PROVINCE_OPTION_TEXT": self.ework_customer_province_option_text or "<missing>",
             "EWORK_CUSTOMER_CITY_FIELD_TEXT": self.ework_customer_city_field_text or "<missing>",
@@ -217,9 +211,7 @@ class MobileSettings:
             "EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID": self.ework_customer_save_confirm_button_id or "<missing>",
             "EWORK_CUSTOMER_SUCCESS_TEXT": self.ework_customer_success_text or "<missing>",
             "EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID": self.ework_customer_success_continue_button_id or "<missing>",
-            "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id or "<missing>",
             "MAESTRO_FLOW_DIR": str(self.maestro_flow_dir),
-            "MAESTRO_OUTPUT_DIR": str(self.maestro_output_dir),
             "ALLURE_RESULTS_DIR": str(self.allure_results_dir),
             "EWORK_COMPANY_HANDOFF_PATH": str(self.company_handoff_path),
             "EWORK_STORAGE_STATE": str(self.ework_storage_state_path),
@@ -260,7 +252,6 @@ class MobileSettings:
             "EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID": self.ework_customer_address_type_field_id,
             "EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT": self.ework_customer_address_type_option_text,
             "EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID": self.ework_customer_current_location_button_id,
-            "EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID": self.ework_customer_location_apply_button_id,
             "EWORK_CUSTOMER_PROVINCE_FIELD_TEXT": self.ework_customer_province_field_text,
             "EWORK_CUSTOMER_PROVINCE_OPTION_TEXT": self.ework_customer_province_option_text,
             "EWORK_CUSTOMER_CITY_FIELD_TEXT": self.ework_customer_city_field_text,
@@ -282,7 +273,6 @@ class MobileSettings:
             "EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID": self.ework_customer_save_confirm_button_id,
             "EWORK_CUSTOMER_SUCCESS_TEXT": self.ework_customer_success_text,
             "EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID": self.ework_customer_success_continue_button_id,
-            "EWORK_CUSTOMER_SEARCH_FIELD_ID": self.ework_customer_search_field_id,
         }
         variables = {}
         for key, value in optional_values.items():
@@ -334,7 +324,6 @@ def load_mobile_settings(*, prefer_handoff: bool | None = None) -> MobileSetting
         ework_customer_address_type_field_id=os.getenv("EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID") or None,
         ework_customer_address_type_option_text=os.getenv("EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT") or None,
         ework_customer_current_location_button_id=os.getenv("EWORK_CUSTOMER_CURRENT_LOCATION_BUTTON_ID") or None,
-        ework_customer_location_apply_button_id=os.getenv("EWORK_CUSTOMER_LOCATION_APPLY_BUTTON_ID") or None,
         ework_customer_province_field_text=os.getenv("EWORK_CUSTOMER_PROVINCE_FIELD_TEXT") or None,
         ework_customer_province_option_text=os.getenv("EWORK_CUSTOMER_PROVINCE_OPTION_TEXT") or None,
         ework_customer_city_field_text=os.getenv("EWORK_CUSTOMER_CITY_FIELD_TEXT") or None,
@@ -356,9 +345,7 @@ def load_mobile_settings(*, prefer_handoff: bool | None = None) -> MobileSetting
         ework_customer_save_confirm_button_id=os.getenv("EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID") or None,
         ework_customer_success_text=os.getenv("EWORK_CUSTOMER_SUCCESS_TEXT") or None,
         ework_customer_success_continue_button_id=os.getenv("EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID") or None,
-        ework_customer_search_field_id=os.getenv("EWORK_CUSTOMER_SEARCH_FIELD_ID") or None,
         maestro_flow_dir=_path_from_env("MAESTRO_FLOW_DIR", DEFAULT_MAESTRO_FLOW_DIR),
-        maestro_output_dir=_path_from_env("MAESTRO_OUTPUT_DIR", DEFAULT_MAESTRO_OUTPUT_DIR),
         allure_results_dir=_path_from_env("ALLURE_RESULTS_DIR", DEFAULT_ALLURE_RESULTS),
         company_handoff_path=handoff_path,
         ework_storage_state_path=_path_from_env("EWORK_STORAGE_STATE", DEFAULT_EWORK_STORAGE_STATE),

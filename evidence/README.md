@@ -8,4 +8,4 @@ Generated evidence belongs in the shared Allure output after the final execution
 - Deliberate failure stays failed in Allure so triage can read the real failure.
 
 Do not place `.env`, storage state, cookies, API keys, passwords, or raw secret headers here.
-The evidence command runs a secret scan automatically before finishing.
+Run `python tools/check_submission_safety.py` before creating the submission archive.

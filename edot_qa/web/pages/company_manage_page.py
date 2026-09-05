@@ -180,51 +180,6 @@ COMPANY_ACTION_MARK_SCRIPT = """
   };
 }
 """
-SEARCH_CONTROL_FILL_SCRIPT = """
-(searchText) => {
-  const normalize = (value) => String(value || "").replace(/\\s+/g, " ").trim();
-  const visible = (element) => {
-    if (!element) return false;
-    const style = window.getComputedStyle(element);
-    const rect = element.getBoundingClientRect();
-    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
-  };
-  const selectors = [
-    "input[type='search']",
-    "input[placeholder*='Search' i]",
-    "input[aria-label*='Search' i]",
-    "[role='searchbox']",
-    "[data-testid*='search' i] input",
-    "[data-testid*='company-search' i] input"
-  ];
-  const controls = selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)));
-  const control = controls.find((element) => visible(element) && !element.disabled && !element.readOnly);
-  if (!control) return {used: false, reason: "visible search input not found"};
-
-  control.focus();
-  const prototype = control.tagName.toLowerCase() === "textarea"
-    ? HTMLTextAreaElement.prototype
-    : HTMLInputElement.prototype;
-  const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-  if (descriptor && descriptor.set) {
-    descriptor.set.call(control, searchText);
-  } else {
-    control.value = searchText;
-  }
-  control.dispatchEvent(new Event("input", {bubbles: true}));
-  control.dispatchEvent(new Event("change", {bubbles: true}));
-  control.dispatchEvent(new KeyboardEvent("keydown", {bubbles: true, key: "Enter", code: "Enter"}));
-  control.dispatchEvent(new KeyboardEvent("keyup", {bubbles: true, key: "Enter", code: "Enter"}));
-  return {
-    used: true,
-    value: normalize(control.value),
-    placeholder: control.getAttribute("placeholder") || "",
-    ariaLabel: control.getAttribute("aria-label") || "",
-  };
-}
-"""
-
-
 class CompanyManagePage(BasePage):
     @property
     def heading(self) -> Locator:
@@ -232,22 +187,6 @@ class CompanyManagePage(BasePage):
             self._heading_candidates(),
             "Companies Manage page",
             timeout_ms=5_000,
-        )
-
-    @property
-    def search_control(self) -> Locator:
-        return self.first_visible(
-            [
-                ("data-testid company-search", self.page.get_by_test_id("company-search").first),
-                ("data-testid search", self.page.get_by_test_id("search").first),
-                ("searchbox", self.page.get_by_role("searchbox").first),
-                ("textbox named Search", self.page.get_by_role("textbox", name=re.compile(r"Search", re.I)).first),
-                ("labelled Search", self.page.get_by_label(re.compile(r"Search", re.I)).first),
-                ("placeholder Search", self.page.get_by_placeholder(re.compile(r"Search", re.I)).first),
-                ("stable search input", self.page.locator(stable_search_selector()).first),
-            ],
-            "company search control",
-            timeout_ms=1_500,
         )
 
     def expect_loaded(self) -> None:
@@ -265,23 +204,8 @@ class CompanyManagePage(BasePage):
                 continue
         return False
 
-    def search_company(self, company_name: str) -> None:
-        with allure_step("Search company in Manage list", page=self.page):
-            result = self._try_fast_search(company_name)
-            if not result.get("used"):
-                return
-            attach_json("Inputs", {"fields": {"company_search": company_name}})
-            try:
-                self.page.keyboard.press("Enter")
-            except PlaywrightError:
-                pass
-            attach_json("company-manage-search-used", result)
-            self._wait_after_table_action()
-            attach_page_evidence("Company search result", self.page, screenshot=True)
-
     def expect_company_present(self, company_name: str) -> None:
         with allure_step("Verify company exists in Manage list", page=self.page, data={"company_name": company_name}, screenshot=True):
-            self.search_company(company_name)
             # Tier 2: created company must exist in Manage results after submit.
             self._expect_company_text_visible(company_name, timeout_ms=5_000)
             attach_json("company-manage-record-present", {"company_name": company_name})
@@ -294,11 +218,9 @@ class CompanyManagePage(BasePage):
             screenshot=True,
         ):
             self._reload_companies_page()
-            self.search_company(company_name)
             self._expect_exact_text_absent("company name", company_name)
 
             if company_id:
-                self.search_company(company_id)
                 self._expect_exact_text_absent("company id", company_id)
 
             attach_json("company-cleanup-record-absent", {"company_name": company_name, "company_id": company_id})
@@ -307,7 +229,6 @@ class CompanyManagePage(BasePage):
         with allure_step("Open company detail from Manage list", page=self.page, data={"company_name": company_name}):
             errors: list[str] = []
             for attempt in range(1, DETAIL_OPEN_ATTEMPTS_AFTER_EMPTY_REFRESH + 1):
-                self.search_company(company_name)
                 try:
                     self._expect_company_text_visible(company_name, timeout_ms=5_000)
                     with allure_step(
@@ -355,7 +276,6 @@ class CompanyManagePage(BasePage):
 
     def delete_company_if_present(self, company_name: str) -> None:
         with allure_step("Delete company if present", page=self.page, data={"company_name": company_name}, screenshot=True):
-            self.search_company(company_name)
             if not self._is_company_visible(company_name, timeout_ms=5_000):
                 attach_json("company-cleanup-skipped", {"company_name": company_name, "reason": "not_found"})
                 return
@@ -442,13 +362,6 @@ class CompanyManagePage(BasePage):
         except PlaywrightError as error:
             raise AssertionError(f"Could not evaluate company text visibility for {text!r}") from error
 
-    def _try_fast_search(self, search_text: str) -> dict[str, object]:
-        try:
-            result = self.page.evaluate(SEARCH_CONTROL_FILL_SCRIPT, search_text)
-        except PlaywrightError as error:
-            return {"used": False, "reason": str(error)}
-        return result if isinstance(result, dict) else {"used": False, "reason": "unexpected search result"}
-
     def _mark_company_action(self, company_name: str, action_pattern: str, marker: str) -> dict[str, object]:
         try:
             result = self.page.evaluate(
@@ -478,10 +391,3 @@ class CompanyManagePage(BasePage):
             self.page.wait_for_load_state("domcontentloaded", timeout=2_000)
         except TimeoutError:
             pass
-
-
-def stable_search_selector() -> str:
-    return (
-        "input[name='search'], input[id='search'], "
-        "input[aria-label='Search'], input[placeholder='Search']"
-    )

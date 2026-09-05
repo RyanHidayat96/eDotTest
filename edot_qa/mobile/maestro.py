@@ -143,14 +143,6 @@ class MaestroRunner:
                 "passed": result.passed,
             },
         )
-        self.attach_output_artifacts()
-
-    def attach_output_artifacts(self) -> None:
-        if not self.settings.maestro_output_dir.is_dir():
-            return
-        for path in sorted(self.settings.maestro_output_dir.rglob("*")):
-            if path.is_file() and path.suffix.lower() in {".log", ".mp4", ".png", ".txt", ".webm"}:
-                attach_file(f"maestro-artifact-{path.name}", path)
 
     def attach_device_screenshot(self) -> None:
         image = capture_device_screenshot(
@@ -182,15 +174,6 @@ def maestro_flow_inputs(
                 "Company ID": _login_input_value("EWORK_COMPANY_CODE", variables, reveal_login_secrets),
                 "Username": _login_input_value("EWORK_EMAIL", variables, reveal_login_secrets),
                 "Password": _login_input_value("EWORK_PASSWORD", variables, reveal_login_secrets),
-            }
-        }
-
-    if flow_name == "create_customer.yaml":
-        return {
-            "fields": {
-                **_customer_basic_inputs(variables),
-                **_customer_location_inputs(variables),
-                **_customer_document_inputs(variables),
             }
         }
 

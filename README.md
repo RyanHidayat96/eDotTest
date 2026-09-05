@@ -25,9 +25,9 @@ edot_qa/
   web/                 eSuite page objects, registration model, scenarios, storage state helpers
     scenarios/         Thin business flows for login and company registration
 mobile/flows/          Maestro entry flows and reusable runFlow sub-flows
-test_cases/            Manual test case CSV and Excel workbook
+test_cases/            Final manual test case workbook
 tests/                 Pytest suites for web, mobile, AI, quality gates
-tools/                 Safety checker, workbook builder, Allure report generator, and triage CLI
+tools/                 Safety checker, Allure report generator, and triage CLI
 ```
 
 ## Prerequisites
@@ -133,7 +133,6 @@ EWORK_PREFER_HANDOFF=false
 EWORK_COMPANY_HANDOFF_PATH=artifacts/handoff/web_company.json
 EWORK_STORAGE_STATE=artifacts/auth/ework_session_state.json
 MAESTRO_FLOW_DIR=mobile/flows
-MAESTRO_OUTPUT_DIR=artifacts/maestro
 EWORK_LOGIN_SCREEN_TEXT=Login
 EWORK_COMPANY_ID_FIELD_ID=id.edot.ework:id/tv_company_id
 EWORK_USERNAME_FIELD_ID=id.edot.ework:id/tv_username
@@ -175,7 +174,6 @@ EWORK_CUSTOMER_SAVE_BUTTON_ID=id.edot.ework:id/update_info_action_submit
 EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID=id.edot.ework:id/btn_positive
 EWORK_CUSTOMER_SUCCESS_TEXT=Data Saved Successfully
 EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID=id.edot.ework:id/btn_success_continue
-EWORK_CUSTOMER_SEARCH_FIELD_ID=
 ```
 
 Mobile credentials should come from the web-created company handoff only when the product has proven that the created company can log in to eWork. Default mobile runs keep explicit `.env` fallback identity first. Set `EWORK_PREFER_HANDOFF=true` only for the dedicated handoff proof; that proof creates a Company User with a generated runtime password and uses it only for the matching eWork login.
@@ -357,7 +355,7 @@ reports/allure-report/
 reports/triage/triage-report.md
 ```
 
-Generated evidence folders are ignored by Git. Evidence commands scan their output automatically; run `python tools/check_submission_safety.py` before any submission archive is created.
+Generated evidence folders are ignored by Git. Run `python tools/check_submission_safety.py` before any submission archive is created.
 
 ## Troubleshooting
 

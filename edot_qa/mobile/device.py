@@ -91,6 +91,31 @@ def force_stop_app(
     return completed.stdout.strip()
 
 
+def launch_app(
+    package_name: str,
+    adb_command: str = "adb",
+    *,
+    device_id: str | None = None,
+    timeout_seconds: int = 10,
+) -> str:
+    command = [adb_command]
+    if device_id:
+        command.extend(["-s", device_id])
+    command.extend(
+        [
+            "shell",
+            "monkey",
+            "-p",
+            package_name,
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "1",
+        ]
+    )
+    completed = _run_adb(command, timeout_seconds=timeout_seconds)
+    return completed.stdout.strip()
+
+
 def wake_device(
     adb_command: str = "adb",
     *,

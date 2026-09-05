@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 
 from edot_qa.mobile import config as mobile_config
+from edot_qa.mobile import runtime as mobile_runtime
+from edot_qa.mobile.device import MobileDevice
 from edot_qa.mobile.flow_profile import EWORK_FLOW_VARIABLES
 
 
@@ -54,3 +56,48 @@ def test_customer_runtime_needs_session_not_login_credentials(monkeypatch):
     settings = mobile_config.load_mobile_settings()
 
     assert settings.missing_customer_requirements() == []
+
+
+def test_customer_runtime_launches_ework_before_customer_flow(monkeypatch):
+    calls: list[tuple[str, str, str | None, int]] = []
+
+    def wake(adb_command: str, *, device_id: str | None, timeout_seconds: int) -> str:
+        calls.append(("wake", adb_command, device_id, timeout_seconds))
+        return ""
+
+    def force_stop(package_name: str, adb_command: str, *, device_id: str | None, timeout_seconds: int) -> str:
+        calls.append((f"force-stop:{package_name}", adb_command, device_id, timeout_seconds))
+        return ""
+
+    def launch(package_name: str, adb_command: str, *, device_id: str | None, timeout_seconds: int) -> str:
+        calls.append((f"launch:{package_name}", adb_command, device_id, timeout_seconds))
+        return "Events injected: 1"
+
+    monkeypatch.setattr(mobile_runtime, "wake_device", wake)
+    monkeypatch.setattr(mobile_runtime, "force_stop_app", force_stop)
+    monkeypatch.setattr(mobile_runtime, "launch_app", launch)
+
+    settings = mobile_config.MobileSettings(
+        maestro_cli="maestro",
+        adb_command="adb",
+        mobile_device_id=None,
+        mobile_flow_timeout_seconds=300,
+        edot_live=True,
+        prefer_company_handoff=False,
+        ework_app_id="id.edot.ework",
+        ework_email=None,
+        ework_password=None,
+        ework_company_code=None,
+    )
+    context = mobile_runtime.MobileRuntimeContext(
+        settings=settings,
+        device=MobileDevice(serial="device-1", status="device"),
+    )
+
+    mobile_runtime.start_app_from_stored_session(context)
+
+    assert calls == [
+        ("wake", "adb", "device-1", 10),
+        ("force-stop:id.edot.ework", "adb", "device-1", 10),
+        ("launch:id.edot.ework", "adb", "device-1", 10),
+    ]

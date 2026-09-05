@@ -9,6 +9,7 @@ from edot_qa.mobile.device import (
     clear_app_data,
     command_available,
     force_stop_app,
+    launch_app,
     package_installed,
     ready_device,
     wake_device,
@@ -82,6 +83,13 @@ def start_app_from_stored_session(context: MobileRuntimeContext) -> None:
             device_id=context.device_id,
             timeout_seconds=10,
         )
+        launch_output = launch_app(
+            context.settings.ework_app_id or "",
+            context.settings.adb_command,
+            device_id=context.device_id,
+            timeout_seconds=10,
+        )
+        attach_json("mobile-start-app", {"package": context.settings.ework_app_id, "result": launch_output})
 
 
 def _require_values(missing: list[str], *, prefix: str) -> None:

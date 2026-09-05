@@ -11,7 +11,7 @@
     "test:mobile": ".venv\\Scripts\\python.exe -m pytest tests/mobile -m \"not deliberate_failure\" -q -rs",
     "test:mobile:login": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_login.py::test_ework_login_displays_dashboard -q -rs",
     "test:mobile:deliberate": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_login.py::test_mobile_login_wrong_password_locator_records_real_failure -q -rs",
-    "test:mobile:customer": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_create_customer.py -q -rs",
+    "test:mobile:customer": ".venv\\Scripts\\python.exe -m pytest tests/mobile/test_mobile_create_customer.py::test_ework_create_customer_appears_with_correct_data -q -rs",
     "test:ai": ".venv\\Scripts\\python.exe -m pytest tests/ai -q",
     "test:handoff": ".venv\\Scripts\\python.exe -m pytest tests/web/test_web_mobile_handoff.py::test_web_created_company_handoff_drives_mobile_login -q -rs",
     "triage": ".venv\\Scripts\\python.exe tools/triage_allure_failures.py --results-dir reports/allure-results --output reports/triage/triage-report.md",

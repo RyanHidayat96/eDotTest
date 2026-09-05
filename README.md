@@ -2,8 +2,6 @@
 
 Clean Python + Pytest automation project for the eDOT QA Automation Engineer V4 assignment.
 
-Repository link: https://github.com/RyanHidayat96/TestEdot
-
 ## Scope
 
 - Manual test case workbook: `test_cases/eDOT_QA_Automation_Test_Cases.xlsx`

@@ -64,6 +64,27 @@ def test_manual_step_one_validation_is_not_mislabeled_as_negative() -> None:
     assert "specific error message" not in cases["WEB-TC-002"]["Expected Result"].lower()
 
 
+def test_manual_mobile_customer_case_matches_real_list_card_validation() -> None:
+    cases = {row["Test Case ID"]: row for row in _csv_rows()}
+    mobile_customer = cases["MOB-TC-002"]
+    combined = " ".join(
+        mobile_customer[column]
+        for column in ("Test Steps", "Test Data (exact values)", "Expected Result")
+    )
+    combined_lower = combined.lower()
+
+    assert "Use my current location" in combined
+    assert "Current Location Address=<captured from app address field>" in combined
+    assert "KTP=<16 digit runtime value>" in combined
+    assert "Attachment=camera capture" in combined
+    assert "Signature=drawn" in combined
+    assert "card name equals submitted outlet name" in combined_lower
+    assert "card address equals the address captured from the app" in combined_lower
+    assert "card customer type equals submitted customer type" in combined_lower
+    assert "Search or open created customer" not in combined
+    assert "customer list/detail" not in combined
+
+
 def test_manual_cases_do_not_store_secret_values() -> None:
     secret_assignment = re.compile(r"(PASSWORD|API_KEY|TOKEN|SECRET)=([^<;\s][^;\s]*)", re.IGNORECASE)
     combined = "\n".join(value for row in _csv_rows() for value in row.values())

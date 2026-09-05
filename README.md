@@ -4,7 +4,6 @@ Clean Python + Pytest automation project for the eDOT QA Automation Engineer V4 
 
 ## Scope
 
-- Manual test case workbook deliverable: `test_cases/eDOT_QA_Automation_Test_Cases.xlsx`
 - Web automation: eSuite at `https://esuite.edot.id` using Playwright, Pytest, Page Object Model, and Allure.
 - Mobile automation: eWork SFA using Maestro YAML flows wrapped by Pytest so web and mobile share Allure output.
 - AI test data: optional Gemini model call with deterministic Faker fallback.
@@ -24,7 +23,6 @@ edot_qa/
   web/                 eSuite page objects, registration model, scenarios, storage state helpers
     scenarios/         Thin business flows for login and company registration
 mobile/flows/          Maestro entry flows and reusable runFlow sub-flows
-test_cases/            Final manual test case workbook deliverable
 tests/                 Pytest suites for web, mobile, AI, quality gates
 tools/                 Safety checker, Allure report generator, and triage CLI
 AI_USAGE.md            AI test-data and triage usage documentation

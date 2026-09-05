@@ -15,7 +15,6 @@
     "test:ai": ".venv\\Scripts\\python.exe -m pytest tests/ai -q",
     "test:handoff": ".venv\\Scripts\\python.exe -m pytest tests/web/test_web_mobile_handoff.py::test_web_created_company_handoff_drives_mobile_login -q -rs",
     "triage": ".venv\\Scripts\\python.exe tools/triage_allure_failures.py --results-dir reports/allure-results --output reports/triage/triage-report.md",
-    "evidence:deliberate": ".venv\\Scripts\\python.exe tools/evidence_workflow.py deliberate-failure",
     "allure:generate": ".venv\\Scripts\\python.exe tools/generate_allure_report.py --open"
   },
   "devDependencies": {

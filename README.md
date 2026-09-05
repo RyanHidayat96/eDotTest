@@ -332,17 +332,13 @@ Triage verdicts are human-review proposals only. The script never changes tests,
 ## Deliberate Failure Evidence
 
 ```powershell
-npm run evidence:deliberate
-```
-
-Deliberate failures can be run separately:
-
-```powershell
 npm run test:web:deliberate
 npm run test:mobile:deliberate
+npm run triage
+npm run allure:generate
 ```
 
-Web opens the eSuite login page and points the login button assertion at a wrong locator. Mobile opens the eWork login flow and points the password field at a wrong id. `npm run evidence:deliberate` runs both deliberate checks, expects pytest to fail, writes triage to `reports/triage/triage-report.md`, then regenerates the shared Allure report. The deliberate tests remain red under `eDOT Evidence` because that failed status is the evidence triage needs. The command scans preserved evidence for secrets before finishing.
+Web opens the eSuite login page and points the login button assertion at a wrong locator. Mobile opens the eWork login flow and points the password field at a wrong id. These deliberate tests stay failed under `eDOT Evidence` by design, then `npm run triage` reads those failures and `npm run allure:generate` shows the triage report in the shared Allure report.
 
 ## Test Data Cleanup
 

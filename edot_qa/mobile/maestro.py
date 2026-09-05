@@ -7,7 +7,14 @@ from pathlib import Path
 from edot_qa.config import ROOT_DIR
 from edot_qa.mobile.config import MobileSettings
 from edot_qa.mobile.device import capture_device_screenshot, command_available
-from edot_qa.reporting.allure_helpers import allure_step, attach_file, attach_json, attach_png, attach_text
+from edot_qa.reporting.allure_helpers import (
+    allure_step,
+    attach_file,
+    attach_json,
+    attach_png,
+    attach_text,
+    show_dev_inputs_in_reports,
+)
 
 
 SENSITIVE_MAESTRO_KEYS = {"EWORK_EMAIL", "EWORK_PASSWORD", "EWORK_COMPANY_CODE"}
@@ -87,6 +94,13 @@ class MaestroRunner:
             },
             screenshot=False,
         ):
+            flow_inputs = maestro_flow_inputs(
+                flow_path.name,
+                maestro_variables,
+                reveal_login_secrets=show_dev_inputs_in_reports(),
+            )
+            if flow_inputs:
+                attach_json("Inputs", flow_inputs, redact=False)
             attach_json("maestro-command", {"command": redacted_command, "flow": str(flow_path)})
             attach_file("maestro-flow-yaml", flow_path)
 
@@ -154,6 +168,87 @@ def assert_maestro_passed(result: MaestroResult) -> MaestroResult:
     raise AssertionError(
         f"Maestro flow failed with exit code {result.returncode}: {result.flow_path.name}\n{result.stderr}".strip()
     )
+
+
+def maestro_flow_inputs(
+    flow_name: str,
+    variables: dict[str, str],
+    *,
+    reveal_login_secrets: bool = True,
+) -> dict[str, object]:
+    if flow_name == "login.yaml":
+        return {
+            "fields": {
+                "Company ID": _login_input_value("EWORK_COMPANY_CODE", variables, reveal_login_secrets),
+                "Username": _login_input_value("EWORK_EMAIL", variables, reveal_login_secrets),
+                "Password": _login_input_value("EWORK_PASSWORD", variables, reveal_login_secrets),
+            }
+        }
+
+    if flow_name == "create_customer.yaml":
+        return {
+            "fields": {
+                **_customer_basic_inputs(variables),
+                **_customer_location_inputs(variables),
+                **_customer_document_inputs(variables),
+            }
+        }
+
+    if flow_name == "create_customer_basic.yaml":
+        return {"fields": _customer_basic_inputs(variables)}
+
+    if flow_name == "create_customer_locations.yaml":
+        return {"fields": _customer_location_inputs(variables)}
+
+    if flow_name == "create_customer_documents.yaml":
+        return {"fields": _customer_document_inputs(variables)}
+
+    if flow_name == "validate_customer_list_card.yaml":
+        return {
+            "expected_card": {
+                "Name": variables.get("EWORK_CUSTOMER_NAME", ""),
+                "Address": variables.get("EWORK_CUSTOMER_CARD_ADDRESS", ""),
+                "Customer Type": variables.get("EWORK_CUSTOMER_TYPE_OPTION_TEXT", ""),
+            }
+        }
+
+    return {}
+
+
+def _login_input_value(key: str, variables: dict[str, str], reveal_login_secrets: bool) -> str:
+    if not reveal_login_secrets and variables.get(key):
+        return "<redacted>"
+    return variables.get(key, "")
+
+
+def _customer_basic_inputs(variables: dict[str, str]) -> dict[str, str]:
+    return {
+        "Outlet Name": variables.get("EWORK_CUSTOMER_NAME", ""),
+        "Contact": variables.get("EWORK_CUSTOMER_CONTACT", ""),
+        "Contact Person": variables.get("EWORK_CUSTOMER_CONTACT_PERSON", ""),
+        "Channel": variables.get("EWORK_CUSTOMER_CHANNEL_OPTION_TEXT", ""),
+        "Customer Type": variables.get("EWORK_CUSTOMER_TYPE_OPTION_TEXT", ""),
+    }
+
+
+def _customer_location_inputs(variables: dict[str, str]) -> dict[str, str]:
+    return {
+        "Address Type": variables.get("EWORK_CUSTOMER_ADDRESS_TYPE_OPTION_TEXT", ""),
+        "Current Location": "Use my current location",
+        "Province": variables.get("EWORK_CUSTOMER_PROVINCE_OPTION_TEXT", ""),
+        "City": variables.get("EWORK_CUSTOMER_CITY_OPTION_TEXT", ""),
+        "District": variables.get("EWORK_CUSTOMER_DISTRICT_OPTION_TEXT", ""),
+        "Sub District": variables.get("EWORK_CUSTOMER_SUBDISTRICT_OPTION_TEXT", ""),
+        "Postal Code": variables.get("EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT", ""),
+    }
+
+
+def _customer_document_inputs(variables: dict[str, str]) -> dict[str, str]:
+    return {
+        "KTP": variables.get("EWORK_CUSTOMER_KTP_NUMBER", ""),
+        "Attachment": "camera capture",
+        "Signature": "drawn",
+    }
 
 
 def redact_command(command: list[str], variables: dict[str, str] | None = None) -> list[str]:

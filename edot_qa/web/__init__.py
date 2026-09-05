@@ -1,2 +1,1 @@
-"""Web automation foundations."""
-
+"""Web automation package."""

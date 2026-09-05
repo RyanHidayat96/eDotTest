@@ -34,7 +34,7 @@ class CompaniesPage(BasePage):
         )
 
     def open(self) -> None:
-        with allure_step("Open eSuite Companies page", page=self.page):
+        with allure_step("Open eSuite Companies page", page=self.page, screenshot=True):
             if not self.page.url.rstrip("/").endswith("/companies"):
                 if not self._try_click_companies_navigation():
                     self.page.goto("/companies")
@@ -42,7 +42,7 @@ class CompaniesPage(BasePage):
             self._wait_for_company_list()
 
     def open_register_company_wizard(self) -> RegisterCompanyWizardPage:
-        with allure_step("Open Register Company wizard", page=self.page):
+        with allure_step("Open Register Company wizard", page=self.page, screenshot=True):
             self.open()
             self.add_company_button.click()
             wizard = RegisterCompanyWizardPage(self.page, self.settings)
@@ -50,7 +50,7 @@ class CompaniesPage(BasePage):
             return wizard
 
     def open_manage(self) -> CompanyManagePage:
-        with allure_step("Open Companies Manage page", page=self.page):
+        with allure_step("Open Companies Manage page", page=self.page, screenshot=True):
             self.open()
             self.page.wait_for_load_state("domcontentloaded")
             manage_page = CompanyManagePage(self.page, self.settings)
@@ -60,7 +60,7 @@ class CompaniesPage(BasePage):
     def _try_back_to_company_list(self) -> bool:
         if "/profile" not in self.page.url:
             return False
-        with allure_step("Return from company detail to Companies list", page=self.page):
+        with allure_step("Return from company detail to Companies list", page=self.page, screenshot=True):
             return self._try_back_link_to_company_list()
 
     def _try_back_link_to_company_list(self) -> bool:

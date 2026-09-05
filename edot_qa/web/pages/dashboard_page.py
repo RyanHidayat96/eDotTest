@@ -10,7 +10,7 @@ from edot_qa.web.base_page import BasePage
 
 class DashboardPage(BasePage):
     def open(self) -> None:
-        with allure_step("Open eSuite dashboard", page=self.page):
+        with allure_step("Open eSuite dashboard", page=self.page, screenshot=True):
             self.open_path("/")
 
     @property
@@ -32,5 +32,6 @@ class DashboardPage(BasePage):
             "Verify eSuite dashboard greeting",
             page=self.page,
             data={"expected_text": "Welcome Back,"},
+            screenshot=True,
         ):
             expect(self.welcome_back_greeting).to_be_visible()

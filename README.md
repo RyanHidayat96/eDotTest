@@ -87,6 +87,7 @@ HEADLESS=true
 BROWSER=chromium
 PLAYWRIGHT_STORAGE_STATE=artifacts/auth/esuite_storage_state.json
 ALLURE_RESULTS_DIR=reports/allure-results
+ALLURE_SHOW_DEV_INPUTS=true
 ```
 
 Company registration defaults:
@@ -280,14 +281,7 @@ npm run test:handoff
 
 Implemented bonus scope:
 
-- Parallel execution: `npm run test:parallel` runs safe non-live Pytest checks with `pytest-xdist -n auto`. Live web/mobile/device flows stay outside that script because they share external accounts, storage state, browser state, and a single Android device.
 - Genuine web-to-mobile handoff: `npm run test:handoff` creates a company through eSuite web, verifies Tier 2 web detail, creates a Company User for that company, writes only non-secret handoff data, then attempts eWork login using that created Company User identity. Treat this bonus as proven only when the live run passes.
-
-Run safe parallel checks locally:
-
-```powershell
-npm run test:parallel
-```
 
 ## Allure Reporting
 
@@ -299,6 +293,8 @@ Pytest writes Allure results to `reports/allure-results` by default:
 
 Results are cumulative across different test commands. When the same test is rerun, `npm run allure:generate` keeps only the latest result for that test identity in the HTML report, so `test:web:login` followed by `test:web:company` shows both, while rerunning `test:web:login` replaces its previous run.
 
+`ALLURE_SHOW_DEV_INPUTS=true` keeps local dev login inputs visible in Allure. Set it to `false` for secret-safe evidence generation.
+
 Generate and open the shared web/mobile HTML report through the repository-local Allure CLI:
 
 ```powershell
@@ -307,7 +303,9 @@ npm run allure:generate
 
 The Allure binary comes from `allure-commandline` in `devDependencies`, same as a local Node-based automation project. No global Allure PATH is required.
 
-Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Reports are intentionally lean: page-level web steps show one redacted input summary only when fields are entered, successful UI screenshots are captured at important milestones such as submit success, failures attach full-page evidence, and Maestro steps attach redacted commands, flow YAML, stdout/stderr, result JSON, device screenshots, and supported output artifacts.
+Generated Allure reports include eDOT-specific suite hierarchy, Behaviors labels, owner, severity, test case IDs for live requirement flows, environment properties, executor metadata, defect categories, and preserved trend history from the previous report. Reports are intentionally lean: page-level web steps show one input summary only when fields are entered, login input evidence is visible for the local dev report when `ALLURE_SHOW_DEV_INPUTS=true`, successful UI screenshots are captured at page-open/page-change milestones such as login, wizard pages, submit success, manage/detail pages, and mobile list validation, failures attach full-page evidence, and Maestro steps attach input summaries, redacted commands/logs, flow YAML, result JSON, device screenshots, and supported output artifacts.
+
+If `reports/triage/triage-report.md` exists, `npm run allure:generate` attaches it into the same shared Allure report as an Evidence item. Deliberate wrong-locator evidence is intentionally failed only during raw pytest execution; the generator marks it as expected evidence with a note so normal web/mobile report status is not made red.
 
 ## AI Failure Triage
 
@@ -339,7 +337,7 @@ Final web evidence command:
 npm run evidence:web
 ```
 
-This cleans `reports/allure-results` and `evidence/web-allure`, runs the required web login/company scenarios, generates the preserved Allure HTML report in `evidence/web-allure`, then scans preserved evidence for secrets.
+This cleans `reports/allure-results` and `reports/allure-report`, runs the required web login/company scenarios, generates the shared Allure HTML report in `reports/allure-report`, then scans preserved evidence for secrets.
 
 Deliberate-failure evidence command:
 
@@ -347,7 +345,7 @@ Deliberate-failure evidence command:
 npm run evidence:deliberate
 ```
 
-This runs only the isolated wrong-locator evidence test with `EDOT_DELIBERATE_FAILURE=wrong_locator`, expects that test to fail, writes triage to `evidence/triage/triage-report.md`, generates `evidence/deliberate-allure`, then scans preserved evidence for secrets. Normal suites do not enable this flag.
+This runs only the wrong-locator evidence test with `EDOT_DELIBERATE_FAILURE=wrong_locator`, expects that raw pytest test to fail, writes triage to `reports/triage/triage-report.md`, then regenerates the shared Allure report. In the HTML report the deliberate failure appears under `eDOT Evidence` with an expected-failure note instead of making normal web/mobile suites red.
 
 Both evidence commands scan preserved evidence for secrets before finishing.
 
@@ -363,11 +361,9 @@ Final evidence is generated in the dedicated final execution step. Expected evid
 
 ```text
 evidence/README.md
-evidence/web-allure/
-evidence/deliberate-allure/
-evidence/triage/triage-report.md
 reports/allure-results/
-reports/allure-results-deliberate/
+reports/allure-report/
+reports/triage/triage-report.md
 ```
 
 Generated evidence folders are ignored by Git. Evidence commands scan their output automatically; run `python tools/check_submission_safety.py` before any submission archive is created.

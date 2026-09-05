@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import Locator, TimeoutError
 
-from edot_qa.reporting.allure_helpers import allure_step
+from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_page_evidence, show_dev_inputs_in_reports
 from edot_qa.web.base_page import BasePage
 
 
@@ -21,6 +21,7 @@ class LoginPage(BasePage):
             "Open eSuite login page",
             page=self.page,
             data={"base_url": self.settings.esuite_base_url},
+            screenshot=True,
         ):
             self.page.goto(self.settings.esuite_base_url)
             self.page.wait_for_load_state("domcontentloaded")
@@ -79,25 +80,31 @@ class LoginPage(BasePage):
         )
 
     def choose_email_or_username(self) -> None:
-        with allure_step("Choose email or username login method", page=self.page):
+        with allure_step("Choose email or username login method", page=self.page, screenshot=True):
             self.use_email_or_username_button.click()
 
     def submit_email(self, email: str) -> None:
+        visible_email = email if show_dev_inputs_in_reports() else "<redacted>"
         with allure_step(
             "Input eSuite email or username",
             page=self.page,
-            input_data={"field": "email_or_username", "email": email},
+            force=True,
         ):
             self.email_or_username_input.fill(email)
+            attach_json("Inputs", {"fields": {"email_or_username": visible_email}}, redact=False)
+            attach_page_evidence("Email or username input", self.page, screenshot=True)
             self.submit_button.click()
 
     def submit_password(self, password: str) -> None:
+        visible_password = password if show_dev_inputs_in_reports() else "<redacted>"
         with allure_step(
             "Input eSuite password",
             page=self.page,
-            input_data={"field": "password", "password": password},
+            force=True,
         ):
             self.password_input.fill(password)
+            attach_json("Inputs", {"fields": {"password": visible_password}}, redact=False)
+            attach_page_evidence("Password input", self.page, screenshot=True)
             self.submit_button.click()
 
     def wait_for_esuite_return(self) -> None:
@@ -110,6 +117,7 @@ class LoginPage(BasePage):
             "Wait for redirect back to eSuite",
             page=self.page,
             data={"expected_host": expected_host},
+            screenshot=True,
         ):
             try:
                 self.page.wait_for_url(is_esuite_url, timeout=20_000)

@@ -7,11 +7,12 @@ from edot_qa.mobile.customer import MobileCustomerData
 from edot_qa.mobile.device import (
     MobileDevice,
     ScrollSearchResult,
+    capture_device_screenshot,
     scroll_list_to_end_and_find_texts,
     visible_texts_by_resource_id,
 )
 from edot_qa.mobile.maestro import MaestroResult
-from edot_qa.reporting.allure_helpers import allure_step, attach_json
+from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_png
 
 
 CUSTOMER_CARD_ADDRESS_MARKER = "__EWORK_CUSTOMER_CARD_ADDRESS__="
@@ -113,6 +114,7 @@ def find_created_customer_card(
             timeout_seconds=10,
         )
         attach_json("customer-card-locators-before-scroll", pre_scroll_locator_texts)
+        _attach_customer_list_screenshot("customer-card-before-scroll", settings, device)
         if customer_card_values_visible(
             pre_scroll_locator_texts,
             customer_name=customer.name,
@@ -127,6 +129,7 @@ def find_created_customer_card(
                 "skipped_scroll": True,
             }
             attach_json("customer-list-scroll-search", result)
+            _attach_customer_list_screenshot("customer-card-visible-before-scroll", settings, device)
             return result
 
         scroll_result = scroll_list_to_end_and_find_texts(
@@ -147,6 +150,7 @@ def find_created_customer_card(
                 "skipped_scroll": False,
             },
         )
+        _attach_customer_list_screenshot("customer-card-after-scroll-search", settings, device)
         return scroll_result
 
 
@@ -177,3 +181,13 @@ def _text_in_values(expected_text: str, values: list[str]) -> bool:
 
 def _normalize_text(value: str) -> str:
     return " ".join(value.split())
+
+
+def _attach_customer_list_screenshot(name: str, settings: MobileSettings, device: MobileDevice) -> None:
+    image = capture_device_screenshot(
+        settings.adb_command,
+        device_id=settings.mobile_device_id or device.serial,
+        timeout_seconds=5,
+    )
+    if image:
+        attach_png(name, image)

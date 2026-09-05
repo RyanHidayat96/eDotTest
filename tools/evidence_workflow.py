@@ -17,10 +17,10 @@ DELIBERATE_FAILURE_ENV = "EDOT_DELIBERATE_FAILURE"
 DELIBERATE_FAILURE_MODE = "wrong_locator"
 EVIDENCE_DIR = ROOT_DIR / "evidence"
 WEB_RESULTS_DIR = ROOT_DIR / "reports" / "allure-results"
-WEB_REPORT_DIR = EVIDENCE_DIR / "web-allure"
-DELIBERATE_RESULTS_DIR = ROOT_DIR / "reports" / "allure-results-deliberate"
-DELIBERATE_REPORT_DIR = EVIDENCE_DIR / "deliberate-allure"
-DELIBERATE_TRIAGE_REPORT = EVIDENCE_DIR / "triage" / "triage-report.md"
+WEB_REPORT_DIR = ROOT_DIR / "reports" / "allure-report"
+DELIBERATE_RESULTS_DIR = WEB_RESULTS_DIR
+DELIBERATE_REPORT_DIR = WEB_REPORT_DIR
+DELIBERATE_TRIAGE_REPORT = ROOT_DIR / "reports" / "triage" / "triage-report.md"
 
 SENSITIVE_KEY_RE = re.compile(
     r"(?:API_KEY|PASSWORD|TOKEN|SECRET|AUTHORIZATION|COOKIE|CREDENTIAL|COMPANY_CODE|COMPANY_ID|EMAIL)",
@@ -95,10 +95,11 @@ def build_full_web_plan() -> EvidencePlan:
                     _rel(WEB_RESULTS_DIR),
                     "--clean-alluredir",
                 ),
+                env=(("ALLURE_SHOW_DEV_INPUTS", "false"),),
                 continue_after_failure=True,
             ),
             EvidenceCommand(
-                name="generate preserved web Allure report",
+                name="generate shared Allure report",
                 command=(
                     _python(),
                     "tools/generate_allure_report.py",
@@ -115,10 +116,10 @@ def build_full_web_plan() -> EvidencePlan:
 def build_deliberate_failure_plan() -> EvidencePlan:
     return EvidencePlan(
         name="deliberate-failure",
-        clean_paths=(DELIBERATE_RESULTS_DIR, DELIBERATE_REPORT_DIR, DELIBERATE_TRIAGE_REPORT.parent),
+        clean_paths=(DELIBERATE_TRIAGE_REPORT.parent,),
         commands=(
             EvidenceCommand(
-                name="run isolated deliberate wrong-locator failure",
+                name="run deliberate wrong-locator evidence",
                 command=(
                     _python(),
                     "-m",
@@ -126,14 +127,13 @@ def build_deliberate_failure_plan() -> EvidencePlan:
                     "tests/web/test_deliberate_failure_evidence.py::test_deliberate_wrong_locator_failure_records_real_allure_failure",
                     "--alluredir",
                     _rel(DELIBERATE_RESULTS_DIR),
-                    "--clean-alluredir",
                     "-q",
                 ),
-                env=((DELIBERATE_FAILURE_ENV, DELIBERATE_FAILURE_MODE),),
+                env=((DELIBERATE_FAILURE_ENV, DELIBERATE_FAILURE_MODE), ("ALLURE_SHOW_DEV_INPUTS", "false")),
                 expected_failure=True,
             ),
             EvidenceCommand(
-                name="triage deliberate Allure failure",
+                name="triage shared Allure failures",
                 command=(
                     _python(),
                     "tools/triage_allure_failures.py",
@@ -144,7 +144,7 @@ def build_deliberate_failure_plan() -> EvidencePlan:
                 ),
             ),
             EvidenceCommand(
-                name="generate preserved deliberate-failure Allure report",
+                name="generate shared Allure report with expected deliberate note",
                 command=(
                     _python(),
                     "tools/generate_allure_report.py",
@@ -227,7 +227,7 @@ def run_plan(plan: EvidencePlan) -> int:
             if result.returncode == 0:
                 print(f"FAIL {step.name}: deliberate failure did not fail")
                 return 1
-            if not _allure_failure_result_exists(DELIBERATE_RESULTS_DIR):
+            if not _deliberate_failure_result_exists(DELIBERATE_RESULTS_DIR):
                 print(f"FAIL {step.name}: no failed Allure result was written")
                 return 1
             continue
@@ -307,13 +307,22 @@ def _run_command(step: EvidenceCommand) -> subprocess.CompletedProcess[str]:
     return subprocess.run(step.command, cwd=ROOT_DIR, env=env, check=False, text=True)
 
 
-def _allure_failure_result_exists(results_dir: Path) -> bool:
+def _deliberate_failure_result_exists(results_dir: Path) -> bool:
     for result_path in sorted(results_dir.glob("*-result.json")):
         try:
             payload = json.loads(result_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if payload.get("status") in {"failed", "broken"}:
+        text = " ".join(str(payload.get(key) or "") for key in ("fullName", "name")).lower()
+        tags = {
+            str(label.get("value")).lower()
+            for label in payload.get("labels", [])
+            if label.get("name") == "tag" and label.get("value")
+        }
+        if payload.get("status") in {"failed", "broken"} and (
+            "deliberate_failure" in tags
+            or "deliberate_wrong_locator" in text
+        ):
             return True
     return False
 
@@ -325,11 +334,12 @@ def _write_evidence_readme() -> None:
             [
                 "# Execution Evidence",
                 "",
-                "Generated evidence belongs here after the final execution step.",
+                "Generated evidence belongs in the shared Allure output after the final execution step.",
                 "",
-                "- `web-allure/`: Allure HTML report from the required web scenarios.",
-                "- `deliberate-allure/`: Allure HTML report from the isolated deliberate-failure run.",
-                "- `triage/triage-report.md`: human-review triage proposal for the deliberate failure.",
+                "- `reports/allure-results/`: shared raw web, mobile, and evidence results.",
+                "- `reports/allure-report/`: shared Allure HTML report.",
+                "- `reports/triage/triage-report.md`: human-review triage proposal attached by `allure:generate`.",
+                "- Deliberate failure is intentionally red only at raw pytest time; `allure:generate` marks it as expected evidence.",
                 "",
                 "Do not place `.env`, storage state, cookies, API keys, passwords, or raw secret headers here.",
                 "Evidence commands run a secret scan automatically before finishing.",

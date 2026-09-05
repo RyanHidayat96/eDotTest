@@ -228,14 +228,14 @@ def _web_metadata(file_name: str, test_name: str) -> AllureMetadata:
         )
     if file_name == "test_deliberate_failure_evidence.py":
         return _metadata(
-            parent_suite="eSuite Web",
-            suite="Web",
-            sub_suite="Failure Evidence",
-            epic="eSuite Web",
-            feature="Allure Evidence",
-            story=_humanize_test_name(test_name),
+            parent_suite="eDOT Evidence",
+            suite="Evidence",
+            sub_suite="Deliberate Failure",
+            epic="Evidence",
+            feature="Failure Evidence",
+            story="Intentional Wrong Locator" if "wrong_locator" in test_name else _humanize_test_name(test_name),
             severity="normal",
-            tags={"web", "evidence"},
+            tags={"evidence"},
         )
     return _metadata(
         parent_suite="eSuite Web",
@@ -276,12 +276,12 @@ def _mobile_metadata(file_name: str, test_name: str) -> AllureMetadata:
     return _metadata(
         parent_suite="eWork SFA",
         suite="Mobile",
-        sub_suite="Mobile Foundation",
+        sub_suite="Runtime Guardrails",
         epic="eWork SFA",
         feature="Runtime Guardrails",
         story=_humanize_test_name(test_name),
         severity="normal",
-        tags={"mobile", "foundation"},
+        tags={"mobile", "runtime-guardrails"},
     )
 
 

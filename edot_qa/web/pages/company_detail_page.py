@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, Page, TimeoutError, expect
 
-from edot_qa.reporting.allure_helpers import allure_step, attach_json
+from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_page_evidence
 from edot_qa.web.base_page import BasePage
 from edot_qa.web.company_registration import CompanyRegistrationData
 
@@ -276,12 +276,12 @@ class CompanyDetailPage(BasePage):
     )
 
     def expect_loaded_for(self, company_name: str) -> None:
-        with allure_step("Verify company detail loaded for company", page=self.page, data={"company_name": company_name}):
+        with allure_step("Verify company detail loaded for company", page=self.page, data={"company_name": company_name}, screenshot=True):
             self.expect_detail_shell_loaded()
             self._expect_company_name_field_matches(company_name, timeout_ms=5_000)
 
     def expect_detail_shell_loaded(self) -> None:
-        with allure_step("Verify company detail shell loaded", page=self.page):
+        with allure_step("Verify company detail shell loaded", page=self.page, screenshot=True):
             self.first_visible(
                 [
                     ("Company Details heading", self.page.get_by_role("heading", name=re.compile(r"Company Details", re.I)).first),
@@ -294,7 +294,7 @@ class CompanyDetailPage(BasePage):
             )
 
     def expect_company_values(self, data: CompanyRegistrationData) -> None:
-        with allure_step("Verify company detail values", page=self.page, data=data.expected_detail_values()):
+        with allure_step("Verify company detail values", page=self.page, data=data.expected_detail_values(), screenshot=True):
             expected_values = data.expected_detail_values()
             self.refresh_until_company_name_loaded(data.company_name)
             attach_json("company-detail-expected-values", expected_values)
@@ -348,7 +348,7 @@ class CompanyDetailPage(BasePage):
             return value
 
     def delete_current_company(self) -> None:
-        with allure_step("Delete current company from detail page", page=self.page):
+        with allure_step("Delete current company from detail page", page=self.page, screenshot=True):
             self._delete_action().click()
             self._confirm_delete_if_needed()
             self._wait_after_delete()
@@ -370,6 +370,7 @@ class CompanyDetailPage(BasePage):
 
     def _confirm_delete_if_needed(self) -> None:
         with allure_step("Confirm delete company dialog", page=self.page):
+            attach_page_evidence("Delete confirmation dialog", self.page, screenshot=True)
             confirm_delete_if_needed(self.page)
 
     def _wait_after_delete(self) -> None:
@@ -490,6 +491,7 @@ class CompanyDetailPage(BasePage):
             "Wait for Company Name field to load",
             page=self.page,
             data={"company_name": company_name, "max_reloads": max_reloads, "wait_per_attempt_ms": DETAIL_EMPTY_REFRESH_TIMEOUT_MS},
+            screenshot=True,
         ):
             self.expect_detail_shell_loaded()
             for reload_attempt in range(0, max_reloads + 1):
@@ -547,6 +549,7 @@ class CompanyDetailPage(BasePage):
                         "reload_attempt": reload_attempt + 1,
                         "max_reloads": max_reloads,
                     },
+                    screenshot=True,
                 ):
                     attach_json(
                         "company-detail-refresh",
@@ -626,7 +629,7 @@ def confirm_delete_if_needed(page: Page) -> None:
             try:
                 expect(locator).to_be_visible(timeout=3_000)
                 expect(locator).to_be_enabled(timeout=3_000)
-                with allure_step("Click delete confirmation Confirm", page=page):
+                with allure_step("Click delete confirmation Confirm", page=page, screenshot=True):
                     locator.click()
                 _expect_delete_confirmation_closed(page)
                 return
@@ -640,7 +643,8 @@ def _accept_delete_agreement_if_present(page: Page) -> None:
     with allure_step(
         "Accept delete agreement checkbox",
         page=page,
-        data={"agreement": "I understand & agree to delete"},
+        input_data={"field": "delete_agreement", "value": "I understand & agree to delete"},
+        screenshot=True,
     ):
         candidates = [
             ("delete agreement checkbox role", page.get_by_role("checkbox", name=DELETE_AGREEMENT).first),

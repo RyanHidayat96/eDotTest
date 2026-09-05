@@ -21,16 +21,21 @@ def test_full_web_plan_runs_required_web_scenarios_before_report() -> None:
     assert "tests/web/test_login.py" in commands[0]
     assert "tests/web/test_create_company.py" in commands[0]
     assert "tools/generate_allure_report.py" in commands[1]
-    assert "evidence/web-allure" in commands[1]
+    assert "reports/allure-report" in commands[1]
 
 
-def test_deliberate_failure_plan_sets_isolated_expected_failure() -> None:
+def test_deliberate_failure_plan_sets_shared_expected_failure() -> None:
     plan = build_deliberate_failure_plan()
     deliberate_step = plan.commands[0]
+    commands = [" ".join(command.command) for command in plan.commands]
 
     assert deliberate_step.expected_failure is True
     assert (DELIBERATE_FAILURE_ENV, DELIBERATE_FAILURE_MODE) in deliberate_step.env
     assert "test_deliberate_failure_evidence.py" in " ".join(deliberate_step.command)
+    assert "--clean-alluredir" not in " ".join(deliberate_step.command)
+    assert "reports/allure-results" in commands[0]
+    assert "reports/triage/triage-report.md" in commands[1]
+    assert "reports/allure-report" in commands[2]
 
 
 def test_evidence_generated_paths_are_limited_to_reports_or_evidence() -> None:
@@ -41,8 +46,8 @@ def test_evidence_generated_paths_are_limited_to_reports_or_evidence() -> None:
             validate_generated_path(path)
             messages.append(f"{plan.name}:{path.as_posix()}")
 
-    assert any("evidence/web-allure" in message for message in messages)
-    assert any("reports/allure-results-deliberate" in message for message in messages)
+    assert any("reports/allure-report" in message for message in messages)
+    assert any("reports/triage" in message for message in messages)
 
 
 def test_generated_path_rejects_non_artifact_target(tmp_path: Path) -> None:

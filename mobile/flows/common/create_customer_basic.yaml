@@ -1,0 +1,28 @@
+appId: ${EWORK_APP_ID}
+---
+- runFlow: open_customer_list.yaml
+- tapOn:
+    id: ${EWORK_ADD_CUSTOMER_BUTTON_ID}
+- assertVisible: New Customer Registration
+- tapOn:
+    id: ${EWORK_CUSTOMER_NAME_FIELD_ID}
+- inputText: ${EWORK_CUSTOMER_NAME}
+- tapOn:
+    id: ${EWORK_CUSTOMER_CONTACT_FIELD_ID}
+- inputText: ${EWORK_CUSTOMER_CONTACT}
+- hideKeyboard
+- tapOn:
+    id: ${EWORK_CUSTOMER_CONTACT_PERSON_FIELD_ID}
+- inputText: ${EWORK_CUSTOMER_CONTACT_PERSON}
+- hideKeyboard
+- tapOn:
+    id: ${EWORK_CUSTOMER_CHANNEL_FIELD_ID}
+- tapOn:
+    text: ${EWORK_CUSTOMER_CHANNEL_OPTION_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_TYPE_FIELD_ID}
+- tapOn:
+    text: ${EWORK_CUSTOMER_TYPE_OPTION_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_BASIC_CONTINUE_BUTTON_ID}
+- assertVisible: Locations

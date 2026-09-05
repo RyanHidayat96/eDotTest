@@ -1,0 +1,30 @@
+appId: ${EWORK_APP_ID}
+---
+- assertVisible: KTP *
+- tapOn:
+    id: ${EWORK_CUSTOMER_KTP_FIELD_ID}
+- inputText: ${EWORK_CUSTOMER_KTP_NUMBER}
+- hideKeyboard
+- tapOn:
+    id: ${EWORK_CUSTOMER_UPLOAD_BUTTON_ID}
+- tapOn:
+    id: ${EWORK_CUSTOMER_CAMERA_CAPTURE_BUTTON_ID}
+- assertVisible: Preview
+- tapOn:
+    id: ${EWORK_CUSTOMER_DOCUMENT_SUBMIT_BUTTON_ID}
+- assertVisible: ${EWORK_CUSTOMER_SIGNATURE_TITLE_TEXT}
+- assertVisible:
+    id: ${EWORK_CUSTOMER_SIGNATURE_VIEW_ID}
+# Signature canvas has no text input or semantic value; pointer stroke is required by the widget.
+- swipe:
+    start: "20%, 70%"
+    end: "80%, 70%"
+    duration: 500
+- tapOn:
+    id: ${EWORK_CUSTOMER_SAVE_BUTTON_ID}
+- tapOn:
+    id: ${EWORK_CUSTOMER_SAVE_CONFIRM_BUTTON_ID}
+- assertVisible: ${EWORK_CUSTOMER_SUCCESS_TEXT}
+- tapOn:
+    id: ${EWORK_CUSTOMER_SUCCESS_CONTINUE_BUTTON_ID}
+- assertVisible: New Customer List

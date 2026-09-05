@@ -5,7 +5,7 @@ import re
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, TimeoutError, expect
 
-from edot_qa.reporting.allure_helpers import allure_step, attach_json
+from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_page_evidence
 from edot_qa.web.base_page import BasePage
 from edot_qa.web.pages.company_detail_page import (
     CompanyDetailDataNotLoadedError,
@@ -251,7 +251,7 @@ class CompanyManagePage(BasePage):
         )
 
     def expect_loaded(self) -> None:
-        with allure_step("Verify Companies Manage page loaded", page=self.page):
+        with allure_step("Verify Companies Manage page loaded", page=self.page, screenshot=True):
             expect(self.heading).to_be_visible(timeout=5_000)
 
     def is_loaded(self, *, timeout_ms: int = 1_000) -> bool:
@@ -266,19 +266,21 @@ class CompanyManagePage(BasePage):
         return False
 
     def search_company(self, company_name: str) -> None:
-        with allure_step("Search company in Manage list", page=self.page, data={"search_text": company_name}):
+        with allure_step("Search company in Manage list", page=self.page):
             result = self._try_fast_search(company_name)
             if not result.get("used"):
                 return
+            attach_json("Inputs", {"fields": {"company_search": company_name}})
             try:
                 self.page.keyboard.press("Enter")
             except PlaywrightError:
                 pass
             attach_json("company-manage-search-used", result)
             self._wait_after_table_action()
+            attach_page_evidence("Company search result", self.page, screenshot=True)
 
     def expect_company_present(self, company_name: str) -> None:
-        with allure_step("Verify company exists in Manage list", page=self.page, data={"company_name": company_name}):
+        with allure_step("Verify company exists in Manage list", page=self.page, data={"company_name": company_name}, screenshot=True):
             self.search_company(company_name)
             # Tier 2: created company must exist in Manage results after submit.
             self._expect_company_text_visible(company_name, timeout_ms=5_000)
@@ -289,6 +291,7 @@ class CompanyManagePage(BasePage):
             "Verify deleted company is absent from Companies page",
             page=self.page,
             data={"company_name": company_name, "company_id": company_id},
+            screenshot=True,
         ):
             self._reload_companies_page()
             self.search_company(company_name)
@@ -311,6 +314,7 @@ class CompanyManagePage(BasePage):
                         "Click Manage action for company",
                         page=self.page,
                         data={"company_name": company_name, "attempt": attempt},
+                        screenshot=True,
                     ):
                         marker = f"detail-{attempt}"
                         target = self._mark_company_action(company_name, DETAIL_ACTION.pattern, marker)
@@ -350,7 +354,7 @@ class CompanyManagePage(BasePage):
             raise AssertionError(f"Could not open detail for company {company_name!r}; {' | '.join(errors)}")
 
     def delete_company_if_present(self, company_name: str) -> None:
-        with allure_step("Delete company if present", page=self.page, data={"company_name": company_name}):
+        with allure_step("Delete company if present", page=self.page, data={"company_name": company_name}, screenshot=True):
             self.search_company(company_name)
             if not self._is_company_visible(company_name, timeout_ms=5_000):
                 attach_json("company-cleanup-skipped", {"company_name": company_name, "reason": "not_found"})
@@ -390,7 +394,7 @@ class CompanyManagePage(BasePage):
                 raise AssertionError(f"Deleted company {label} {identifier!r} is still visible in Companies results")
 
     def _reload_companies_page(self) -> None:
-        with allure_step("Reload Companies page", page=self.page):
+        with allure_step("Reload Companies page", page=self.page, screenshot=True):
             self.page.goto("/companies")
             self.page.wait_for_load_state("domcontentloaded")
             self.first_visible(
@@ -409,7 +413,7 @@ class CompanyManagePage(BasePage):
         return self._is_exact_text_visible(company_name, timeout_ms=timeout_ms)
 
     def _try_delete_from_manage(self, company_name: str) -> bool:
-        with allure_step("Try delete company from Manage list", page=self.page, data={"company_name": company_name}):
+        with allure_step("Try delete company from Manage list", page=self.page, data={"company_name": company_name}, screenshot=True):
             target = self._mark_company_action(company_name, DELETE_ACTION.pattern, "delete")
             attach_json("company-delete-action-target", target)
             if not target.get("found"):

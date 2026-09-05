@@ -5,7 +5,13 @@ import re
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, TimeoutError, expect
 
-from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_text
+from edot_qa.reporting.allure_helpers import (
+    allure_step,
+    attach_json,
+    attach_page_evidence,
+    attach_text,
+    show_dev_inputs_in_reports,
+)
 from edot_qa.web.base_page import BasePage
 from edot_qa.web.company_user import CompanyUserData
 
@@ -65,7 +71,7 @@ class CompanyUserPage(BasePage):
             return self
 
     def expect_loaded(self) -> None:
-        with allure_step("Verify Company User list loaded", page=self.page):
+        with allure_step("Verify Company User list loaded", page=self.page, screenshot=True):
             self.first_visible(
                 [
                     ("Company User count text", self.page.get_by_text(re.compile(r"Company User \\(\\d+/\\d+\\)", re.I)).first),
@@ -80,7 +86,6 @@ class CompanyUserPage(BasePage):
         with allure_step(
             "Create company user for eWork login",
             page=self.page,
-            input_data=user.as_allure_payload(),
             screenshot=True,
         ):
             dialog = self.open_add_user_dialog()
@@ -91,7 +96,7 @@ class CompanyUserPage(BasePage):
             self.expect_user_present(user)
 
     def open_add_user_dialog(self) -> Locator:
-        with allure_step("Open Add Company User dialog", page=self.page):
+        with allure_step("Open Add Company User dialog", page=self.page, screenshot=True):
             self.add_user_button.click()
             dialog = self.add_user_dialog()
             expect(dialog).to_be_visible(timeout=10_000)
@@ -101,14 +106,7 @@ class CompanyUserPage(BasePage):
         with allure_step(
             "Fill Company User general info",
             page=self.page,
-            input_data={
-                "name": user.name,
-                "username": user.username,
-                "employee_id": user.employee_id,
-                "email": user.email,
-                "phone": user.phone,
-                "password": user.password,
-            },
+            force=True,
         ):
             self.select_active_status(dialog)
             dialog.get_by_placeholder("Input Name").fill(user.name)
@@ -117,6 +115,8 @@ class CompanyUserPage(BasePage):
             dialog.get_by_placeholder("Input Email").fill(user.email)
             dialog.get_by_placeholder("Input Phone").fill(user.phone)
             dialog.get_by_placeholder("Input Password").fill(user.password)
+            attach_json("Inputs", _company_user_input_payload(user), redact=False)
+            attach_page_evidence("Company User general info input", self.page, screenshot=True)
             next_button = dialog.get_by_role("button", name=re.compile(r"^Next$", re.I)).first
             expect(next_button).to_be_enabled(timeout=5_000)
             next_button.click()
@@ -138,6 +138,7 @@ class CompanyUserPage(BasePage):
             "Add Company User branch access",
             page=self.page,
             input_data={"branch_name": branch_name},
+            screenshot=True,
         ):
             dialog.get_by_role("button", name=re.compile(r"^Add Branch$", re.I)).first.click()
             branch_dialog = self.add_branch_dialog(branch_name)
@@ -175,8 +176,10 @@ class CompanyUserPage(BasePage):
             expect(search).to_be_visible(timeout=2_000)
             search.fill(username)
             self.page.keyboard.press("Enter")
+            attach_json("Inputs", {"fields": {"company_user_search": username}})
+            attach_page_evidence("Company User search result", self.page, screenshot=True)
         except (AssertionError, PlaywrightError, TimeoutError):
-            attach_text("company-user-search-not-used", "visible Search input not found")
+            return
 
     def add_user_dialog(self) -> Locator:
         return self.page.get_by_role("dialog").filter(has_text="Add Company User").last
@@ -190,3 +193,17 @@ class CompanyUserPage(BasePage):
         expect(checkbox).to_be_visible(timeout=5_000)
         if checkbox.get_attribute("aria-checked") != "true":
             checkbox.click()
+
+
+def _company_user_input_payload(user: CompanyUserData) -> dict[str, object]:
+    password = user.password if show_dev_inputs_in_reports() else "<redacted>"
+    return {
+        "fields": {
+            "Name": user.name,
+            "Username": user.username,
+            "Employee ID": user.employee_id,
+            "Email": user.email,
+            "Phone": user.phone,
+            "Password": password,
+        }
+    }

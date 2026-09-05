@@ -4,6 +4,7 @@ from contextvars import ContextVar
 from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 import json
+import os
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -18,6 +19,7 @@ SENSITIVE_KEY = ("authorization", "cookie", "password", "passwd", "token", "secr
 MAX_ARRAY_ITEMS = 25
 _STEP_DEPTH: ContextVar[int] = ContextVar("_STEP_DEPTH", default=0)
 _STEP_INPUTS: ContextVar[list[dict[str, Any]] | None] = ContextVar("_STEP_INPUTS", default=None)
+TRUE_VALUES = {"1", "true", "yes", "y", "on"}
 
 
 def attach_text(name: str, text: str) -> None:
@@ -26,11 +28,11 @@ def attach_text(name: str, text: str) -> None:
     allure.attach(text, name=name, attachment_type=allure.attachment_type.TEXT)
 
 
-def attach_json(name: str, payload: Any) -> None:
+def attach_json(name: str, payload: Any, *, redact: bool = True) -> None:
     if allure is None:
         return
     allure.attach(
-        json.dumps(redact_payload(payload), indent=2, sort_keys=True),
+        json.dumps(redact_payload(payload) if redact else payload, indent=2, sort_keys=True),
         name=name,
         attachment_type=allure.attachment_type.JSON,
     )
@@ -67,7 +69,7 @@ def allure_step(
         return
 
     depth = _STEP_DEPTH.get()
-    if depth > 0 and not force:
+    if depth > 0 and not force and not screenshot:
         if input_data is not None:
             _record_input(title, input_data)
         try:
@@ -135,6 +137,10 @@ def attach_page_evidence(
 
 def redact_payload(value: Any) -> Any:
     return _normalize_payload(value)
+
+
+def show_dev_inputs_in_reports() -> bool:
+    return os.getenv("ALLURE_SHOW_DEV_INPUTS", "true").strip().lower() in TRUE_VALUES
 
 
 def _record_input(title: str, data: Any) -> None:

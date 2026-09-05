@@ -21,13 +21,15 @@ class MobileCreateCustomerScenario:
 
         customer = generate_mobile_customer_data()
         customer_env = customer.as_maestro_env()
-        create_result = self.run_flow("create_customer.yaml", extra_env=customer_env)
-        customer_card_address = customer_card_address_from_maestro_result(create_result)
+        self.run_flow("common/create_customer_basic.yaml", extra_env=customer_env)
+        location_result = self.run_flow("common/create_customer_locations.yaml", extra_env=customer_env)
+        customer_card_address = customer_card_address_from_maestro_result(location_result)
         with allure_step("Record mobile customer address mapping", screenshot=False):
             attach_json(
                 "mobile-customer-address-mapping",
                 customer.as_persistence_payload(customer_card_address),
             )
+        self.run_flow("common/create_customer_documents.yaml", extra_env=customer_env)
 
         find_created_customer_card(
             customer,

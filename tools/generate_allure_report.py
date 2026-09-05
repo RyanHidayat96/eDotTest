@@ -23,6 +23,26 @@ from edot_qa.reporting.allure_helpers import redact_payload
 
 
 DEFAULT_CATEGORIES = ROOT_DIR / "edot_qa" / "reporting" / "allure_categories.json"
+DEFAULT_TRIAGE_REPORT = ROOT_DIR / "reports" / "triage" / "triage-report.md"
+TRIAGE_HISTORY_ID = "edot-evidence-ai-failure-triage-report"
+TRIAGE_FULL_NAME = "tools.triage_allure_failures#triage_report"
+TRIAGE_RESULT_NAME = "AI failure triage report"
+DELIBERATE_RESULT_NAME = "Expected deliberate failure - wrong locator evidence"
+DELIBERATE_NOTE = (
+    "Expected deliberate failure: this test intentionally uses a missing locator to prove "
+    "Allure failure screenshots and triage evidence. It is shown as expected evidence so "
+    "normal web/mobile report status is not made red."
+)
+CONTROLLED_LABEL_NAMES = {
+    "parentSuite",
+    "suite",
+    "subSuite",
+    "epic",
+    "feature",
+    "story",
+    "severity",
+    "owner",
+}
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(line_buffering=True)
 
@@ -32,23 +52,31 @@ def main() -> int:
     parser.add_argument("--results-dir", type=Path, default=ROOT_DIR / "reports" / "allure-results")
     parser.add_argument("--report-dir", type=Path, default=ROOT_DIR / "reports" / "allure-report")
     parser.add_argument("--categories", type=Path, default=DEFAULT_CATEGORIES)
+    parser.add_argument("--triage-report", type=Path, default=DEFAULT_TRIAGE_REPORT)
+    parser.add_argument("--no-triage", action="store_true", help="Do not attach reports/triage markdown to Allure.")
     parser.add_argument("--open", action="store_true", help="Open the generated report with the local Allure CLI.")
     args = parser.parse_args()
 
     results_dir = _resolve(args.results_dir)
     report_dir = _resolve(args.report_dir)
     categories_path = _resolve(args.categories)
+    triage_report_path = _resolve(args.triage_report)
 
     results_dir.mkdir(parents=True, exist_ok=True)
     _copy_history(report_dir, results_dir)
     _write_environment(results_dir)
     _write_executor(results_dir)
     _copy_categories(categories_path, results_dir)
+    removed_triage = _remove_existing_triage_results(results_dir)
+    if removed_triage:
+        print(f"[Allure Generate] Removed {removed_triage} older triage result file(s).")
     removed = _deduplicate_latest_results(results_dir)
     if removed:
         print(f"[Allure Generate] Removed {removed} older duplicate result file(s).")
     processed = _postprocess_results(results_dir)
     print(f"[Allure Generate] Enriched {processed} result file(s).")
+    if not args.no_triage and _upsert_triage_result(results_dir, triage_report_path):
+        print("[Allure Generate] Attached triage report to the shared Allure report.")
 
     command = _allure_command(ROOT_DIR)
     completed = subprocess.run(
@@ -200,12 +228,186 @@ def _postprocess_results(results_dir: Path) -> int:
         try:
             payload = json.loads(result_path.read_text(encoding="utf-8"))
             payload = apply_metadata_to_result(payload)
+            _mark_deliberate_failure_expected(payload, results_dir)
             _ensure_step_evidence(payload, results_dir)
             result_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             count += 1
         except (OSError, json.JSONDecodeError) as error:
             print(f"[Allure Generate] Skipped {result_path.name}: {error}")
     return count
+
+
+def _mark_deliberate_failure_expected(result: dict[str, Any], results_dir: Path) -> bool:
+    if not _is_deliberate_failure_result(result):
+        return False
+
+    result["name"] = DELIBERATE_RESULT_NAME
+    _set_expected_failure_labels(result)
+    _add_parameter_once(result, "expected_failure", "true")
+
+    original_status = _status(result.get("status"))
+    if original_status in {"failed", "broken"}:
+        original_details = result.get("statusDetails") if isinstance(result.get("statusDetails"), dict) else {}
+        original_message = str(original_details.get("message") or "").strip()
+        result["status"] = "skipped"
+        result["statusDetails"] = {
+            "message": f"{DELIBERATE_NOTE} Original status: {original_status}.",
+            "trace": original_details.get("trace") or original_message,
+        }
+
+    _remove_step_by_name(result, "Expected deliberate failure note")
+    note_source = f"{uuid.uuid4()}-attachment.txt"
+    (results_dir / note_source).write_text(DELIBERATE_NOTE, encoding="utf-8")
+    result.setdefault("steps", []).insert(
+        0,
+        {
+            "name": "Expected deliberate failure note",
+            "status": "passed",
+            "stage": "finished",
+            "start": result.get("start"),
+            "stop": result.get("start") or result.get("stop"),
+            "attachments": [
+                {
+                    "name": "Expected deliberate failure note",
+                    "source": note_source,
+                    "type": "text/plain",
+                }
+            ],
+            "steps": [],
+        },
+    )
+    return True
+
+
+def _upsert_triage_result(results_dir: Path, triage_report_path: Path) -> bool:
+    if not triage_report_path.is_file():
+        return False
+
+    _remove_existing_triage_results(results_dir)
+    attachment_source = f"{uuid.uuid4()}-attachment.md"
+    shutil.copy2(triage_report_path, results_dir / attachment_source)
+    now = int(datetime.now(ZoneInfo("Asia/Jakarta")).timestamp() * 1000)
+    payload = {
+        "uuid": str(uuid.uuid4()),
+        "historyId": TRIAGE_HISTORY_ID,
+        "testCaseId": TRIAGE_HISTORY_ID,
+        "fullName": TRIAGE_FULL_NAME,
+        "name": TRIAGE_RESULT_NAME,
+        "status": "passed",
+        "stage": "finished",
+        "start": now,
+        "stop": now,
+        "labels": [
+            {"name": "parentSuite", "value": "eDOT Evidence"},
+            {"name": "suite", "value": "Evidence"},
+            {"name": "subSuite", "value": "Failure Triage"},
+            {"name": "epic", "value": "Evidence"},
+            {"name": "feature", "value": "AI Failure Triage"},
+            {"name": "story", "value": "Triage Markdown"},
+            {"name": "severity", "value": "normal"},
+            {"name": "owner", "value": "qa-automation"},
+            {"name": "tag", "value": "triage"},
+            {"name": "tag", "value": "evidence"},
+        ],
+        "steps": [
+            {
+                "name": "Attach AI failure triage markdown",
+                "status": "passed",
+                "stage": "finished",
+                "start": now,
+                "stop": now,
+                "attachments": [
+                    {
+                        "name": "AI failure triage report",
+                        "source": attachment_source,
+                        "type": "text/markdown",
+                    }
+                ],
+                "steps": [],
+            }
+        ],
+    }
+    result_path = results_dir / f"{payload['uuid']}-result.json"
+    result_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return True
+
+
+def _remove_existing_triage_results(results_dir: Path) -> int:
+    removed = 0
+    for result_path in sorted(results_dir.glob("*-result.json")):
+        try:
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload.get("historyId") != TRIAGE_HISTORY_ID and payload.get("fullName") != TRIAGE_FULL_NAME:
+            continue
+        _unlink_result_attachments(payload, results_dir)
+        try:
+            result_path.unlink()
+            removed += 1
+        except OSError as error:
+            print(f"[Allure Generate] Could not remove old triage result {result_path.name}: {error}")
+    return removed
+
+
+def _unlink_result_attachments(payload: dict[str, Any], results_dir: Path) -> None:
+    for source in _attachment_sources(payload):
+        if not source:
+            continue
+        try:
+            (results_dir / source).unlink(missing_ok=True)
+        except OSError:
+            continue
+
+
+def _attachment_sources(node: dict[str, Any]) -> list[str]:
+    sources = [str(attachment.get("source")) for attachment in node.get("attachments", []) if attachment.get("source")]
+    for step in node.get("steps", []):
+        if isinstance(step, dict):
+            sources.extend(_attachment_sources(step))
+    return sources
+
+
+def _is_deliberate_failure_result(result: dict[str, Any]) -> bool:
+    tags = {
+        str(label.get("value")).lower()
+        for label in result.get("labels", [])
+        if label.get("name") == "tag" and label.get("value")
+    }
+    text = " ".join(str(result.get(key) or "") for key in ("fullName", "name")).lower()
+    return "deliberate_failure" in tags or "deliberate_wrong_locator" in text
+
+
+def _set_expected_failure_labels(result: dict[str, Any]) -> None:
+    labels = [label for label in result.get("labels", []) if label.get("name") not in CONTROLLED_LABEL_NAMES]
+    existing_tags = {label.get("value") for label in labels if label.get("name") == "tag"}
+    labels.extend(
+        [
+            {"name": "parentSuite", "value": "eDOT Evidence"},
+            {"name": "suite", "value": "Evidence"},
+            {"name": "subSuite", "value": "Deliberate Failure"},
+            {"name": "epic", "value": "Evidence"},
+            {"name": "feature", "value": "Failure Evidence"},
+            {"name": "story", "value": "Intentional Wrong Locator"},
+            {"name": "severity", "value": "normal"},
+            {"name": "owner", "value": "qa-automation"},
+        ]
+    )
+    for tag in ("deliberate_failure", "expected_failure", "evidence"):
+        if tag not in existing_tags:
+            labels.append({"name": "tag", "value": tag})
+            existing_tags.add(tag)
+    result["labels"] = labels
+
+
+def _add_parameter_once(result: dict[str, Any], name: str, value: str) -> None:
+    parameters = result.setdefault("parameters", [])
+    if not any(parameter.get("name") == name for parameter in parameters):
+        parameters.append({"name": name, "value": value})
+
+
+def _remove_step_by_name(result: dict[str, Any], name: str) -> None:
+    result["steps"] = [step for step in result.get("steps", []) if step.get("name") != name]
 
 
 def _ensure_step_evidence(result: dict[str, Any], results_dir: Path) -> None:

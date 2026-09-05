@@ -6,7 +6,7 @@ import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
 
 from edot_qa.config import Settings, load_settings
-from edot_qa.reporting.allure_helpers import attach_json, attach_png, attach_text
+from edot_qa.reporting.allure_helpers import attach_json, attach_page_evidence, attach_png, attach_text
 from edot_qa.web.scenarios.login import EsuiteLoginScenario
 from edot_qa.web.session_state import has_storage_state, new_context
 
@@ -101,5 +101,6 @@ def authenticated_page(authenticated_context: BrowserContext, settings: Settings
     page_instance = authenticated_context.new_page()
     page_instance.goto(settings.esuite_base_url)
     page_instance.wait_for_load_state("domcontentloaded")
+    attach_page_evidence("Authenticated eSuite landing", page_instance, screenshot=True)
     yield page_instance
     page_instance.close()

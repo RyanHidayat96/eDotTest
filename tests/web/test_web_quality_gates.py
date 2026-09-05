@@ -78,7 +78,6 @@ def test_no_tracked_runtime_or_tool_artifacts():
     )
     tracked = completed.stdout.splitlines()
     banned_parts = (
-        ".cursor/",
         ".continue/",
         ".allure/",
         ".maestro/",

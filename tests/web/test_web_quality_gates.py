@@ -120,5 +120,5 @@ def _env_template_values() -> dict[str, str]:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        values[key] = value
+        values[key] = value.split("#", 1)[0].strip()
     return values

@@ -4,7 +4,7 @@ import csv
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from edot_qa.reporting.allure_metadata import metadata_for_node
 
@@ -22,6 +22,7 @@ HEADERS = [
     "Assertion Tier",
     "Status",
 ]
+WORKBOOK_HEADERS = [*HEADERS[:-1], "Status (leave blank)"]
 EXPECTED_IDS = [
     "WEB-TC-001",
     "WEB-TC-002",
@@ -149,10 +150,10 @@ def test_manual_cases_do_not_store_secret_values() -> None:
 
 def test_manual_xlsx_matches_csv_headers_row_count_and_metadata() -> None:
     csv_rows = _csv_rows()
-    workbook_rows = _xlsx_rows("xl/worksheets/sheet1.xml")
-    overview_text = "\n".join(value for row in _xlsx_rows("xl/worksheets/sheet2.xml") for value in row)
+    workbook_rows = _xlsx_rows("Test Cases", width=len(WORKBOOK_HEADERS))
+    overview_text = "\n".join(value for row in _xlsx_rows("Overview", width=8) for value in row)
 
-    assert workbook_rows[0] == HEADERS
+    assert workbook_rows[0] == WORKBOOK_HEADERS
     assert len(workbook_rows) == len(csv_rows) + 1
     assert [row[0] for row in workbook_rows[1:]] == EXPECTED_IDS
     assert workbook_rows[1:] == [[row[header] for header in HEADERS] for row in csv_rows]
@@ -161,16 +162,28 @@ def test_manual_xlsx_matches_csv_headers_row_count_and_metadata() -> None:
 
 def test_manual_xlsx_has_professional_navigation_and_readable_multiline_rows() -> None:
     with zipfile.ZipFile(XLSX_PATH) as workbook:
-        test_cases_xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        test_cases_member = _xlsx_sheet_member(workbook, "Test Cases")
+        overview_member = _xlsx_sheet_member(workbook, "Overview")
+        test_cases_xml = workbook.read(test_cases_member).decode("utf-8")
         styles_xml = workbook.read("xl/styles.xml").decode("utf-8")
-        overview_relationships = workbook.read("xl/worksheets/_rels/sheet2.xml.rels").decode("utf-8")
+        overview_relationships = workbook.read(_worksheet_relationships_member(overview_member)).decode(
+            "utf-8"
+        )
+        table_xml = next(
+            workbook.read(member).decode("utf-8")
+            for member in workbook.namelist()
+            if member.startswith("xl/tables/")
+            and 'name="ManualTestCases"' in workbook.read(member).decode("utf-8")
+        )
 
     assert 'showGridLines="0"' in test_cases_xml
-    assert 'state="frozen"' in test_cases_xml
-    assert f'<autoFilter ref="A1:H{len(EXPECTED_IDS) + 1}"/>' in test_cases_xml
+    assert 'state="frozenSplit"' in test_cases_xml
+    assert f'<autoFilter ref="A1:H{len(EXPECTED_IDS) + 1}"' in table_xml
     assert '<dataValidations count="1">' in test_cases_xml
     assert '<rowBreaks count="2" manualBreakCount="2"><brk id="5"' in test_cases_xml
-    assert '<brk id="9" max="16383" man="1"/>' in test_cases_xml
+    assert '<brk id="9"' in test_cases_xml
+    assert 'paperSize="8"' in test_cases_xml
+    assert '<pageSetUpPr fitToPage="1"/>' in test_cases_xml
     assert 'wrapText="1"' in styles_xml
     assert 'Target="https://github.com/RyanHidayat96/TestEdot"' in overview_relationships
 
@@ -208,15 +221,75 @@ def _csv_rows() -> list[dict[str, str]]:
         return list(reader)
 
 
-def _xlsx_rows(member: str) -> list[list[str]]:
+def _xlsx_rows(sheet_name: str, *, width: int) -> list[list[str]]:
     namespace = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
     with zipfile.ZipFile(XLSX_PATH) as workbook:
-        root = ET.fromstring(workbook.read(member))
+        root = ET.fromstring(workbook.read(_xlsx_sheet_member(workbook, sheet_name)))
+        shared_strings = _xlsx_shared_strings(workbook)
 
     rows: list[list[str]] = []
     for row in root.findall(".//main:sheetData/main:row", namespace):
-        values: list[str] = []
+        values = [""] * width
         for cell in row.findall("main:c", namespace):
-            values.append("".join(text.text or "" for text in cell.findall(".//main:t", namespace)))
+            match = re.match(r"([A-Z]+)", cell.attrib["r"])
+            assert match is not None
+            column_index = _column_index(match.group(1))
+            if column_index >= width:
+                continue
+            value_node = cell.find("main:v", namespace)
+            if cell.attrib.get("t") == "s" and value_node is not None:
+                value = shared_strings[int(value_node.text or 0)]
+            elif cell.attrib.get("t") == "inlineStr":
+                value = "".join(text.text or "" for text in cell.findall(".//main:t", namespace))
+            else:
+                value = value_node.text if value_node is not None and value_node.text else ""
+            values[column_index] = value
         rows.append(values)
     return rows
+
+
+def _xlsx_sheet_member(workbook: zipfile.ZipFile, sheet_name: str) -> str:
+    main_namespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    document_relationship_namespace = (
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    )
+    package_relationship_namespace = "http://schemas.openxmlformats.org/package/2006/relationships"
+    workbook_root = ET.fromstring(workbook.read("xl/workbook.xml"))
+    relationships_root = ET.fromstring(workbook.read("xl/_rels/workbook.xml.rels"))
+    relationship_targets = {
+        relationship.attrib["Id"]: relationship.attrib["Target"]
+        for relationship in relationships_root.findall(
+            f"{{{package_relationship_namespace}}}Relationship"
+        )
+    }
+    sheet = next(
+        item
+        for item in workbook_root.findall(f".//{{{main_namespace}}}sheet")
+        if item.attrib["name"] == sheet_name
+    )
+    relationship_id = sheet.attrib[f"{{{document_relationship_namespace}}}id"]
+    return str(PurePosixPath("xl") / relationship_targets[relationship_id])
+
+
+def _xlsx_shared_strings(workbook: zipfile.ZipFile) -> list[str]:
+    member = "xl/sharedStrings.xml"
+    if member not in workbook.namelist():
+        return []
+    namespace = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    root = ET.fromstring(workbook.read(member))
+    return [
+        "".join(text.text or "" for text in item.findall(".//main:t", namespace))
+        for item in root.findall("main:si", namespace)
+    ]
+
+
+def _worksheet_relationships_member(sheet_member: str) -> str:
+    sheet_path = PurePosixPath(sheet_member)
+    return str(sheet_path.parent / "_rels" / f"{sheet_path.name}.rels")
+
+
+def _column_index(column_name: str) -> int:
+    value = 0
+    for character in column_name:
+        value = value * 26 + ord(character) - ord("A") + 1
+    return value - 1

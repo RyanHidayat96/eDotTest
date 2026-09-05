@@ -5,7 +5,7 @@ import re
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, TimeoutError, expect
 
-from edot_qa.reporting.allure_helpers import allure_step, attach_json, attach_text
+from edot_qa.reporting.allure_helpers import allure_step, attach_json
 from edot_qa.web.base_page import BasePage
 from edot_qa.web.pages.company_detail_page import (
     CompanyDetailDataNotLoadedError,
@@ -269,7 +269,6 @@ class CompanyManagePage(BasePage):
         with allure_step("Search company in Manage list", page=self.page, data={"search_text": company_name}):
             result = self._try_fast_search(company_name)
             if not result.get("used"):
-                attach_text("company-manage-search-not-used", result.get("reason", "visible search input not found"))
                 return
             try:
                 self.page.keyboard.press("Enter")

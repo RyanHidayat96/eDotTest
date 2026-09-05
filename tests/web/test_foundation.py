@@ -112,6 +112,7 @@ def test_allure_report_generator_prunes_noisy_step_attachments(tmp_path):
                     {"name": "step-runtime-info", "source": "runtime.json"},
                     {"name": "step-result", "source": "result.json"},
                     {"name": "step-evidence-page", "source": "page.json"},
+                    {"name": "company-manage-search-not-used", "source": "search.txt"},
                     {"name": "step-input", "source": "input.json"},
                 ],
                 "steps": [{"name": "Empty technical step", "status": "passed", "attachments": [], "steps": []}],

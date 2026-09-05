@@ -4,7 +4,7 @@ appId: ${EWORK_APP_ID}
 - tapOn:
     id: ${EWORK_ADD_CUSTOMER_BUTTON_ID}
 - assertVisible: New Customer Registration
-- takeScreenshot: reports/maestro-screenshots/create_customer_basic/01-open-new-customer-registration-expected-basic-customer-form-is-displayed
+- takeScreenshot: 01-open-new-customer-registration-expected-basic-customer-form-is-displayed
 - tapOn:
     id: ${EWORK_CUSTOMER_NAME_FIELD_ID}
 - inputText: ${EWORK_CUSTOMER_NAME}
@@ -24,8 +24,8 @@ appId: ${EWORK_APP_ID}
     id: ${EWORK_CUSTOMER_TYPE_FIELD_ID}
 - tapOn:
     text: ${EWORK_CUSTOMER_TYPE_OPTION_TEXT}
-- takeScreenshot: reports/maestro-screenshots/create_customer_basic/02-enter-basic-customer-information-expected-outlet-contact-channel-and-customer-type-are-filled
+- takeScreenshot: 02-enter-basic-customer-information-expected-outlet-contact-channel-and-customer-type-are-filled
 - tapOn:
     id: ${EWORK_CUSTOMER_BASIC_CONTINUE_BUTTON_ID}
 - assertVisible: Locations
-- takeScreenshot: reports/maestro-screenshots/create_customer_basic/03-continue-to-locations-page-expected-locations-form-is-displayed
+- takeScreenshot: 03-continue-to-locations-page-expected-locations-form-is-displayed

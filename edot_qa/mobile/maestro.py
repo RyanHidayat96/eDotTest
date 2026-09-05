@@ -3,6 +3,8 @@ from __future__ import annotations
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+import re
+from tempfile import TemporaryDirectory
 
 from edot_qa.config import ROOT_DIR
 from edot_qa.mobile.config import MobileSettings
@@ -22,6 +24,8 @@ except ModuleNotFoundError:  # pragma: no cover - depends on optional reporting 
 
 SENSITIVE_MAESTRO_KEYS = {"EWORK_EMAIL", "EWORK_PASSWORD", "EWORK_COMPANY_CODE"}
 MAX_FAILURE_OUTPUT_CHARS = 4_000
+RUN_FLOW_PATTERN = re.compile(r"^\s*-\s*runFlow:\s*(?P<flow>[^#\s]+)")
+TAKE_SCREENSHOT_PATTERN = re.compile(r"^\s*-\s*takeScreenshot:\s*(?P<name>[^#\s]+)")
 
 
 @dataclass(frozen=True)
@@ -47,12 +51,15 @@ class MaestroRunner:
         *,
         include_env_flags: bool = False,
         extra_env: dict[str, str] | None = None,
+        test_output_dir: Path | None = None,
     ) -> list[str]:
         flow_path = self.resolve_flow(flow)
         command = [self.settings.maestro_cli]
         if self.settings.mobile_device_id:
             command.extend(["--device", self.settings.mobile_device_id])
         command.append("test")
+        if test_output_dir is not None:
+            command.extend(["--test-output-dir", str(test_output_dir)])
         if include_env_flags:
             for key, value in self.settings.maestro_variables(extra_env).items():
                 command.extend(["-e", f"{key}={value}"])
@@ -87,52 +94,63 @@ class MaestroRunner:
             raise FileNotFoundError(f"Maestro flow not found: {flow_path}")
 
         self.settings.ensure_runtime_dirs()
-        screenshot_dir = self._prepare_screenshot_dir(flow_path)
         maestro_variables = self.settings.maestro_variables(extra_env)
-        command = self.build_command(flow_path, include_env_flags=True, extra_env=extra_env)
-        redacted_command = redact_command(command, maestro_variables)
-        with allure_step(
-            business_step_title(flow_path.name, step_title=step_title, expected=expected),
-            data={
-                "flow": str(flow_path),
-                "timeout_seconds": timeout_seconds,
-                "device_id": self.settings.mobile_device_id or "<auto>",
-                "extra_env_keys": sorted((extra_env or {}).keys()),
-            },
-            screenshot=False,
-        ):
-            flow_inputs = maestro_flow_inputs(
-                flow_path.name,
-                maestro_variables,
-                reveal_login_secrets=show_dev_inputs_in_reports(),
-            )
+        artifact_root = ROOT_DIR / "artifacts" / "maestro"
+        artifact_root.mkdir(parents=True, exist_ok=True)
 
-            try:
-                completed = subprocess.run(
-                    command,
-                    cwd=ROOT_DIR,
-                    env=self.settings.maestro_environment(extra_env),
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout_seconds,
+        # Maestro writes takeScreenshot files below a per-flow folder inside its
+        # test-output directory. A private directory makes each flow's evidence exact.
+        with TemporaryDirectory(prefix=f"{flow_path.stem}-", dir=artifact_root) as raw_output_dir:
+            test_output_dir = Path(raw_output_dir)
+            command = self.build_command(
+                flow_path,
+                include_env_flags=True,
+                extra_env=extra_env,
+                test_output_dir=test_output_dir,
+            )
+            redacted_command = redact_command(command, maestro_variables)
+            with allure_step(
+                business_step_title(flow_path.name, step_title=step_title, expected=expected),
+                data={
+                    "flow": str(flow_path),
+                    "timeout_seconds": timeout_seconds,
+                    "device_id": self.settings.mobile_device_id or "<auto>",
+                    "extra_env_keys": sorted((extra_env or {}).keys()),
+                },
+                screenshot=False,
+            ):
+                flow_inputs = maestro_flow_inputs(
+                    flow_path.name,
+                    maestro_variables,
+                    reveal_login_secrets=show_dev_inputs_in_reports(),
                 )
-                result = MaestroResult(
-                    flow_path=flow_path,
-                    command=redacted_command,
-                    returncode=completed.returncode,
-                    stdout=redact_sensitive_text(completed.stdout, maestro_variables),
-                    stderr=redact_sensitive_text(completed.stderr, maestro_variables),
-                )
-            except subprocess.TimeoutExpired as error:
-                result = MaestroResult(
-                    flow_path=flow_path,
-                    command=redacted_command,
-                    returncode=124,
-                    stdout=redact_sensitive_text(_timeout_output(error.stdout), maestro_variables),
-                    stderr=f"Maestro flow timed out after {timeout_seconds}s: {flow_path.name}",
-                )
-            self.attach_result(result, screenshot_dir=screenshot_dir, flow_inputs=flow_inputs)
-            return result
+
+                try:
+                    completed = subprocess.run(
+                        command,
+                        cwd=ROOT_DIR,
+                        env=self.settings.maestro_environment(extra_env),
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout_seconds,
+                    )
+                    result = MaestroResult(
+                        flow_path=flow_path,
+                        command=redacted_command,
+                        returncode=completed.returncode,
+                        stdout=redact_sensitive_text(completed.stdout, maestro_variables),
+                        stderr=redact_sensitive_text(completed.stderr, maestro_variables),
+                    )
+                except subprocess.TimeoutExpired as error:
+                    result = MaestroResult(
+                        flow_path=flow_path,
+                        command=redacted_command,
+                        returncode=124,
+                        stdout=redact_sensitive_text(_timeout_output(error.stdout), maestro_variables),
+                        stderr=f"Maestro flow timed out after {timeout_seconds}s: {flow_path.name}",
+                    )
+                self.attach_result(result, screenshot_dir=test_output_dir, flow_inputs=flow_inputs)
+                return result
 
     def attach_result(
         self,
@@ -141,18 +159,22 @@ class MaestroRunner:
         screenshot_dir: Path,
         flow_inputs: dict[str, object] | None = None,
     ) -> None:
-        screenshots_attached = self.attach_flow_screenshots(screenshot_dir, flow_inputs=flow_inputs)
+        screenshots_attached = self.attach_flow_screenshots(
+            screenshot_dir,
+            flow_path=result.flow_path,
+            flow_inputs=flow_inputs,
+        )
 
         if result.passed:
             if not screenshots_attached:
                 if flow_inputs:
-                    attach_json("Inputs", flow_inputs, redact=False)
+                    attach_json("Inputs", _reportable_payload(flow_inputs), redact=False)
                 self.attach_device_screenshot("Screenshot")
             return
 
         if not screenshots_attached:
             if flow_inputs:
-                attach_json("Inputs", flow_inputs, redact=False)
+                attach_json("Inputs", _reportable_payload(flow_inputs), redact=False)
             self.attach_device_screenshot("Failure screenshot")
         attach_json(
             "Failure diagnostics",
@@ -166,8 +188,22 @@ class MaestroRunner:
             redact=False,
         )
 
-    def attach_flow_screenshots(self, screenshot_dir: Path, *, flow_inputs: dict[str, object] | None = None) -> int:
-        screenshots = sorted(screenshot_dir.glob("*.png"))
+    def attach_flow_screenshots(
+        self,
+        screenshot_dir: Path,
+        *,
+        flow_path: Path | None = None,
+        flow_inputs: dict[str, object] | None = None,
+    ) -> int:
+        checkpoint_order = _checkpoint_order(flow_path)
+        screenshots = sorted(
+            (
+                path
+                for path in screenshot_dir.rglob("*.png")
+                if "takeScreenshot" in path.parts
+            ),
+            key=lambda path: _screenshot_sort_key(path, screenshot_dir, checkpoint_order),
+        )
         for screenshot in screenshots:
             try:
                 image = screenshot.read_bytes()
@@ -196,18 +232,6 @@ class MaestroRunner:
         if image:
             attach_png(name, image)
 
-    @staticmethod
-    def _prepare_screenshot_dir(flow_path: Path) -> Path:
-        screenshot_dir = ROOT_DIR / "reports" / "maestro-screenshots" / flow_path.stem
-        screenshot_dir.mkdir(parents=True, exist_ok=True)
-        for screenshot in screenshot_dir.glob("*.png"):
-            try:
-                screenshot.unlink()
-            except OSError:
-                continue
-        return screenshot_dir
-
-
 def assert_maestro_passed(result: MaestroResult) -> MaestroResult:
     if result.passed:
         return result
@@ -223,13 +247,15 @@ def maestro_flow_inputs(
     reveal_login_secrets: bool = True,
 ) -> dict[str, object]:
     if flow_name == "login.yaml":
-        return {
-            "fields": {
-                "Company ID": _login_input_value("EWORK_COMPANY_CODE", variables, reveal_login_secrets),
-                "Username": _login_input_value("EWORK_EMAIL", variables, reveal_login_secrets),
-                "Password": _login_input_value("EWORK_PASSWORD", variables, reveal_login_secrets),
-            }
+        fields = {
+            "Company ID": _login_input_value("EWORK_COMPANY_CODE", variables, reveal_login_secrets),
+            "Username": _login_input_value("EWORK_EMAIL", variables, reveal_login_secrets),
+            "Password": _login_input_value("EWORK_PASSWORD", variables, reveal_login_secrets),
         }
+        return {"fields": fields}
+
+    if flow_name == "create_customer.yaml":
+        return _create_customer_flow_inputs(variables)
 
     if flow_name == "create_customer_basic.yaml":
         return {"fields": _customer_basic_inputs(variables)}
@@ -238,15 +264,19 @@ def maestro_flow_inputs(
         return {"fields": _customer_location_inputs(variables)}
 
     if flow_name == "create_customer_documents.yaml":
-        return {"fields": _customer_document_inputs(variables)}
-
-    if flow_name == "validate_customer_list_card.yaml":
+        fields = _customer_document_inputs(variables)
         return {
-            "expected_card": {
-                "Name": variables.get("EWORK_CUSTOMER_NAME", ""),
-                "Address": variables.get("EWORK_CUSTOMER_CARD_ADDRESS", ""),
-                "Customer Type": variables.get("EWORK_CUSTOMER_TYPE_OPTION_TEXT", ""),
-            }
+            "fields": fields,
+            "_checkpoint_inputs": {
+                "enter-ktp-document-information": _fields_subset(
+                    {"fields": fields},
+                    included={"KTP", "Attachment"},
+                ),
+                "sign-and-submit-customer-registration": _fields_subset(
+                    {"fields": fields},
+                    included={"Signature"},
+                ),
+            },
         }
 
     return {}
@@ -261,54 +291,10 @@ def business_step_title(flow_name: str, *, step_title: str | None = None, expect
 
 FLOW_STEP_TITLES = {
     "login.yaml": "Login to eWork",
+    "create_customer.yaml": "Create eWork customer",
     "create_customer_basic.yaml": "Complete Basic customer page",
     "create_customer_locations.yaml": "Complete Location page",
     "create_customer_documents.yaml": "Complete Documents page",
-    "validate_customer_list_card.yaml": "Verify created customer card",
-}
-
-SCREENSHOT_STEP_TITLES = {
-    "open-ework-app-expected-login-page-is-displayed": "Open eWork app. Expected: Login page is displayed",
-    "enter-ework-login-credentials-expected-company-id-username-and-password-fields-are-filled": (
-        "Enter eWork login credentials. Expected: Company ID, username, and password fields are filled"
-    ),
-    "submit-ework-login-expected-dashboard-is-displayed": "Submit eWork login. Expected: Dashboard is displayed",
-    "open-new-customer-registration-expected-basic-customer-form-is-displayed": (
-        "Open New Customer Registration. Expected: Basic customer form is displayed"
-    ),
-    "enter-basic-customer-information-expected-outlet-contact-channel-and-customer-type-are-filled": (
-        "Enter Basic customer information. Expected: outlet, contact, channel, and customer type are filled"
-    ),
-    "continue-to-locations-page-expected-locations-form-is-displayed": (
-        "Continue to Locations page. Expected: Locations form is displayed"
-    ),
-    "open-locations-page-expected-location-form-is-displayed": (
-        "Open Locations page. Expected: Location form is displayed"
-    ),
-    "enter-customer-location-information-expected-current-location-address-and-location-dropdowns-are-filled": (
-        "Enter customer Location information. Expected: current-location address and location dropdowns are filled"
-    ),
-    "continue-to-documents-page-expected-ktp-document-form-is-displayed": (
-        "Continue to Documents page. Expected: KTP document form is displayed"
-    ),
-    "open-documents-page-expected-ktp-form-is-displayed": (
-        "Open Documents page. Expected: KTP form is displayed"
-    ),
-    "enter-ktp-document-information-expected-ktp-number-is-filled-and-attachment-preview-is-displayed": (
-        "Enter KTP document information. Expected: KTP number is filled and attachment preview is displayed"
-    ),
-    "open-signature-page-expected-signature-canvas-is-displayed": (
-        "Open signature page. Expected: Signature canvas is displayed"
-    ),
-    "sign-and-submit-customer-registration-expected-success-message-is-displayed": (
-        "Sign and submit customer registration. Expected: Success message is displayed"
-    ),
-    "open-new-customer-list-expected-new-customer-list-page-is-displayed": (
-        "Open New Customer List. Expected: New Customer List page is displayed"
-    ),
-    "verify-created-customer-card-expected-name-address-and-customer-type-match-submitted-data": (
-        "Verify created customer card. Expected: name, address, and customer type match submitted data"
-    ),
 }
 
 
@@ -348,6 +334,31 @@ def _customer_document_inputs(variables: dict[str, str]) -> dict[str, str]:
     }
 
 
+def _create_customer_flow_inputs(variables: dict[str, str]) -> dict[str, object]:
+    basic_fields = _customer_basic_inputs(variables)
+    location_fields = _customer_location_inputs(variables)
+    document_fields = _customer_document_inputs(variables)
+    return {
+        "fields": {
+            **basic_fields,
+            **location_fields,
+            **document_fields,
+        },
+        "_checkpoint_inputs": {
+            "enter-basic-customer-information": {"fields": basic_fields},
+            "enter-customer-location-information": {"fields": location_fields},
+            "enter-ktp-document-information": _fields_subset(
+                {"fields": document_fields},
+                included={"KTP", "Attachment"},
+            ),
+            "sign-and-submit-customer-registration": _fields_subset(
+                {"fields": document_fields},
+                included={"Signature"},
+            ),
+        },
+    }
+
+
 def redact_command(command: list[str], variables: dict[str, str] | None = None) -> list[str]:
     return [redact_sensitive_text(value, variables) for value in command]
 
@@ -371,9 +382,7 @@ def _timeout_output(output: str | bytes | None) -> str:
 
 
 def _screenshot_step_title(path: Path) -> str:
-    slug = path.stem.split("-", 1)[-1]
-    if slug in SCREENSHOT_STEP_TITLES:
-        return SCREENSHOT_STEP_TITLES[slug]
+    slug = _checkpoint_slug(path)
     action, separator, expected = slug.partition("-expected-")
     title = _humanize_slug(action)
     if separator:
@@ -381,27 +390,80 @@ def _screenshot_step_title(path: Path) -> str:
     return title
 
 
+def _screenshot_sort_key(path: Path, screenshot_root: Path, checkpoint_order: dict[str, int]) -> tuple[int, str]:
+    slug = _checkpoint_slug(path)
+    return checkpoint_order.get(slug, len(checkpoint_order)), str(path.relative_to(screenshot_root))
+
+
+def _checkpoint_order(flow_path: Path | None) -> dict[str, int]:
+    if flow_path is None or not flow_path.is_file():
+        return {}
+
+    ordered_slugs: list[str] = []
+    _collect_checkpoint_order(flow_path, ordered_slugs, visited=set())
+    return {slug: index for index, slug in enumerate(ordered_slugs)}
+
+
+def _collect_checkpoint_order(flow_path: Path, ordered_slugs: list[str], *, visited: set[Path]) -> None:
+    resolved = flow_path.resolve()
+    if resolved in visited:
+        return
+    visited.add(resolved)
+
+    try:
+        lines = flow_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+
+    for line in lines:
+        run_flow = RUN_FLOW_PATTERN.match(line)
+        if run_flow:
+            child_flow = _resolve_nested_flow(flow_path, run_flow.group("flow"))
+            if child_flow is not None:
+                _collect_checkpoint_order(child_flow, ordered_slugs, visited=visited)
+            continue
+
+        screenshot = TAKE_SCREENSHOT_PATTERN.match(line)
+        if screenshot:
+            ordered_slugs.append(_checkpoint_slug(Path(screenshot.group("name"))))
+
+
+def _resolve_nested_flow(parent_flow: Path, raw_flow: str) -> Path | None:
+    clean_flow = raw_flow.strip().strip("'\"")
+    if not clean_flow or clean_flow.startswith("${"):
+        return None
+
+    flow_path = Path(clean_flow)
+    candidates = [flow_path] if flow_path.is_absolute() else [parent_flow.parent / flow_path, ROOT_DIR / "mobile" / "flows" / flow_path]
+    return next((candidate for candidate in candidates if candidate.is_file()), None)
+
+
 def _inputs_for_screenshot(path: Path, flow_inputs: dict[str, object] | None) -> dict[str, object] | None:
     if not flow_inputs:
         return None
 
-    slug = path.stem.split("-", 1)[-1]
-    if any(
-        marker in slug
-        for marker in (
-            "enter-ework-login-credentials",
-            "enter-basic-customer-information",
-            "enter-customer-location-information",
-            "verify-created-customer-card",
-        )
-    ):
-        return flow_inputs
+    slug = _checkpoint_slug(path)
+    action, _, _ = slug.partition("-expected-")
+    checkpoint_inputs = flow_inputs.get("_checkpoint_inputs")
+    if isinstance(checkpoint_inputs, dict):
+        exact_payload = checkpoint_inputs.get(action)
+        if isinstance(exact_payload, dict):
+            return exact_payload
 
-    if "enter-ktp-document-information" in slug:
-        return _fields_subset(flow_inputs, excluded={"Signature"})
-    if "sign-and-submit-customer-registration" in slug:
-        return _fields_subset(flow_inputs, included={"Signature"})
+    reportable_payload = _reportable_payload(flow_inputs)
+    if action.startswith("enter-") and reportable_payload.get("fields"):
+        return reportable_payload
+    if action.startswith("verify-") and reportable_payload:
+        return reportable_payload
     return None
+
+
+def _checkpoint_slug(path: Path) -> str:
+    return path.stem.split("-", 1)[-1]
+
+
+def _reportable_payload(payload: dict[str, object]) -> dict[str, object]:
+    return {key: value for key, value in payload.items() if not key.startswith("_")}
 
 
 def _fields_subset(
@@ -432,16 +494,18 @@ def _evidence_payload_name(payload: dict[str, object] | None) -> str:
 
 def _humanize_slug(value: str) -> str:
     words = value.replace("-", " ").split()
-    return " ".join(_humanize_word(word) for word in words)
+    return " ".join(_humanize_word(word, index=index) for index, word in enumerate(words))
 
 
-def _humanize_word(word: str) -> str:
+def _humanize_word(word: str, *, index: int) -> str:
     normalized = word.lower()
     if normalized == "ework":
         return "eWork"
-    if normalized in {"id", "ktp"}:
+    if normalized in {"id", "ktp", "url"}:
         return normalized.upper()
-    return normalized.title()
+    if index == 0:
+        return normalized.capitalize()
+    return normalized
 
 
 def _tail(value: str) -> str:

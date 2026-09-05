@@ -1,7 +1,7 @@
 appId: ${EWORK_APP_ID}
 ---
 - assertVisible: Locations
-- takeScreenshot: reports/maestro-screenshots/create_customer_locations/01-open-locations-page-expected-location-form-is-displayed
+- takeScreenshot: 01-open-locations-page-expected-location-form-is-displayed
 - tapOn:
     id: ${EWORK_CUSTOMER_ADDRESS_TYPE_FIELD_ID}
 - tapOn:
@@ -65,9 +65,9 @@ appId: ${EWORK_APP_ID}
       - tapOn:
           text: ${EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT}
 - assertVisible: ${EWORK_CUSTOMER_POSTAL_CODE_OPTION_TEXT}
-- takeScreenshot: reports/maestro-screenshots/create_customer_locations/02-enter-customer-location-information-expected-current-location-address-and-location-dropdowns-are-filled
+- takeScreenshot: 02-enter-customer-location-information-expected-current-location-address-and-location-dropdowns-are-filled
 - tapOn:
     text: Continue
     optional: true
 - assertVisible: KTP *
-- takeScreenshot: reports/maestro-screenshots/create_customer_locations/03-continue-to-documents-page-expected-ktp-document-form-is-displayed
+- takeScreenshot: 03-continue-to-documents-page-expected-ktp-document-form-is-displayed

@@ -65,11 +65,11 @@ MOBILE_SCREENSHOT_RENAMES = {
     "maestro-device-screenshot": "Screenshot",
 }
 STEP_NAME_RENAMES = {
+    "Run Maestro flow: create_customer.yaml": "Create eWork customer",
     "Run Maestro flow: login.yaml": "Login to eWork",
     "Run Maestro flow: create_customer_basic.yaml": "Complete Basic customer page",
     "Run Maestro flow: create_customer_locations.yaml": "Complete Location page",
     "Run Maestro flow: create_customer_documents.yaml": "Complete Documents page",
-    "Run Maestro flow: validate_customer_list_card.yaml": "Verify created customer card",
 }
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(line_buffering=True)

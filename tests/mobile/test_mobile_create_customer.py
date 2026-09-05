@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 
 from edot_qa.ai.test_data import GeneratedTestData
+from edot_qa.mobile.config import MobileSettings
 from edot_qa.mobile.customer import MobileCustomerData
 from edot_qa.mobile.customer_list import (
     CUSTOMER_CARD_ADDRESS_ID,
@@ -12,7 +16,9 @@ from edot_qa.mobile.customer_list import (
     customer_card_address_from_maestro_stdout,
     customer_card_values_visible,
 )
-from edot_qa.mobile.scenarios.create_customer import MobileCreateCustomerScenario
+from edot_qa.mobile.device import MobileDevice
+from edot_qa.mobile.maestro import MaestroResult
+from edot_qa.mobile.scenarios import create_customer as create_customer_scenario
 
 
 pytestmark = pytest.mark.mobile
@@ -144,6 +150,17 @@ def test_customer_card_address_marker_reads_latest_maestro_log(tmp_path):
     assert customer_card_address_from_maestro_logs(tmp_path) == "Jl. Musyawarah No.3A"
 
 
+def test_customer_card_address_marker_reads_latest_root_maestro_log(tmp_path):
+    log_path = tmp_path / "2026-09-05_172500" / "maestro.log"
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text(
+        "JsConsole: __EWORK_CUSTOMER_CARD_ADDRESS__=Jl. Root Log Address\n",
+        encoding="utf-8",
+    )
+
+    assert customer_card_address_from_maestro_logs(tmp_path) == "Jl. Root Log Address"
+
+
 def test_customer_card_address_marker_missing_fails_clearly():
     with pytest.raises(AssertionError, match="address marker not found"):
         customer_card_address_from_maestro_stdout("noise only")
@@ -170,10 +187,64 @@ def test_customer_card_visibility_requires_name_address_and_type():
     )
 
 
+def test_mobile_create_customer_uses_one_maestro_run_before_adb_card_validation(monkeypatch):
+    customer = MobileCustomerData(
+        name="Budi QA",
+        contact="+6281299900111",
+        contact_person="Raka QA PIC 123456",
+        address="Jl. Generated From AI",
+        ktp_number="3175070101909999",
+        run_id="mobile-customer-one-run",
+        source="faker_fallback:unit",
+    )
+    settings = MobileSettings(
+        maestro_cli="maestro",
+        adb_command="adb",
+        mobile_device_id="device-1",
+        mobile_flow_timeout_seconds=300,
+        edot_live=True,
+        prefer_company_handoff=False,
+        ework_app_id="id.edot.ework",
+        ework_email=None,
+        ework_password=None,
+        ework_company_code=None,
+    )
+    flow_calls = []
+    validation_calls = []
+
+    def run_flow(flow, **kwargs):
+        flow_calls.append((flow, kwargs))
+        return MaestroResult(
+            flow_path=Path(str(flow)),
+            command=["maestro", "test", str(flow)],
+            returncode=0,
+            stdout="__EWORK_CUSTOMER_CARD_ADDRESS__=Jl. Saved From Location",
+            stderr="",
+        )
+
+    monkeypatch.setattr(create_customer_scenario, "generate_mobile_customer_data", lambda: customer)
+    monkeypatch.setattr(
+        create_customer_scenario,
+        "require_customer_runtime",
+        lambda _settings: SimpleNamespace(device=MobileDevice(serial="device-1", status="device")),
+    )
+    monkeypatch.setattr(create_customer_scenario, "start_app_from_stored_session", lambda _context: None)
+    monkeypatch.setattr(
+        create_customer_scenario,
+        "find_created_customer_card",
+        lambda *args, **kwargs: validation_calls.append((args, kwargs)),
+    )
+
+    create_customer_scenario.MobileCreateCustomerScenario(settings, run_flow).run()
+
+    assert [flow for flow, _kwargs in flow_calls] == ["create_customer.yaml"]
+    assert validation_calls[0][1]["customer_card_address"] == "Jl. Saved From Location"
+
+
 @pytest.mark.requires_credentials
 @pytest.mark.requires_device
 @pytest.mark.requires_maestro
 @pytest.mark.requires_mobile_app
 def test_ework_create_customer_appears_with_correct_data(mobile_settings, run_maestro_flow, run_mobile_scenario):
-    scenario = MobileCreateCustomerScenario(mobile_settings, run_maestro_flow)
+    scenario = create_customer_scenario.MobileCreateCustomerScenario(mobile_settings, run_maestro_flow)
     run_mobile_scenario(scenario.run)

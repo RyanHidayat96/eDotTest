@@ -173,6 +173,57 @@ def test_allure_generator_keeps_mobile_report_lean(tmp_path: Path) -> None:
     assert [step["name"] for step in payload["steps"]] == ["Complete Basic customer page"]
 
 
+def test_allure_generator_keeps_mobile_checkpoint_steps_and_input_evidence(tmp_path: Path) -> None:
+    results_dir = tmp_path / "results"
+    results_dir.mkdir()
+    result_path = results_dir / "mobile-checkpoint-result.json"
+    result_path.write_text(
+        json.dumps(
+            {
+                "name": "test_ework_create_customer_appears_with_correct_data",
+                "fullName": "tests.mobile.test_mobile_create_customer#test_ework_create_customer_appears_with_correct_data",
+                "status": "passed",
+                "steps": [
+                    {
+                        "name": "Complete sample mobile flow",
+                        "status": "passed",
+                        "attachments": [],
+                        "steps": [
+                            {
+                                "name": "Open sample page. Expected: Ready state is displayed",
+                                "status": "passed",
+                                "attachments": [{"name": "Screenshot", "source": "open.png", "type": "image/png"}],
+                                "steps": [],
+                            },
+                            {
+                                "name": "Enter sample data. Expected: Form fields are filled",
+                                "status": "passed",
+                                "attachments": [
+                                    {"name": "Inputs", "source": "inputs.json", "type": "application/json"},
+                                    {"name": "Screenshot", "source": "filled.png", "type": "image/png"},
+                                ],
+                                "steps": [],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _postprocess_results(results_dir)
+
+    payload = json.loads(result_path.read_text(encoding="utf-8"))
+    checkpoints = payload["steps"][0]["steps"]
+    assert [step["name"] for step in checkpoints] == [
+        "Open sample page. Expected: Ready state is displayed",
+        "Enter sample data. Expected: Form fields are filled",
+    ]
+    assert [attachment["name"] for attachment in checkpoints[0]["attachments"]] == ["Screenshot"]
+    assert [attachment["name"] for attachment in checkpoints[1]["attachments"]] == ["Inputs", "Screenshot"]
+
+
 def test_allure_generator_removes_support_only_results_from_main_report(tmp_path: Path) -> None:
     results_dir = tmp_path / "results"
     results_dir.mkdir()
@@ -286,13 +337,13 @@ def test_allure_generator_deduplicates_same_test_when_history_id_is_missing(tmp_
 def test_allure_generator_deduplicates_only_same_test_identity(tmp_path: Path) -> None:
     results_dir = tmp_path / "results"
     results_dir.mkdir()
-    web_login = results_dir / "web-login-result.json"
-    mobile_login = results_dir / "mobile-login-result.json"
-    web_login.write_text(
+    web_result = results_dir / "web-company-result.json"
+    mobile_result = results_dir / "mobile-customer-result.json"
+    web_result.write_text(
         json.dumps(
             {
-                "name": "test_esuite_login_shows_dashboard_greeting",
-                "fullName": "tests.web.test_login#test_esuite_login_shows_dashboard_greeting",
+                "name": "test_create_company_three_step_wizard_with_ai_data",
+                "fullName": "tests.web.test_create_company#test_create_company_three_step_wizard_with_ai_data",
                 "status": "passed",
                 "start": 100,
                 "stop": 200,
@@ -300,11 +351,11 @@ def test_allure_generator_deduplicates_only_same_test_identity(tmp_path: Path) -
         ),
         encoding="utf-8",
     )
-    mobile_login.write_text(
+    mobile_result.write_text(
         json.dumps(
             {
-                "name": "test_ework_login_displays_dashboard",
-                "fullName": "tests.mobile.test_mobile_login#test_ework_login_displays_dashboard",
+                "name": "test_ework_create_customer_appears_with_correct_data",
+                "fullName": "tests.mobile.test_mobile_create_customer#test_ework_create_customer_appears_with_correct_data",
                 "status": "passed",
                 "start": 300,
                 "stop": 400,
@@ -315,8 +366,8 @@ def test_allure_generator_deduplicates_only_same_test_identity(tmp_path: Path) -
 
     assert _deduplicate_latest_results(results_dir) == 0
 
-    assert web_login.exists()
-    assert mobile_login.exists()
+    assert web_result.exists()
+    assert mobile_result.exists()
 
 
 def test_allure_generator_keeps_different_parameterized_runs(tmp_path: Path) -> None:

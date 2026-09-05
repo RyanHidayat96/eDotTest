@@ -11,10 +11,10 @@ appId: ${EWORK_APP_ID}
     visible:
       text: ${EWORK_LOGIN_SCREEN_TEXT}
     timeout: 30000
-- takeScreenshot: reports/maestro-screenshots/login/01-open-ework-app-expected-login-page-is-displayed
+- takeScreenshot: 01-open-ework-app-expected-login-page-is-displayed
 - runFlow: common/login.yaml
-- takeScreenshot: reports/maestro-screenshots/login/02-enter-ework-login-credentials-expected-company-id-username-and-password-fields-are-filled
+- takeScreenshot: 02-enter-ework-login-credentials-expected-company-id-username-and-password-fields-are-filled
 - tapOn:
     id: ${EWORK_LOGIN_BUTTON_ID}
 - assertVisible: ${EWORK_DASHBOARD_TEXT}
-- takeScreenshot: reports/maestro-screenshots/login/03-submit-ework-login-expected-dashboard-is-displayed
+- takeScreenshot: 03-submit-ework-login-expected-dashboard-is-displayed

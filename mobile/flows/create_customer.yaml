@@ -1,0 +1,5 @@
+appId: ${EWORK_APP_ID}
+---
+- runFlow: common/create_customer_basic.yaml
+- runFlow: common/create_customer_locations.yaml
+- runFlow: common/create_customer_documents.yaml

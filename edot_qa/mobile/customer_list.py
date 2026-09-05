@@ -52,8 +52,6 @@ def customer_card_address_from_maestro_logs(log_root: Path) -> str | None:
         return None
     log_paths = sorted(log_root.rglob("maestro.log"), key=lambda path: path.stat().st_mtime, reverse=True)
     for log_path in log_paths[:20]:
-        if "create_customer" not in str(log_path):
-            continue
         value = customer_card_address_from_maestro_text(log_path.read_text(encoding="utf-8", errors="replace"))
         if value:
             return value
@@ -104,6 +102,15 @@ def find_created_customer_card(
         },
         screenshot=False,
     ):
+        attach_json(
+            "Expected card",
+            {
+                "Name": customer.name,
+                "Address": customer_card_address,
+                "Customer Type": CUSTOMER_CARD_TYPE_TEXT,
+            },
+            redact=False,
+        )
         expected_card_texts = [
             customer.name,
             customer_card_address,

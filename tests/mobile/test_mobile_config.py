@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 from edot_qa.mobile import config as mobile_config
@@ -23,7 +24,6 @@ DYNAMIC_FLOW_VARIABLES = {
     "EWORK_CUSTOMER_CONTACT",
     "EWORK_CUSTOMER_CONTACT_PERSON",
     "EWORK_CUSTOMER_KTP_NUMBER",
-    "EWORK_CUSTOMER_CARD_ADDRESS",
 }
 
 
@@ -37,7 +37,10 @@ def test_versioned_ui_profile_matches_maestro_flow_contract():
 
 def test_mobile_flow_screenshots_are_grouped_by_page():
     flow_root = ROOT_DIR / "mobile" / "flows"
-    flow_files = {str(path.relative_to(flow_root)).replace("\\", "/") for path in flow_root.rglob("*.yaml")}
+    flow_files = {
+        str(path.relative_to(flow_root)).replace("\\", "/")
+        for path in flow_root.rglob("*.yaml")
+    }
     screenshots = {
         str(path.relative_to(flow_root)).replace("\\", "/"): SCREENSHOT_PATTERN.findall(
             path.read_text(encoding="utf-8")
@@ -46,40 +49,29 @@ def test_mobile_flow_screenshots_are_grouped_by_page():
     }
 
     assert flow_files == {
+        "create_customer.yaml",
         "login.yaml",
-        "validate_customer_list_card.yaml",
         "common/create_customer_basic.yaml",
         "common/create_customer_documents.yaml",
         "common/create_customer_locations.yaml",
         "common/login.yaml",
         "common/open_customer_list.yaml",
     }
-    assert screenshots["login.yaml"] == [
-        "reports/maestro-screenshots/login/01-open-ework-app-expected-login-page-is-displayed",
-        "reports/maestro-screenshots/login/02-enter-ework-login-credentials-expected-company-id-username-and-password-fields-are-filled",
-        "reports/maestro-screenshots/login/03-submit-ework-login-expected-dashboard-is-displayed",
-    ]
-    assert screenshots["common/login.yaml"] == []
-    assert screenshots["common/create_customer_basic.yaml"] == [
-        "reports/maestro-screenshots/create_customer_basic/01-open-new-customer-registration-expected-basic-customer-form-is-displayed",
-        "reports/maestro-screenshots/create_customer_basic/02-enter-basic-customer-information-expected-outlet-contact-channel-and-customer-type-are-filled",
-        "reports/maestro-screenshots/create_customer_basic/03-continue-to-locations-page-expected-locations-form-is-displayed",
-    ]
-    assert screenshots["common/create_customer_locations.yaml"] == [
-        "reports/maestro-screenshots/create_customer_locations/01-open-locations-page-expected-location-form-is-displayed",
-        "reports/maestro-screenshots/create_customer_locations/02-enter-customer-location-information-expected-current-location-address-and-location-dropdowns-are-filled",
-        "reports/maestro-screenshots/create_customer_locations/03-continue-to-documents-page-expected-ktp-document-form-is-displayed",
-    ]
-    assert screenshots["common/create_customer_documents.yaml"] == [
-        "reports/maestro-screenshots/create_customer_documents/01-open-documents-page-expected-ktp-form-is-displayed",
-        "reports/maestro-screenshots/create_customer_documents/02-enter-ktp-document-information-expected-ktp-number-is-filled-and-attachment-preview-is-displayed",
-        "reports/maestro-screenshots/create_customer_documents/03-open-signature-page-expected-signature-canvas-is-displayed",
-        "reports/maestro-screenshots/create_customer_documents/04-sign-and-submit-customer-registration-expected-success-message-is-displayed",
-        "reports/maestro-screenshots/create_customer_documents/05-open-new-customer-list-expected-new-customer-list-page-is-displayed",
-    ]
-    assert screenshots["validate_customer_list_card.yaml"] == [
-        "reports/maestro-screenshots/validate_customer_list_card/01-verify-created-customer-card-expected-name-address-and-customer-type-match-submitted-data",
-    ]
+    assert {flow: len(names) for flow, names in screenshots.items()} == {
+        "create_customer.yaml": 0,
+        "login.yaml": 3,
+        "common/create_customer_basic.yaml": 3,
+        "common/create_customer_documents.yaml": 5,
+        "common/create_customer_locations.yaml": 3,
+        "common/login.yaml": 0,
+        "common/open_customer_list.yaml": 1,
+    }
+    for checkpoint_names in screenshots.values():
+        for checkpoint_name in checkpoint_names:
+            assert re.fullmatch(
+                r"\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*-expected-[a-z0-9]+(?:-[a-z0-9]+)*",
+                checkpoint_name,
+            )
     assert "outlet-name-entered" not in str(screenshots)
     assert "province-selected" not in str(screenshots)
 
@@ -155,10 +147,56 @@ def test_customer_runtime_launches_ework_before_customer_flow(monkeypatch):
     ]
 
 
+def test_maestro_command_writes_checkpoint_artifacts_to_its_test_output_dir(tmp_path):
+    output_dir = tmp_path / "maestro-output"
+    command = MaestroRunner(_mobile_settings()).build_command(
+        "create_customer.yaml",
+        test_output_dir=output_dir,
+    )
+
+    assert command[:4] == ["maestro", "test", "--test-output-dir", str(output_dir)]
+    assert Path(command[-1]).name == "create_customer.yaml"
+
+
+def test_maestro_runner_collects_checkpoint_screenshots_from_test_output(monkeypatch, tmp_path):
+    attached_png: list[str] = []
+    flow_path = tmp_path / "generic_customer_flow.yaml"
+    flow_path.write_text("appId: id.edot.ework\n", encoding="utf-8")
+    checkpoint_names = [
+        "01-open-sample-page-expected-ready-state-is-displayed.png",
+        "02-enter-sample-data-expected-form-fields-are-filled.png",
+        "03-submit-sample-form-expected-confirmation-is-displayed.png",
+    ]
+
+    def fake_run(command, **kwargs):
+        output_index = command.index("--test-output-dir") + 1
+        screenshot_dir = Path(command[output_index]) / "generic_customer_flow" / "takeScreenshot"
+        screenshot_dir.mkdir(parents=True)
+        for checkpoint in checkpoint_names:
+            (screenshot_dir / checkpoint).write_bytes(b"png")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(mobile_maestro, "allure", None)
+    monkeypatch.setattr(mobile_maestro, "command_available", lambda command: True)
+    monkeypatch.setattr(mobile_maestro.subprocess, "run", fake_run)
+    monkeypatch.setattr(mobile_maestro, "attach_png", lambda name, image: attached_png.append(name))
+
+    result = MaestroRunner(_mobile_settings()).run_flow(flow_path)
+
+    assert result.passed
+    assert attached_png == [
+        "Screenshot - Open sample page. Expected: Ready state is displayed",
+        "Screenshot - Enter sample data. Expected: Form fields are filled",
+        "Screenshot - Submit sample form. Expected: Confirmation is displayed",
+    ]
+
+
 def test_passed_maestro_result_attaches_only_screenshots(monkeypatch, tmp_path):
     attached_json: list[str] = []
     attached_png: list[str] = []
-    screenshot = tmp_path / "01-open-ework-app-expected-login-page-is-displayed.png"
+    screenshot_dir = tmp_path / "generic_flow" / "takeScreenshot"
+    screenshot_dir.mkdir(parents=True)
+    screenshot = screenshot_dir / "01-open-sample-page-expected-ready-state-is-displayed.png"
     screenshot.write_bytes(b"png")
     monkeypatch.setattr(mobile_maestro, "allure", None)
     monkeypatch.setattr(mobile_maestro, "attach_json", lambda name, payload, **kwargs: attached_json.append(name))
@@ -166,23 +204,25 @@ def test_passed_maestro_result_attaches_only_screenshots(monkeypatch, tmp_path):
 
     runner = MaestroRunner(_mobile_settings())
     result = MaestroResult(
-        flow_path=Path("login.yaml"),
-        command=["maestro", "test", "login.yaml"],
+        flow_path=Path("generic_flow.yaml"),
+        command=["maestro", "test", "generic_flow.yaml"],
         returncode=0,
         stdout="debug output",
         stderr="",
     )
 
-    runner.attach_result(result, screenshot_dir=tmp_path, flow_inputs={})
+    runner.attach_result(result, screenshot_dir=screenshot_dir, flow_inputs={})
 
     assert attached_json == []
-    assert attached_png == ["Screenshot - Open eWork app. Expected: Login page is displayed"]
+    assert attached_png == ["Screenshot - Open sample page. Expected: Ready state is displayed"]
 
 
 def test_maestro_result_attaches_inputs_to_matching_screenshot_step(monkeypatch, tmp_path):
     attached_json: list[tuple[str, object]] = []
     attached_png: list[str] = []
-    screenshot = tmp_path / "02-enter-ework-login-credentials-expected-company-id-username-and-password-fields-are-filled.png"
+    screenshot_dir = tmp_path / "generic_flow" / "takeScreenshot"
+    screenshot_dir.mkdir(parents=True)
+    screenshot = screenshot_dir / "02-enter-customer-contact-details-expected-fields-are-filled.png"
     screenshot.write_bytes(b"png")
     monkeypatch.setattr(mobile_maestro, "allure", None)
     monkeypatch.setattr(
@@ -194,18 +234,58 @@ def test_maestro_result_attaches_inputs_to_matching_screenshot_step(monkeypatch,
 
     runner = MaestroRunner(_mobile_settings())
     result = MaestroResult(
-        flow_path=Path("login.yaml"),
-        command=["maestro", "test", "login.yaml"],
+        flow_path=Path("generic_flow.yaml"),
+        command=["maestro", "test", "generic_flow.yaml"],
         returncode=0,
         stdout="",
         stderr="",
     )
-    flow_inputs = {"fields": {"Username": "qa.user", "Password": "it.QA2025"}}
+    flow_inputs = {"fields": {"Contact Person": "Budi QA", "Contact": "081234567890"}}
 
     runner.attach_result(result, screenshot_dir=tmp_path, flow_inputs=flow_inputs)
 
-    expected_step = "Enter eWork login credentials. Expected: Company ID, username, and password fields are filled"
+    expected_step = "Enter customer contact details. Expected: Fields are filled"
     assert attached_json == [(f"Inputs - {expected_step}", flow_inputs)]
+    assert attached_png == [f"Screenshot - {expected_step}"]
+
+
+def test_maestro_result_uses_checkpoint_specific_input_payload(monkeypatch, tmp_path):
+    attached_json: list[tuple[str, object]] = []
+    attached_png: list[str] = []
+    screenshot_dir = tmp_path / "create_customer_documents" / "takeScreenshot"
+    screenshot_dir.mkdir(parents=True)
+    screenshot = screenshot_dir / "04-sign-and-submit-customer-registration-expected-success-message-is-displayed.png"
+    screenshot.write_bytes(b"png")
+    monkeypatch.setattr(mobile_maestro, "allure", None)
+    monkeypatch.setattr(
+        mobile_maestro,
+        "attach_json",
+        lambda name, payload, **kwargs: attached_json.append((name, payload)),
+    )
+    monkeypatch.setattr(mobile_maestro, "attach_png", lambda name, image: attached_png.append(name))
+
+    runner = MaestroRunner(_mobile_settings())
+    result = MaestroResult(
+        flow_path=Path("create_customer_documents.yaml"),
+        command=["maestro", "test", "create_customer_documents.yaml"],
+        returncode=0,
+        stdout="",
+        stderr="",
+    )
+    signature_payload = {"fields": {"Signature": "drawn"}}
+    flow_inputs = {
+        "fields": {
+            "KTP": "3175070101909999",
+            "Attachment": "camera capture",
+            "Signature": "drawn",
+        },
+        "_checkpoint_inputs": {"sign-and-submit-customer-registration": signature_payload},
+    }
+
+    runner.attach_result(result, screenshot_dir=tmp_path, flow_inputs=flow_inputs)
+
+    expected_step = "Sign and submit customer registration. Expected: Success message is displayed"
+    assert attached_json == [(f"Inputs - {expected_step}", signature_payload)]
     assert attached_png == [f"Screenshot - {expected_step}"]
 
 
@@ -219,8 +299,8 @@ def test_failed_maestro_result_keeps_single_diagnostic_attachment(monkeypatch, t
 
     runner = MaestroRunner(_mobile_settings())
     result = MaestroResult(
-        flow_path=Path("login.yaml"),
-        command=["maestro", "test", "login.yaml"],
+        flow_path=Path("generic_flow.yaml"),
+        command=["maestro", "test", "generic_flow.yaml"],
         returncode=1,
         stdout="debug output",
         stderr="wrong locator",
